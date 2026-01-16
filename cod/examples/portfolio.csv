@@ -1,0 +1,6 @@
+instrument_type,position_id,option_type,style,quantity,notional,underlying_symbol,underlying_price,strike,volatility,maturity_date,valuation_date,risk_free_rate,dividend_yield,currency,liquidity_haircut,model,fixed_rate,float_rate,day_count
+option,call_eu,call,european,10,1,MOEX,100,95,0.2,2025-12-31,2025-01-01,0.06,0.01,RUB,0.1,black_scholes,,,
+option,put_us,put,american,-5,1,MOEX,100,105,0.25,2025-09-30,2025-01-01,0.05,0.00,RUB,0.2,binomial,,,
+option,call_mc,call,european,8,1,FXUSD,75,80,0.3,2025-07-15,2025-01-01,0.04,0.00,USD,0.05,mc,,,
+forward,fwd_fx,call,european,3,100000,USDRUB,92,90,0.01,2025-06-30,2025-01-01,0.045,0.00,RUB,0.0,,,
+swap_ir,irs_pay_fixed,call,european,2,1000000,RUBIRS,1,0.05,0.001,2025-09-30,2025-01-01,0.05,0.00,RUB,0.0,,0.05,0.06,0.5
