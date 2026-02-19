@@ -17,30 +17,38 @@ const order: WorkflowStep[] = [
 export default function WorkflowStepper() {
   const { state } = useWorkflow();
   const nav = useNavigate();
-  const steps = useMemo(() => order.map((s) => ({
-    step: s,
-    label: stepShortLabel[s],
-    status: state.completedSteps.includes(s) ? "done" : isStepAvailable(state, s) ? "active" : "locked",
-  })), [state]);
+  const steps = useMemo(
+    () =>
+      order.map((s) => ({
+        step: s,
+        label: stepShortLabel[s],
+        status: state.completedSteps.includes(s) ? "done" : isStepAvailable(state, s) ? "active" : "locked",
+      })),
+    [state]
+  );
+
   return (
-    <div className="stepper">
-      {steps.map((s, idx) => (
-        <button
-          key={s.step}
-          type="button"
-          className={`step ${s.status}`}
-          disabled={s.status === "locked"}
-          title={s.status === "locked" ? "Сначала завершите предыдущие шаги" : "Открыть шаг"}
-          onClick={() => nav(stepToRoute[s.step])}
-          style={{ textAlign: "left" }}
-        >
-          <div className="stepRow">
-            <div className="stepIndex">{idx + 1}</div>
-            <div className="stepTitle">{s.label}</div>
+    <div className="workflowChainWrap" aria-label="Прогресс выполнения шагов">
+      <div className="workflowChain">
+        {steps.map((s, idx) => (
+          <div key={s.step} className="workflowChainItem">
+            <button
+              type="button"
+              className={`workflowNode ${s.status}`}
+              disabled={s.status === "locked"}
+              title={s.status === "locked" ? "Сначала завершите предыдущие шаги" : "Открыть шаг"}
+              onClick={() => nav(stepToRoute[s.step])}
+            >
+              <div className="workflowNodeCircle">{s.status === "done" ? "OK" : idx + 1}</div>
+              <div className="workflowNodeLabel">{s.label}</div>
+              <div className="workflowNodeState">{s.status === "done" ? "Готово" : s.status === "active" ? "Сейчас" : "Недоступно"}</div>
+            </button>
+            {idx < steps.length - 1 && (
+              <div className={`workflowConnector workflowConnector--${s.status}`} aria-hidden="true" />
+            )}
           </div>
-          <div className="stepDesc">{s.status === "done" ? "Готово" : s.status === "active" ? "Сейчас" : "Недоступно"}</div>
-        </button>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
