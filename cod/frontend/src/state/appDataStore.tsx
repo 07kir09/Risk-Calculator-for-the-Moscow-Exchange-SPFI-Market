@@ -38,6 +38,65 @@ type Action =
   | { type: "RESET_ALL" };
 
 const STORAGE_KEY = "app_data_v1";
+const MAX_VALIDATION_LOG_ENTRIES = 800;
+const MAX_SCENARIOS_FOR_STORAGE = 3000;
+const MAX_PNL_DISTRIBUTION_POINTS = 1500;
+const MAX_STRESS_ROWS = 400;
+const MAX_LC_BREAKDOWN_ROWS = 400;
+const MAX_CONTRIBUTORS_PER_METRIC = 40;
+
+function tail<T>(items: T[] | undefined | null, limit: number): T[] {
+  if (!items || items.length <= limit) return items ?? [];
+  return items.slice(items.length - limit);
+}
+
+function head<T>(items: T[] | undefined | null, limit: number): T[] {
+  if (!items || items.length <= limit) return items ?? [];
+  return items.slice(0, limit);
+}
+
+function sanitizeMetricsForStorage(metrics: MetricsResponse | null): MetricsResponse | null {
+  if (!metrics) return null;
+
+  const topContributors = metrics.top_contributors
+    ? Object.fromEntries(
+        Object.entries(metrics.top_contributors).map(([metric, rows]) => [metric, head(rows, MAX_CONTRIBUTORS_PER_METRIC)])
+      )
+    : metrics.top_contributors;
+
+  return {
+    ...metrics,
+    // Самые тяжёлые поля не сохраняем целиком, чтобы не переполнять localStorage.
+    pnl_matrix: undefined,
+    correlations: undefined,
+    pnl_distribution: head(metrics.pnl_distribution, MAX_PNL_DISTRIBUTION_POINTS),
+    stress: head(metrics.stress, MAX_STRESS_ROWS),
+    lc_var_breakdown: head(metrics.lc_var_breakdown, MAX_LC_BREAKDOWN_ROWS),
+    top_contributors: topContributors,
+  };
+}
+
+function buildStorageSnapshot(state: AppDataState): AppDataState {
+  return {
+    ...state,
+    validationLog: tail(state.validationLog, MAX_VALIDATION_LOG_ENTRIES),
+    scenarios: head(state.scenarios, MAX_SCENARIOS_FOR_STORAGE),
+    results: {
+      ...state.results,
+      metrics: sanitizeMetricsForStorage(state.results.metrics),
+    },
+  };
+}
+
+function buildFallbackStorageSnapshot(state: AppDataState): AppDataState {
+  return {
+    ...state,
+    validationLog: [],
+    scenarios: [],
+    limits: null,
+    results: { metrics: null, computedAt: state.results.computedAt },
+  };
+}
 
 function reducer(state: AppDataState, action: Action): AppDataState {
   switch (action.type) {
@@ -83,7 +142,23 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const snapshot = buildStorageSnapshot(state);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+    } catch (error) {
+      console.warn("AppDataProvider: localStorage quota exceeded, saving minimal snapshot", error);
+      const fallbackSnapshot = buildFallbackStorageSnapshot(snapshot);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(fallbackSnapshot));
+      } catch (fallbackError) {
+        console.warn("AppDataProvider: unable to persist fallback snapshot, clearing saved state", fallbackError);
+        try {
+          localStorage.removeItem(STORAGE_KEY);
+        } catch {
+          // No-op.
+        }
+      }
+    }
   }, [state]);
 
   const value = useMemo(() => ({ state, dispatch }), [state]);
@@ -95,4 +170,3 @@ export function useAppData() {
   if (!ctx) throw new Error("useAppData must be used within AppDataProvider");
   return ctx;
 }
-

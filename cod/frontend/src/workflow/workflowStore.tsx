@@ -84,11 +84,20 @@ const WorkflowContext = createContext<{ state: WorkflowState; dispatch: React.Di
 export function WorkflowProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialWorkflowState, (init) => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? { ...init, ...JSON.parse(saved) } : init;
+    if (!saved) return init;
+    try {
+      return { ...init, ...JSON.parse(saved) };
+    } catch {
+      return init;
+    }
   });
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (error) {
+      console.warn("WorkflowProvider: localStorage quota exceeded, skipping workflow persistence", error);
+    }
   }, [state]);
 
   return <WorkflowContext.Provider value={{ state, dispatch }}>{children}</WorkflowContext.Provider>;
