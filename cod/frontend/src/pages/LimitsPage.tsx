@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 import Card from "../ui/Card";
+import StatePanel from "../ui/StatePanel";
 import { useAppData } from "../state/appDataStore";
 import { useWorkflow } from "../workflow/workflowStore";
 import { WorkflowStep } from "../workflow/workflowTypes";
@@ -33,10 +34,12 @@ export default function LimitsPage() {
       </div>
 
       {!m ? (
-        <Card>
-          <div className="badge warn">Нет результатов. Сначала запустите расчёт.</div>
-          <Button onClick={() => nav("/run")}>Перейти к запуску</Button>
-        </Card>
+        <StatePanel
+          tone="warning"
+          title="Лимиты пока недоступны"
+          description="Сначала выполните расчёт портфеля. После этого появится сравнение fact vs limit."
+          action={<Button onClick={() => nav("/run")}>Перейти к запуску</Button>}
+        />
       ) : (
         <Card>
           <div className="row wrap" style={{ justifyContent: "space-between" }}>

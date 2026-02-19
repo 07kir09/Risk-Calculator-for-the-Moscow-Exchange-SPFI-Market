@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 import Card from "../ui/Card";
+import StatePanel from "../ui/StatePanel";
 import { useAppData } from "../state/appDataStore";
 import { useWorkflow } from "../workflow/workflowStore";
 import { WorkflowStep } from "../workflow/workflowTypes";
@@ -32,10 +33,12 @@ export default function ActionsPage() {
       </div>
 
       {!hasResults ? (
-        <Card>
-          <div className="badge warn">Нет результатов. Сначала запустите расчёт.</div>
-          <Button onClick={() => nav("/run")}>Перейти к запуску</Button>
-        </Card>
+        <StatePanel
+          tone="warning"
+          title="Нет результатов для пост-аналитики"
+          description="What-if, хедж и План B опираются на рассчитанные метрики. Сначала запустите расчёт."
+          action={<Button onClick={() => nav("/run")}>Перейти к запуску</Button>}
+        />
       ) : (
         <div className="grid" style={{ marginTop: 12 }}>
           <Card>

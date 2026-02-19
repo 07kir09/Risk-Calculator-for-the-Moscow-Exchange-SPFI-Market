@@ -5,6 +5,11 @@ import Button from "../components/Button";
 import HelpTooltip from "../components/HelpTooltip";
 import InteractiveRiskChart from "../components/InteractiveRiskChart";
 import Card from "../ui/Card";
+import KpiCard from "../ui/KpiCard";
+import PageHeader from "../ui/PageHeader";
+import ResultPanel from "../ui/ResultPanel";
+import Skeleton from "../ui/Skeleton";
+import StatePanel from "../ui/StatePanel";
 import { useAppData } from "../state/appDataStore";
 import { useWorkflow } from "../workflow/workflowStore";
 import { WorkflowStep } from "../workflow/workflowTypes";
@@ -143,25 +148,44 @@ export default function DashboardPage() {
     return (
       <Card>
         <h1 className="pageTitle">Шаг 6. Панель риска</h1>
-        <p className="pageHint">Пока нет результатов. Сначала запустите расчёт, и здесь появятся метрики и графики.</p>
-        <Button onClick={() => navigate("/run")}>Перейти к запуску</Button>
+        {wf.calcRun.status === "running" ? (
+          <div className="grid" style={{ marginTop: 12 }}>
+            <Card>
+              <Skeleton height={22} width={180} />
+              <Skeleton height={14} width={"80%"} style={{ marginTop: 8 }} />
+              <Skeleton height={14} width={"65%"} style={{ marginTop: 6 }} />
+            </Card>
+            <Card>
+              <Skeleton height={22} width={160} />
+              <Skeleton height={220} style={{ marginTop: 12 }} />
+            </Card>
+          </div>
+        ) : (
+          <StatePanel
+            tone="warning"
+            title="Пока нет результатов"
+            description="Сначала запустите расчёт, и здесь появятся KPI, графики и вкладчики риска."
+            action={<Button onClick={() => navigate("/run")}>Перейти к запуску</Button>}
+          />
+        )}
       </Card>
     );
   }
 
   return (
     <Card>
-      <div className="pageHeader">
-        <div className="pageHeaderText">
-          <h1 className="pageTitle">Шаг 6. Панель риска</h1>
-          <p className="pageHint">Главный экран: где риск и за счёт чего. Детали — через «Стрессы» и «Лимиты».</p>
-        </div>
-        <div className="pageActions">
-          <Button variant="secondary" onClick={() => navigate("/stress")}>Открыть стрессы</Button>
-          <Button variant="secondary" onClick={() => navigate("/limits")}>Открыть лимиты</Button>
-          <Button variant="secondary" onClick={() => navigate("/export")}>Экспорт</Button>
-        </div>
-      </div>
+      <PageHeader
+        kicker="Results"
+        title="Шаг 6. Панель риска"
+        subtitle="Главный экран: сначала KPI, ниже детализация причин риска, стрессов и лимитов."
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => navigate("/stress")}>Открыть стрессы</Button>
+            <Button variant="secondary" onClick={() => navigate("/limits")}>Открыть лимиты</Button>
+            <Button onClick={() => navigate("/export")}>Экспорт</Button>
+          </>
+        }
+      />
 
       <div className="row wrap" style={{ gap: 10, marginTop: 12 }}>
         <span className="badge ok">Валюта: {baseCurrency}</span>
@@ -173,61 +197,64 @@ export default function DashboardPage() {
       {m.methodology_note && <div className="badge warn" style={{ marginTop: 10 }}>{m.methodology_note}</div>}
 
       <div className="grid" style={{ marginTop: 12 }}>
-        <KPI label={`Стоимость портфеля (${baseCurrency})`} value={m.base_value} tooltip="Суммарная стоимость (PV) по выбранной модели, в базовой валюте отчёта." />
-        <KPI
+        <KpiCard label={`Стоимость портфеля (${baseCurrency})`} value={formatNumber(m.base_value)} tooltip="Суммарная стоимость (PV) по выбранной модели, в базовой валюте отчёта." />
+        <KpiCard
           label={`VaR (${baseCurrency})`}
-          value={m.var_hist ?? undefined}
+          value={m.var_hist !== null && m.var_hist !== undefined ? formatNumber(m.var_hist) : "—"}
           tooltip={`Historical VaR: дискретный квантиль без интерполяции, CL=${confidenceLevel.toFixed(4)}. Потери отображаются положительным числом.`}
         />
-        <KPI
+        <KpiCard
           label={`ES (${baseCurrency})`}
-          value={m.es_hist ?? undefined}
+          value={m.es_hist !== null && m.es_hist !== undefined ? formatNumber(m.es_hist) : "—"}
           tooltip="ES: средний убыток по худшему хвосту, включая VaR-точку."
         />
-        <KPI
+        <KpiCard
           label={`LC VaR (${baseCurrency})`}
-          value={m.lc_var ?? undefined}
+          value={m.lc_var !== null && m.lc_var !== undefined ? formatNumber(m.lc_var) : "—"}
           tooltip="LC VaR = VaR + Liquidity add-on. Add-on считается в деньгах в той же валюте, что и VaR."
         />
-        <KPI label={`Худший стресс P&L (${baseCurrency})`} value={worstStress} tooltip="Минимальный P&L среди выбранных стресс‑сценариев." />
-        <KPI label={`Initial Margin (${baseCurrency})`} value={m.initial_margin ?? undefined} tooltip="Оценка требуемой маржи (демо)." />
+        <KpiCard
+          label={`Худший стресс P&L (${baseCurrency})`}
+          value={worstStress !== undefined ? formatNumber(worstStress) : "—"}
+          tooltip="Минимальный P&L среди выбранных стресс‑сценариев."
+        />
+        <KpiCard
+          label={`Initial Margin (${baseCurrency})`}
+          value={m.initial_margin !== null && m.initial_margin !== undefined ? formatNumber(m.initial_margin) : "—"}
+          tooltip="Оценка требуемой маржи (демо)."
+        />
       </div>
 
-      <div style={{ marginTop: 12 }}>
-        <Card className="riskChartsCard">
-          <div className="row wrap" style={{ justifyContent: "space-between", gap: 12 }}>
-            <div>
-              <div className="cardTitle">Визуализация расчёта</div>
-              <div className="cardSubtitle">
-                {activeChart?.description ?? "Выберите график, чтобы увидеть, как сформировались итоговые метрики."}
-              </div>
-            </div>
-            <div className="chartSelector" role="tablist" aria-label="Выбор графика на дашборде">
-              {chartDefinitions.map((chart) => (
-                <button
-                  key={chart.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={selectedChart === chart.key}
-                  className={`chartSelectorBtn ${selectedChart === chart.key ? "chartSelectorBtn--active" : ""}`}
-                  onClick={() => setSelectedChart(chart.key)}
-                  disabled={!chart.available}
-                  title={chart.available ? chart.description : chart.emptyText}
-                >
-                  {chart.label}
-                </button>
-              ))}
-            </div>
+      <ResultPanel
+        className="riskChartsCard"
+        title="Визуализация расчёта"
+        subtitle={activeChart?.description ?? "Выберите график, чтобы увидеть, как сформировались итоговые метрики."}
+        actions={
+          <div className="chartSelector" role="tablist" aria-label="Выбор графика на дашборде">
+            {chartDefinitions.map((chart) => (
+              <button
+                key={chart.key}
+                type="button"
+                role="tab"
+                aria-selected={selectedChart === chart.key}
+                className={`chartSelectorBtn ${selectedChart === chart.key ? "chartSelectorBtn--active" : ""}`}
+                onClick={() => setSelectedChart(chart.key)}
+                disabled={!chart.available}
+                title={chart.available ? chart.description : chart.emptyText}
+              >
+                {chart.label}
+              </button>
+            ))}
           </div>
-          <div style={{ marginTop: 14 }}>
-            <InteractiveRiskChart
-              option={activeChart?.option ?? null}
-              emptyText={activeChart?.emptyText ?? "Нет данных для визуализации."}
-              chartId={activeChart?.key ?? "empty"}
-            />
-          </div>
-        </Card>
-      </div>
+        }
+        summary={
+          <InteractiveRiskChart
+            option={activeChart?.option ?? null}
+            emptyText={activeChart?.emptyText ?? "Нет данных для визуализации."}
+            chartId={activeChart?.key ?? "empty"}
+          />
+        }
+      />
 
       <div className="grid" style={{ marginTop: 12 }}>
         <Card>
@@ -332,21 +359,6 @@ export default function DashboardPage() {
             </table>
           </div>
         </Card>
-      </div>
-    </Card>
-  );
-}
-
-function KPI({ label, value, tooltip }: { label: string; value?: number; tooltip?: string }) {
-  return (
-    <Card>
-      <div className="row wrap" style={{ justifyContent: "space-between" }}>
-        <div className="textMuted">
-          {label} {tooltip && <HelpTooltip text={tooltip} />}
-        </div>
-      </div>
-      <div style={{ fontSize: 26, fontWeight: 900, marginTop: 10 }} title={value !== undefined ? String(value) : undefined}>
-        {value !== undefined ? formatNumber(value) : "—"}
       </div>
     </Card>
   );

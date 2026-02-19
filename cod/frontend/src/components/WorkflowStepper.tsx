@@ -28,27 +28,25 @@ export default function WorkflowStepper() {
   );
 
   return (
-    <div className="workflowChainWrap" aria-label="Прогресс выполнения шагов">
-      <div className="workflowChain">
-        {steps.map((s, idx) => (
-          <div key={s.step} className="workflowChainItem">
-            <button
-              type="button"
-              className={`workflowNode ${s.status}`}
-              disabled={s.status === "locked"}
-              title={s.status === "locked" ? "Сначала завершите предыдущие шаги" : "Открыть шаг"}
-              onClick={() => nav(stepToRoute[s.step])}
-            >
-              <div className="workflowNodeCircle">{s.status === "done" ? "OK" : idx + 1}</div>
-              <div className="workflowNodeLabel">{s.label}</div>
-              <div className="workflowNodeState">{s.status === "done" ? "Готово" : s.status === "active" ? "Сейчас" : "Недоступно"}</div>
-            </button>
-            {idx < steps.length - 1 && (
-              <div className={`workflowConnector workflowConnector--${s.status}`} aria-hidden="true" />
-            )}
-          </div>
-        ))}
-      </div>
+    <div className="workflowRailList" aria-label="Прогресс выполнения шагов">
+      {steps.map((s, idx) => (
+        <button
+          key={s.step}
+          type="button"
+          className={`workflowRailItem workflowRailItem--${s.status}`}
+          disabled={s.status === "locked"}
+          title={s.status === "locked" ? "Сначала завершите предыдущие шаги" : "Открыть шаг"}
+          onClick={() => nav(stepToRoute[s.step])}
+        >
+          <span className="workflowRailIndex">{s.status === "done" ? "✓" : idx + 1}</span>
+          <span className="workflowRailText">
+            <span className="workflowRailLabel">{s.label}</span>
+            <span className="workflowRailState">
+              {s.status === "done" ? "Готово" : s.status === "active" ? "Сейчас" : "Недоступно"}
+            </span>
+          </span>
+        </button>
+      ))}
     </div>
   );
 }

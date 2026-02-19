@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import Button from "../components/Button";
 import Card from "../ui/Card";
+import PageHeader from "../ui/PageHeader";
+import StatePanel from "../ui/StatePanel";
+import { useToast } from "../ui/Toast";
 import { useAppData } from "../state/appDataStore";
 import { useWorkflow } from "../workflow/workflowStore";
 import { WorkflowStep } from "../workflow/workflowTypes";
@@ -22,6 +25,7 @@ export default function ExportPage() {
   const nav = useNavigate();
   const { state: dataState } = useAppData();
   const { state: wf, dispatch } = useWorkflow();
+  const { showToast } = useToast();
   const m = dataState.results.metrics;
 
   const [sections, setSections] = useState<SectionKey[]>(["Summary", "Metrics", "Greeks", "Stress", "Limits", "Params", "ValidationLog"]);
@@ -44,24 +48,25 @@ export default function ExportPage() {
 
   return (
     <Card>
-      <div className="pageHeader">
-        <div className="pageHeaderText">
-          <h1 className="pageTitle">Шаг 10. Отчёты и экспорт</h1>
-          <p className="pageHint">
-            Выберите, какие разделы включить в отчёт, и выгрузите CSV/Excel. В отчёт всегда попадают параметры расчёта и идентификаторы запуска.
-          </p>
-        </div>
-        <div className="pageActions">
-          <Button variant="secondary" onClick={() => nav("/dashboard")}>Назад: панель</Button>
-          <Button variant="secondary" onClick={() => nav("/actions")}>Перейти к What‑if</Button>
-        </div>
-      </div>
+      <PageHeader
+        kicker="Reports"
+        title="Шаг 10. Отчёты и экспорт"
+        subtitle="Выберите разделы отчёта и выгрузите JSON/Excel. Параметры расчёта и идентификаторы запуска включаются в отчёт."
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => nav("/dashboard")}>Назад: панель</Button>
+            <Button variant="secondary" onClick={() => nav("/actions")}>Перейти к What‑if</Button>
+          </>
+        }
+      />
 
       {!m ? (
-        <Card>
-          <div className="badge warn">Нет результатов. Сначала запустите расчёт.</div>
-          <Button onClick={() => nav("/run")}>Перейти к запуску</Button>
-        </Card>
+        <StatePanel
+          tone="warning"
+          title="Нет результатов для экспорта"
+          description="Сначала выполните расчёт. После этого отчёты будут доступны в JSON и Excel."
+          action={<Button onClick={() => nav("/run")}>Перейти к запуску</Button>}
+        />
       ) : (
         <div className="grid" style={{ marginTop: 12 }}>
           <Card>
@@ -131,6 +136,7 @@ export default function ExportPage() {
                   const out = XLSX.write(wb, { type: "array", bookType: "xlsx" });
                   downloadBlob("risk_report.xlsx", new Blob([out], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
                   dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Export });
+                  showToast("Excel-отчёт сформирован", "success");
                 }}
               >
                 Скачать отчёт (Excel)
@@ -148,6 +154,7 @@ export default function ExportPage() {
                   };
                   downloadBlob("risk_report.json", new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" }));
                   dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Export });
+                  showToast("JSON-отчёт сформирован", "success");
                 }}
               >
                 Скачать отчёт (JSON)
@@ -170,4 +177,3 @@ export default function ExportPage() {
     </Card>
   );
 }
-

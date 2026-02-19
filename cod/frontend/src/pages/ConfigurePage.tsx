@@ -3,11 +3,17 @@ import { useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 import Checklist from "../components/Checklist";
 import HelpTooltip from "../components/HelpTooltip";
+import AdvancedSettings from "../ui/AdvancedSettings";
 import Card from "../ui/Card";
+import FormField from "../ui/FormField";
+import PageHeader from "../ui/PageHeader";
+import StatePanel from "../ui/StatePanel";
+import { useToast } from "../ui/Toast";
 import { useAppData } from "../state/appDataStore";
 import { demoScenarios } from "../mock/demoData";
 import { useWorkflow } from "../workflow/workflowStore";
 import { WorkflowStep } from "../workflow/workflowTypes";
+import { ConfigPreset, loadConfigPresets, saveConfigPresets } from "../lib/scenarios";
 
 type MetricKey =
   | "var_hist"
@@ -38,6 +44,7 @@ export default function ConfigurePage() {
   const nav = useNavigate();
   const { state: dataState, dispatch: dataDispatch } = useAppData();
   const { state: wf, dispatch } = useWorkflow();
+  const { showToast } = useToast();
 
   const [selected, setSelected] = useState<MetricKey[]>(() => {
     const current = (wf.calcConfig.selectedMetrics as MetricKey[]) ?? [];
@@ -53,6 +60,9 @@ export default function ConfigurePage() {
     if (!raw || typeof raw !== "object") return "{}";
     return JSON.stringify(raw, null, 2);
   });
+  const [presetName, setPresetName] = useState("");
+  const [savedPresets, setSavedPresets] = useState<ConfigPreset[]>(() => loadConfigPresets());
+  const [selectedPresetId, setSelectedPresetId] = useState("");
 
   useEffect(() => {
     if (!dataState.scenarios.length) {
@@ -62,6 +72,17 @@ export default function ConfigurePage() {
 
   const toggle = (key: MetricKey) => {
     setSelected((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  };
+
+  const resetDefaults = () => {
+    setSelected(recommendedSet);
+    setAlpha(0.99);
+    setHorizonDays(10);
+    setHistoryDays(250);
+    setBaseCurrency("RUB");
+    setLiquidityModel("fraction_of_position_value");
+    setFxRatesText("{}");
+    showToast("Настройки сброшены к умолчанию", "info");
   };
 
   const fxRatesResult = useMemo(() => {
@@ -115,24 +136,83 @@ export default function ConfigurePage() {
     fxRatesResult.error,
   ]);
 
+  const persistPresets = (next: ConfigPreset[]) => {
+    setSavedPresets(next);
+    saveConfigPresets(next);
+  };
+
+  const savePreset = () => {
+    const name = presetName.trim();
+    if (!name) {
+      showToast("Введите название сценария перед сохранением", "error");
+      return;
+    }
+    const preset: ConfigPreset = {
+      id: crypto.randomUUID(),
+      name,
+      selected,
+      params: {
+        alpha,
+        horizonDays,
+        historyDays,
+        baseCurrency,
+        liquidityModel,
+        fxRatesText,
+      },
+    };
+    persistPresets([preset, ...savedPresets].slice(0, 10));
+    setPresetName("");
+    showToast("Сценарий сохранён", "success");
+  };
+
+  const applyPreset = () => {
+    const preset = savedPresets.find((item) => item.id === selectedPresetId);
+    if (!preset) return;
+    setSelected(preset.selected as MetricKey[]);
+    setAlpha(preset.params.alpha);
+    setHorizonDays(preset.params.horizonDays);
+    setHistoryDays(preset.params.historyDays);
+    setBaseCurrency(preset.params.baseCurrency);
+    setLiquidityModel(preset.params.liquidityModel);
+    setFxRatesText(preset.params.fxRatesText);
+    showToast(`Сценарий «${preset.name}» применён`, "success");
+  };
+
   return (
     <Card>
-      <div className="pageHeader">
-        <div className="pageHeaderText">
-          <h1 className="pageTitle">Шаг 4. Настройка расчёта</h1>
-          <p className="pageHint">
-            Выберите, что считать — чтобы не гонять лишнее. Если вы не понимаете термин, наведите на <HelpTooltip text="Короткое объяснение термина. Формулы — в справке." />.
-          </p>
-        </div>
-        <div className="pageActions">
-          <Button variant="secondary" onClick={() => setSelected(recommendedSet)}>
-            Рекомендуемый набор
-          </Button>
-          <Button variant="secondary" onClick={() => nav("/market")}>
-            Назад: рыночные данные
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        kicker="Calculator / Configure"
+        title="Шаг 4. Настройка расчёта"
+        subtitle={
+          <>
+            Выберите, что считать, чтобы не гонять лишнее. Если термин непонятен, наведите на{" "}
+            <HelpTooltip text="Короткое объяснение термина. Формулы — в справке." />.
+          </>
+        }
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => setSelected(recommendedSet)}>
+              Рекомендуемый набор
+            </Button>
+            <Button variant="secondary" onClick={resetDefaults}>
+              Сбросить по умолчанию
+            </Button>
+            <Button variant="secondary" onClick={() => nav("/market")}>
+              Назад: рыночные данные
+            </Button>
+          </>
+        }
+      />
+
+      <StatePanel
+        tone={readiness.ready ? "success" : "warning"}
+        title={readiness.ready ? "Конфигурация готова к запуску" : "Проверьте конфигурацию перед запуском"}
+        description={
+          readiness.ready
+            ? "Все обязательные проверки пройдены."
+            : "Нужно исправить элементы из чек-листа, чтобы открыть запуск."
+        }
+      />
 
       <div className="grid" style={{ marginTop: 12 }}>
         <Card>
@@ -161,41 +241,109 @@ export default function ConfigurePage() {
           <div className="cardTitle">Параметры VaR/ES</div>
           <div className="cardSubtitle">Даже если вы не считаете VaR — можно оставить по умолчанию.</div>
           <div className="stack" style={{ marginTop: 12 }}>
-            <label>
-              Уровень доверия (alpha) <HelpTooltip text="Например, 0.99 означает: «99% случаев должны быть лучше, чем VaR»." />
+            <FormField
+              label={
+                <>
+                  Уровень доверия (alpha){" "}
+                  <HelpTooltip text="Например, 0.99 означает: «99% случаев должны быть лучше, чем VaR»." />
+                </>
+              }
+              helper="Рекомендуемый диапазон: 0.95–0.99."
+            >
               <input type="number" step={0.001} min={0.8} max={0.999} value={alpha} onChange={(e) => setAlpha(Number(e.target.value))} />
-            </label>
-            <label>
-              Горизонт (дней) <HelpTooltip text="Сколько дней «держим позицию» в расчёте риска. Для демо — параметр отчёта." />
+            </FormField>
+
+            <FormField
+              label={
+                <>
+                  Горизонт расчёта{" "}
+                  <HelpTooltip text="Сколько дней «держим позицию» в расчёте риска. Для демо — параметр отчёта." />
+                </>
+              }
+              unit="дн."
+            >
               <input type="number" min={1} value={horizonDays} onChange={(e) => setHorizonDays(Number(e.target.value))} />
-            </label>
-            <label>
-              Окно истории (дней) <HelpTooltip text="Сколько дней истории используем для исторического VaR/ES (демо)." />
+            </FormField>
+
+            <FormField
+              label={
+                <>
+                  Окно истории{" "}
+                  <HelpTooltip text="Сколько дней истории используем для исторического VaR/ES (демо)." />
+                </>
+              }
+              unit="дн."
+            >
               <input type="number" min={30} value={historyDays} onChange={(e) => setHistoryDays(Number(e.target.value))} />
-            </label>
-            <label>
-              Базовая валюта отчёта
+            </FormField>
+
+            <FormField label="Базовая валюта отчёта" helper="Код ISO 4217, например RUB/USD/EUR." unit={baseCurrency}>
               <input
                 type="text"
                 value={baseCurrency}
                 maxLength={3}
                 onChange={(e) => setBaseCurrency(e.target.value.toUpperCase())}
               />
-            </label>
-            <label>
-              FX коэффициенты (JSON, опционально){" "}
-              <HelpTooltip text='Пример: {"USD": 90.5, "EUR": 98.2}. Курс = сколько единиц базовой валюты за 1 единицу валюты позиции.' />
-              <textarea rows={4} value={fxRatesText} onChange={(e) => setFxRatesText(e.target.value)} />
-            </label>
-            {fxRatesResult.error && <div className="badge danger">{fxRatesResult.error}</div>}
-            <label>
-              LC VaR модель ликвидности
-              <select value={liquidityModel} onChange={(e) => setLiquidityModel(e.target.value)}>
-                <option value="fraction_of_position_value">Haircut как доля от стоимости позиции</option>
-                <option value="half_spread_fraction">Haircut как half-spread доля</option>
-                <option value="absolute_per_contract">Haircut как абсолют на контракт</option>
-              </select>
-            </label>
+            </FormField>
+
+            <AdvancedSettings
+              title="Advanced settings"
+              helper="Раскройте, если нужно указать FX-коэффициенты, модель ликвидности и сохранить конфигурацию как сценарий."
+            >
+              <div className="stack">
+                <FormField
+                  label={
+                    <>
+                      FX коэффициенты (JSON){" "}
+                      <HelpTooltip text='Пример: {"USD": 90.5, "EUR": 98.2}. Курс = сколько единиц базовой валюты за 1 единицу валюты позиции.' />
+                    </>
+                  }
+                  helper="Опционально. Пустое значение = использовать валюту позиции без пересчёта."
+                  error={fxRatesResult.error || undefined}
+                >
+                  <textarea rows={4} value={fxRatesText} onChange={(e) => setFxRatesText(e.target.value)} />
+                </FormField>
+
+                <FormField label="LC VaR модель ликвидности">
+                  <select value={liquidityModel} onChange={(e) => setLiquidityModel(e.target.value)}>
+                    <option value="fraction_of_position_value">Haircut как доля от стоимости позиции</option>
+                    <option value="half_spread_fraction">Haircut как half-spread доля</option>
+                    <option value="absolute_per_contract">Haircut как абсолют на контракт</option>
+                  </select>
+                </FormField>
+
+                <FormField label="Сценарий настроек" helper="Сохраните текущие параметры, чтобы быстро применять их в следующих расчётах.">
+                  <input
+                    placeholder="Например: Conservative 99%"
+                    value={presetName}
+                    onChange={(e) => setPresetName(e.target.value)}
+                  />
+                </FormField>
+                <div className="row wrap">
+                  <Button variant="secondary" onClick={savePreset}>
+                    Сохранить сценарий
+                  </Button>
+                </div>
+                <FormField label="Применить сохранённый сценарий">
+                  <select value={selectedPresetId} onChange={(e) => setSelectedPresetId(e.target.value)}>
+                    <option value="">Выберите сценарий</option>
+                    {savedPresets.map((preset) => (
+                      <option key={preset.id} value={preset.id}>
+                        {preset.name}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+                <div className="row wrap">
+                  <Button variant="secondary" disabled={!selectedPresetId} onClick={applyPreset}>
+                    Применить сценарий
+                  </Button>
+                  <Button variant="ghost" onClick={() => nav("/scenarios")} disabled={savedPresets.length === 0}>
+                    Сравнить сценарии
+                  </Button>
+                </div>
+              </div>
+            </AdvancedSettings>
           </div>
         </Card>
 

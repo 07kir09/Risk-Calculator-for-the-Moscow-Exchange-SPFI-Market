@@ -29,20 +29,18 @@ export default function NextStepBanner() {
     [WorkflowStep.PostActions]: "Шаг 11: what-if/хедж/план B после результатов.",
   };
   return (
-    <div className="card">
-      <div className="pageHeader">
-        <div className="pageHeaderText">
-          <div className="cardTitle">Что дальше</div>
-          <div className="cardSubtitle">
-            {messageMap[nextStep]} {!available && <span className="textMuted">(сначала завершите предыдущие шаги)</span>}
-          </div>
-        </div>
-        <div className="pageActions">
-          <Button variant={available ? "primary" : "secondary"} disabled={!available} onClick={() => nav(route)}>
-            Открыть шаг
-          </Button>
+    <section className="nextStepPanel">
+      <div className="nextStepText">
+        <div className="nextStepKicker">Следующий шаг</div>
+        <div className="nextStepMessage">
+          {messageMap[nextStep]} {!available && <span className="textMuted">(сначала завершите предыдущие шаги)</span>}
         </div>
       </div>
-    </div>
+      <div className="nextStepAction">
+        <Button variant={available ? "primary" : "secondary"} disabled={!available} onClick={() => nav(route)}>
+          Открыть шаг
+        </Button>
+      </div>
+    </section>
   );
 }

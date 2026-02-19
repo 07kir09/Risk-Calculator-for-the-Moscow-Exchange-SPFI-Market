@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 import ConfirmDialog from "../components/ConfirmDialog";
 import Card from "../ui/Card";
+import StatePanel from "../ui/StatePanel";
+import { useToast } from "../ui/Toast";
 import { useAppData } from "../state/appDataStore";
 import { useWorkflow } from "../workflow/workflowStore";
 import { WorkflowStep } from "../workflow/workflowTypes";
@@ -13,6 +15,7 @@ export default function StressPage() {
   const nav = useNavigate();
   const { state: dataState, dispatch: dataDispatch } = useAppData();
   const { state: wf, dispatch } = useWorkflow();
+  const { showToast } = useToast();
   const metrics = dataState.results.metrics;
   const stress = metrics?.stress || [];
   const topStressContributors = metrics?.top_contributors?.stress ?? [];
@@ -61,9 +64,12 @@ export default function StressPage() {
       dataDispatch({ type: "SET_RESULTS", metrics: updated });
       dispatch({ type: "SET_CALC_RUN", calcRunId, status: "success", startedAt, finishedAt: new Date().toISOString() });
       setStatus("Готово: результаты обновлены.");
+      showToast("Стресс-результаты обновлены", "success");
     } catch (e: any) {
       dispatch({ type: "SET_CALC_RUN", calcRunId, status: "error", startedAt, finishedAt: new Date().toISOString() });
-      setStatus(e?.message ?? "Ошибка пересчёта");
+      const msg = e?.message ?? "Ошибка пересчёта";
+      setStatus(msg);
+      showToast(msg, "error");
     } finally {
       setIsRecalc(false);
     }
@@ -79,11 +85,13 @@ export default function StressPage() {
       ],
     });
     setStatus("Сценарий добавлен. Нажмите «Обновить результаты», чтобы увидеть новый P&L.");
+    showToast("Сценарий сохранён", "success");
   };
 
   const removeScenario = (id: string) => {
     dataDispatch({ type: "SET_SCENARIOS", scenarios: dataState.scenarios.filter((s) => s.scenario_id !== id) });
     setStatus("Сценарий удалён. Нажмите «Обновить результаты», чтобы пересчитать P&L.");
+    showToast("Сценарий удалён", "info");
   };
   return (
     <Card>
@@ -119,10 +127,12 @@ export default function StressPage() {
       </div>
 
       {!metrics ? (
-        <Card>
-          <div className="badge warn">Нет результатов. Сначала запустите расчёт.</div>
-          <Button onClick={() => nav("/run")}>Перейти к запуску</Button>
-        </Card>
+        <StatePanel
+          tone="warning"
+          title="Нет результатов для стресс-анализа"
+          description="Сначала запустите расчёт в разделе запуска, затем вернитесь на эту страницу."
+          action={<Button onClick={() => nav("/run")}>Перейти к запуску</Button>}
+        />
       ) : (
         <div className="grid" style={{ marginTop: 12 }}>
           <Card>

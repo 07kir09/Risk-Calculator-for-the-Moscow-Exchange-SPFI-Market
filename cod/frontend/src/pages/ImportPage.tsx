@@ -5,6 +5,8 @@ import Checklist from "../components/Checklist";
 import ConfirmDialog from "../components/ConfirmDialog";
 import FileDropzone from "../components/FileDropzone";
 import Card from "../ui/Card";
+import PageHeader from "../ui/PageHeader";
+import StatePanel from "../ui/StatePanel";
 import { useWorkflow } from "../workflow/workflowStore";
 import { WorkflowStep } from "../workflow/workflowTypes";
 import { useAppData } from "../state/appDataStore";
@@ -82,38 +84,56 @@ export default function ImportPage() {
         }}
       />
 
-      <div className="pageHeader">
-        <div className="pageHeaderText">
-          <h1 className="pageTitle">Шаг 1. Импорт сделок</h1>
-          <p className="pageHint">
-            Загрузите CSV с портфелем. Если вы не уверены в формате — скачайте шаблон и заполните его по примеру.
-          </p>
-        </div>
-        <div className="pageActions">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              if (!hasSomethingToLose) return doDemo();
-              setConfirm({
-                title: "Загрузить демо‑портфель?",
-                description: (
-                  <div className="stack">
-                    <div>Это действие заменит текущие сделки и сбросит результаты расчёта.</div>
-                    <div className="textMuted">Если хотите сохранить текущие данные — сначала сделайте экспорт (шаг 10).</div>
-                  </div>
-                ),
-                confirmText: "Загрузить демо",
-                action: doDemo,
-              });
-            }}
-          >
-            Загрузить демо
-          </Button>
-          <a className="btn btn-secondary" href="/sample_portfolio.csv" download>
-            Скачать шаблон CSV
-          </a>
-        </div>
-      </div>
+      <PageHeader
+        kicker="Calculator / Import"
+        title="Шаг 1. Импорт сделок"
+        subtitle="Загрузите CSV с портфелем. Если формат неизвестен, скачайте шаблон и заполните его по примеру."
+        actions={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                if (!hasSomethingToLose) return doDemo();
+                setConfirm({
+                  title: "Загрузить демо‑портфель?",
+                  description: (
+                    <div className="stack">
+                      <div>Это действие заменит текущие сделки и сбросит результаты расчёта.</div>
+                      <div className="textMuted">Если хотите сохранить текущие данные — сначала сделайте экспорт (шаг 10).</div>
+                    </div>
+                  ),
+                  confirmText: "Загрузить демо",
+                  action: doDemo,
+                });
+              }}
+            >
+              Загрузить демо
+            </Button>
+            <a className="btn btn-secondary" href="/sample_portfolio.csv" download>
+              Скачать шаблон CSV
+            </a>
+          </>
+        }
+      />
+
+      <StatePanel
+        tone={positions.length > 0 ? "success" : "info"}
+        title={positions.length > 0 ? "Портфель загружен" : "Загрузите CSV или используйте демо"}
+        description={
+          positions.length > 0
+            ? `Позиции загружены: ${positions.length}. Проверьте качество данных и переходите к валидации.`
+            : "Формат CSV можно скачать по шаблону. Для быстрого старта используйте демо-портфель."
+        }
+        action={
+          positions.length > 0 ? (
+            <div className="row wrap">
+              <Button variant="secondary" onClick={() => nav("/portfolio")}>
+                Управлять позициями
+              </Button>
+            </div>
+          ) : undefined
+        }
+      />
 
       <div className="grid">
         <Card>

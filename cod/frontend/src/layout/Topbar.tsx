@@ -54,16 +54,20 @@ export default function Topbar({
         }}
       />
       <div className="topbarLeft">
-        <button className="btn btn-secondary" onClick={onToggleNavigation} aria-label="Управление навигацией">
-          <MenuIcon /> Навигация
+        <button className="btn btn-secondary topbarNavButton" onClick={onToggleNavigation} aria-label="Управление навигацией">
+          <MenuIcon /> Меню
         </button>
-        <div className="topbarTitle">{title}</div>
+        <div className="topbarContext">
+          <div className="topbarEyebrow">Risk Calculator SPFI</div>
+          <div className="topbarTitle">{title}</div>
+        </div>
       </div>
 
-      <div className="topbarMeta">
+      <div className="topbarActions">
         {(dataState.portfolio.positions.length > 0 || Boolean(dataState.results.metrics) || Boolean(state.snapshotId)) && (
           <Button
             variant="secondary"
+            className="topbarResetBtn"
             onClick={() =>
               setConfirm({
                 title: "Начать заново?",
@@ -87,12 +91,12 @@ export default function Topbar({
           </Button>
         )}
         <button
-          className="btn btn-secondary"
+          className="btn btn-ghost topbarThemeToggle"
           onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
           aria-label="Переключить тему"
           title="Переключить тему"
         >
-          {theme === "dark" ? "Светлая" : "Тёмная"}
+          {theme === "dark" ? "Светлая тема" : "Тёмная тема"}
         </button>
       </div>
     </header>

@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { jest } from "@jest/globals";
+import { beforeEach, jest } from "@jest/globals";
 
 // JSDOM может не иметь crypto.randomUUID — используем стабильный мок для тестов.
 Object.defineProperty(globalThis, "crypto", {
@@ -21,4 +21,8 @@ Object.defineProperty(HTMLAnchorElement.prototype, "click", {
 });
 
 // Отключаем onboarding‑модалку в тестах, чтобы не ломала селекторы.
-localStorage.setItem("onboarding_seen_v1", "1");
+beforeEach(() => {
+  localStorage.removeItem("app_data_v1");
+  localStorage.removeItem("workflow_state_v1");
+  localStorage.setItem("onboarding_seen_v1", "1");
+});

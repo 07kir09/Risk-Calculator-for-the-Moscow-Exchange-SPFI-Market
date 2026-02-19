@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 import Card from "../ui/Card";
+import StatePanel from "../ui/StatePanel";
 import { useAppData } from "../state/appDataStore";
 import { useWorkflow } from "../workflow/workflowStore";
 import { WorkflowStep } from "../workflow/workflowTypes";
@@ -38,6 +39,27 @@ export default function MarketDataPage() {
           </Button>
         </div>
       </div>
+
+      {!hasPortfolio && (
+        <StatePanel
+          tone="warning"
+          title="Портфель пуст"
+          description="Сначала загрузите позиции на шаге импорта, затем вернитесь к рыночным данным."
+          action={<Button onClick={() => nav("/import")}>Перейти к импорту</Button>}
+        />
+      )}
+
+      {hasPortfolio && (
+        <StatePanel
+          tone={isReady ? "success" : localLoading || wf.marketData.status === "loading" ? "info" : "warning"}
+          title={isReady ? "Связка факторов готова" : localLoading || wf.marketData.status === "loading" ? "Подтягиваем данные рынка" : "Нужна связка рыночных факторов"}
+          description={
+            isReady
+              ? "Все сделки получили необходимые рыночные факторы."
+              : "После подтяжки данных можно перейти к настройке расчёта."
+          }
+        />
+      )}
 
       <div className="grid" style={{ marginTop: 12 }}>
         <Card>
