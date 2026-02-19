@@ -3,7 +3,7 @@
 ## Что реализовано
 - Ценообразование: Black–Scholes (европейские), биномиальная CRR (европейские/американские), Монте‑Карло (европейские), поиск IV (Ньютон + бисекция).
 - Греки: Delta/Gamma/Vega/Theta/Rho (аналитические BS) и численные разности.
-- Риск: исторический/параметрический VaR, Expected Shortfall, LC VaR (добавка ликвидности), стресс‑сценарии с подсветкой превышений лимитов.
+- Риск: scenario-based VaR/ES (demo/simulated historical), параметрический VaR/ES (Normal, one-tail), LC VaR (денежный liquidity add-on), стресс‑сценарии с подсветкой превышений лимитов.
 - Данные: загрузка CSV/JSON с жёсткой валидацией дат, валют ISO 4217, положительности цен/волатильности, ненулевых количеств; журнал ошибок.
 - Отчёты: таблицы метрик/PNL/стрессов/лимитов, греки, позиции, журнал валидации; экспорт CSV/Excel/JSON + график распределения PnL.
 - Детерминизм: все рандомизированные расчёты фиксируют seed по умолчанию.
@@ -71,6 +71,8 @@ bash cod/run_all.sh
   - `maturity_date`, `valuation_date` (ISO 8601, maturity > valuation), `risk_free_rate`,
   - опционально: `dividend_yield`, `liquidity_haircut`, `model`, `fixed_rate`/`float_rate`/`day_count` (для свопа).
 - Сценарии (CSV/JSON): `scenario_id`, `underlying_shift` (например, -0.05), `volatility_shift`, `rate_shift`.
+  - `rate_shift` трактуется как абсолютный сдвиг ставки (в долях).
+  - После шока волатильность ограничивается снизу (`max(vol, eps)`), чтобы избежать отрицательных значений.
 - Лимиты (JSON): ключи метрик (`var_hist`, `es_hist`, `var_param`, `es_param`, `lc_var`), вложенный объект `stress` со значениями по `scenario_id`.
 
 ### CLI-опции
@@ -83,12 +85,17 @@ bash cod/run_all.sh
 ```bash
 PYTHONPATH=cod pytest cod/tests -q
 ```
+Включены golden-тесты в `cod/tests/golden/*.json` (фиксированные входы/ожидания для VaR/ES/LC/FX).
 
 ## Допущения и правки наблюдателя
 - Hazard rate исключён из расчётов и описаний (требование 4.1.1 remove_hazard_rate).
 - Источник данных нейтрален: файлы/ручной ввод/выгрузки, без обещаний интеграции с ISS (4.1.2 rephrase_no_iss).
 - KPI «до 1000 записей ≤5с» не заявлен как обязательный (4.1.4 remove_unfeasible).
-- LC VaR считается как VaR + сумма ликвидностных надбавок `|qty| * liquidity_haircut` (допущение, легко сменить в коде `risk/var_es.py`).
+- В demo режиме “historical” VaR/ES считаются по пользовательским сценариям (simulated), а не по рыночному time-series.
+- Historical VaR использует дискретную конвенцию `k = ceil(N*(1-CL))` без интерполяции.
+- LC VaR считается как `VaR + liquidity add-on` в деньгах базовой валюты.
+  Поддержаны модели add-on: `fraction_of_position_value`, `half_spread_fraction`, `absolute_per_contract`.
+- Добавлена минимальная мультивалютная агрегация: `base_currency` + `fx_rates` (stub), с предупреждением при неполном FX-покрытии.
 - Образовательная направленность уточнена как внутренняя/внутри программы в плане (см. `cod/docs/plan.md`).
 - Все вычисления без округлений; форматирование только на уровне вывода.
 

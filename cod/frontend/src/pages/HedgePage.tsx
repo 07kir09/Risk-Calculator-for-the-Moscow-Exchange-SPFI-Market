@@ -34,6 +34,10 @@ export default function HedgePage() {
 
   const template = basePositions[0];
   const alpha = Number(wf.calcConfig.params?.alpha ?? 0.99);
+  const horizonDays = Number(wf.calcConfig.params?.horizonDays ?? 10);
+  const baseCurrency = String(wf.calcConfig.params?.baseCurrency ?? "RUB").toUpperCase();
+  const fxRates = (wf.calcConfig.params?.fxRates as Record<string, number> | undefined) ?? undefined;
+  const liquidityModel = String(wf.calcConfig.params?.liquidityModel ?? "fraction_of_position_value");
 
   const suggestions = useMemo(() => {
     if (!m?.greeks || !template) return [];
@@ -227,6 +231,10 @@ export default function HedgePage() {
                         scenarios: [],
                         limits: undefined,
                         alpha,
+                        horizonDays,
+                        baseCurrency,
+                        fxRates,
+                        liquidityModel,
                         selectedMetrics: ["greeks"],
                         marginEnabled: false,
                       });

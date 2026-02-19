@@ -1,16 +1,27 @@
 """Пайплайн расчёта риска по шагам из методологии."""
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
+
+import numpy as np
 
 from ..data.loading import ValidationMessage
-from ..data.models import MarketScenario, OptionPosition, Portfolio
-from .correlations import correlation_matrix, pnl_matrix
+from ..data.models import MarketScenario, Portfolio
+from .correlations import pnl_matrix
 from .limits import check_limits
-from .portfolio import greeks_summary, portfolio_value, scenario_pnl_distribution
+from .portfolio import greeks_summary, position_value
 from .stress import run_stress_tests
-from .var_es import historical_es, historical_var, liquidity_adjusted_var, parametric_es, parametric_var
+from .var_es import (
+    LiquidityInput,
+    historical_es,
+    historical_var,
+    liquidity_addon_breakdown,
+    liquidity_adjusted_var,
+    parametric_es,
+    parametric_var,
+)
 from .capital_margin import economic_capital, initial_margin, variation_margin
 
 
@@ -21,6 +32,11 @@ class CalculationConfig:
     calc_stress: bool = True
     calc_margin_capital: bool = True
     alpha: float = 0.99
+    horizon_days: int = 1
+    base_currency: str = "RUB"
+    fx_rates: Optional[Dict[str, float]] = None
+    liquidity_model: str = "fraction_of_position_value"
+    mode: str = "demo"  # demo | api
     aggregations: Optional[List[str]] = None  # например ["currency"]
 
 
@@ -32,12 +48,23 @@ class CalculationResult:
     var_param: Optional[float] = None
     es_param: Optional[float] = None
     lc_var: Optional[float] = None
+    lc_var_addon: Optional[float] = None
+    lc_var_breakdown: Optional[List[dict]] = None
     greeks: Optional[Dict[str, float]] = None
     stress: Optional[list] = None
+    top_contributors: Optional[Dict[str, List[dict]]] = None
     limits: Optional[list] = None
     correlations: Optional[list] = None
     pnl_matrix: Optional[list] = None
+    pnl_distribution: Optional[List[float]] = None
     buckets: Optional[Dict[str, Dict[str, float]]] = None
+    base_currency: str = "RUB"
+    confidence_level: float = 0.99
+    horizon_days: int = 1
+    mode: str = "demo"
+    methodology_note: Optional[str] = None
+    fx_warning: Optional[str] = None
+    liquidity_model: str = "fraction_of_position_value"
     capital: Optional[float] = None
     initial_margin: Optional[float] = None
     variation_margin: Optional[float] = None
@@ -62,6 +89,118 @@ def aggregate_buckets(portfolio: Portfolio, agg_keys: Optional[List[str]] = None
     return buckets
 
 
+def _normalize_currency(currency: str) -> str:
+    return currency.strip().upper()
+
+
+def _resolve_fx_rates(
+    portfolio: Portfolio,
+    base_currency: str,
+    fx_rates: Optional[Dict[str, float]],
+    validation_log: List[ValidationMessage],
+) -> np.ndarray:
+    rates_cfg: Dict[str, float] = {}
+    for key, value in (fx_rates or {}).items():
+        code = _normalize_currency(key)
+        rates_cfg[code] = float(value)
+    rates_cfg[base_currency] = 1.0
+
+    unique_currencies = {_normalize_currency(p.currency) for p in portfolio.positions}
+    rates: List[float] = []
+    missing: set[str] = set()
+    for p in portfolio.positions:
+        ccy = _normalize_currency(p.currency)
+        rate = rates_cfg.get(ccy)
+        if rate is None:
+            # Минимальный fallback: считаем 1.0, но обязательно логируем предупреждение.
+            missing.add(ccy)
+            rate = 1.0
+        rates.append(float(rate))
+
+    if len(unique_currencies) > 1 and missing:
+        validation_log.append(
+            ValidationMessage(
+                severity="WARNING",
+                message=(
+                    "В портфеле смешанные валюты, но нет FX-курсов для: "
+                    f"{', '.join(sorted(missing))}. Использован fallback 1.0; "
+                    "агрегированные метрики могут быть некорректны."
+                ),
+            )
+        )
+    return np.asarray(rates, dtype=np.float64)
+
+
+def _tail_count(n_obs: int, confidence_level: float) -> int:
+    return max(1, int(math.ceil(n_obs * (1.0 - confidence_level) - 1e-12)))
+
+
+def _top_rows(
+    metric: str,
+    position_ids: List[str],
+    contributions: np.ndarray,
+    scenario_id: Optional[str] = None,
+    top_n: int = 5,
+) -> List[dict]:
+    rows = []
+    for idx, pos_id in enumerate(position_ids):
+        pnl_contribution = float(contributions[idx])
+        row: Dict[str, Any] = {
+            "metric": metric,
+            "position_id": pos_id,
+            "pnl_contribution": pnl_contribution,
+            "abs_pnl_contribution": abs(pnl_contribution),
+        }
+        if scenario_id is not None:
+            row["scenario_id"] = scenario_id
+        rows.append(row)
+    rows.sort(key=lambda x: x["abs_pnl_contribution"], reverse=True)
+    return rows[:top_n]
+
+
+def _build_top_contributors(
+    portfolio: Portfolio,
+    scenarios: List[MarketScenario],
+    pnl_dist: List[float],
+    position_pnl_matrix: np.ndarray,
+    confidence_level: float,
+) -> Dict[str, List[dict]]:
+    if not pnl_dist or position_pnl_matrix.size == 0:
+        return {}
+
+    portfolio_pnl = np.asarray(pnl_dist, dtype=np.float64)
+    order = np.argsort(portfolio_pnl)  # от худшего к лучшему
+    tail_n = _tail_count(portfolio_pnl.size, confidence_level)
+    tail_indices = order[:tail_n]
+    var_scenario_idx = int(order[tail_n - 1])
+    stress_scenario_idx = int(np.argmin(portfolio_pnl))
+
+    pos_ids = [p.position_id for p in portfolio.positions]
+    var_rows = _top_rows(
+        metric="var_hist",
+        position_ids=pos_ids,
+        contributions=position_pnl_matrix[:, var_scenario_idx],
+        scenario_id=scenarios[var_scenario_idx].scenario_id if scenarios else None,
+    )
+    es_rows = _top_rows(
+        metric="es_hist",
+        position_ids=pos_ids,
+        contributions=np.mean(position_pnl_matrix[:, tail_indices], axis=1),
+        scenario_id="tail_mean",
+    )
+    stress_rows = _top_rows(
+        metric="stress",
+        position_ids=pos_ids,
+        contributions=position_pnl_matrix[:, stress_scenario_idx],
+        scenario_id=scenarios[stress_scenario_idx].scenario_id if scenarios else None,
+    )
+    return {
+        "var_hist": var_rows,
+        "es_hist": es_rows,
+        "stress": stress_rows,
+    }
+
+
 def run_calculation(
     portfolio: Portfolio,
     scenarios: List[MarketScenario],
@@ -69,45 +208,90 @@ def run_calculation(
     config: CalculationConfig | None = None,
 ) -> CalculationResult:
     cfg = config or CalculationConfig()
-    base_value = portfolio_value(portfolio)
+    base_currency = _normalize_currency(cfg.base_currency)
     validation_log: List[ValidationMessage] = []
+    position_ids = [p.position_id for p in portfolio.positions]
+    fx_rates = _resolve_fx_rates(portfolio, base_currency, cfg.fx_rates, validation_log)
+    base_values = np.asarray([position_value(p) for p in portfolio.positions], dtype=np.float64)
+    base_values_converted = base_values * fx_rates
+    base_value = float(np.sum(base_values_converted, dtype=np.float64))
 
     # 4A Sensitivities
     greeks = greeks_summary(portfolio) if cfg.calc_sensitivities else None
 
     # 6 Сценарии и стресс
-    pnl_dist = scenario_pnl_distribution(portfolio, scenarios) if cfg.calc_stress or cfg.calc_var_es else []
-    stress = run_stress_tests(portfolio, scenarios, limits=(limits_cfg or {}).get("stress") if limits_cfg else None) if cfg.calc_stress else None
+    pnl_dist: List[float] = []
+    pnl_mat = None
+    position_pnl_base = np.zeros((len(portfolio.positions), len(scenarios)), dtype=np.float64)
+    if (cfg.calc_stress or cfg.calc_var_es) and scenarios:
+        position_pnl = pnl_matrix(portfolio, scenarios)
+        position_pnl_base = position_pnl * fx_rates[:, None]
+        pnl_dist = np.sum(position_pnl_base, axis=0, dtype=np.float64).tolist()
+        pnl_mat = position_pnl_base.tolist()
+
+    stress = (
+        run_stress_tests(
+            portfolio,
+            scenarios,
+            limits=(limits_cfg or {}).get("stress") if limits_cfg else None,
+            precomputed_pnls=pnl_dist if pnl_dist else None,
+        )
+        if cfg.calc_stress
+        else None
+    )
 
     # 7 VaR/ES
-    var_h = es_h = var_p = es_p = lc_var = None
+    var_h = es_h = var_p = es_p = lc_var = lc_addon = None
+    lc_breakdown = None
+    top_contributors = None
     if cfg.calc_var_es and pnl_dist:
         var_h = historical_var(pnl_dist, cfg.alpha)
         es_h = historical_es(pnl_dist, cfg.alpha)
-        var_p = parametric_var(pnl_dist, cfg.alpha)
-        es_p = parametric_es(pnl_dist, cfg.alpha)
-        lc_var = liquidity_adjusted_var(var_h, [abs(p.quantity) * p.liquidity_haircut for p in portfolio.positions])
+        var_p = parametric_var(pnl_dist, cfg.alpha, horizon_days=cfg.horizon_days)
+        es_p = parametric_es(pnl_dist, cfg.alpha, horizon_days=cfg.horizon_days)
+        liq_inputs = [
+            LiquidityInput(
+                position_id=position_ids[idx],
+                quantity=p.quantity,
+                position_value=float(base_values_converted[idx]),
+                haircut=p.liquidity_haircut,
+            )
+            for idx, p in enumerate(portfolio.positions)
+        ]
+        lc_addon, lc_break_rows = liquidity_addon_breakdown(liq_inputs, model=cfg.liquidity_model)
+        lc_breakdown = [row.to_dict() for row in lc_break_rows]
+        lc_var = liquidity_adjusted_var(var_h, lc_addon)
+        top_contributors = _build_top_contributors(
+            portfolio=portfolio,
+            scenarios=scenarios,
+            pnl_dist=pnl_dist,
+            position_pnl_matrix=position_pnl_base,
+            confidence_level=cfg.alpha,
+        )
 
     # 8 Лимиты
-    limits = check_limits(
-        {
-            "var_hist": var_h if var_h is not None else 0.0,
-            "es_hist": es_h if es_h is not None else 0.0,
-            "var_param": var_p if var_p is not None else 0.0,
-            "es_param": es_p if es_p is not None else 0.0,
-            "lc_var": lc_var if lc_var is not None else 0.0,
-        },
-        limits_cfg or {},
-    ) if limits_cfg else None
+    limits = (
+        check_limits(
+            {
+                "var_hist": var_h if var_h is not None else 0.0,
+                "es_hist": es_h if es_h is not None else 0.0,
+                "var_param": var_p if var_p is not None else 0.0,
+                "es_param": es_p if es_p is not None else 0.0,
+                "lc_var": lc_var if lc_var is not None else 0.0,
+            },
+            limits_cfg or {},
+        )
+        if limits_cfg
+        else None
+    )
 
     # 5 buckets
     buckets = aggregate_buckets(portfolio, cfg.aggregations)
 
     # Корреляции
-    corr = pnl_mat = None
-    if pnl_dist:
-        pnl_mat = pnl_matrix(portfolio, scenarios).tolist()
-        corr = correlation_matrix(portfolio, scenarios).tolist() if len(scenarios) > 1 else None
+    corr = None
+    if pnl_dist and len(scenarios) > 1 and position_pnl_base.shape[0] > 1 and position_pnl_base.shape[1] > 1:
+        corr = np.corrcoef(position_pnl_base).tolist()
 
     # 9 Маржа и капитал
     capital = initial_m = variation_m = None
@@ -118,6 +302,14 @@ def run_calculation(
         if pnl_dist:
             variation_m = variation_margin(pnl_dist[-1] if pnl_dist else 0.0)
 
+    fx_warning = next((msg.message for msg in validation_log if "FX" in msg.message), None)
+    methodology_note = (
+        "Historical VaR/ES рассчитаны на наборе пользовательских сценариев (simulated demo), "
+        "а не на историческом временном ряде рынка."
+        if cfg.mode == "demo"
+        else None
+    )
+
     return CalculationResult(
         base_value=base_value,
         var_hist=var_h,
@@ -125,15 +317,25 @@ def run_calculation(
         var_param=var_p,
         es_param=es_p,
         lc_var=lc_var,
+        lc_var_addon=lc_addon,
+        lc_var_breakdown=lc_breakdown,
         greeks=greeks,
         stress=stress,
+        top_contributors=top_contributors,
         limits=limits,
         correlations=corr,
         pnl_matrix=pnl_mat,
+        pnl_distribution=pnl_dist if pnl_dist else None,
         buckets=buckets,
+        base_currency=base_currency,
+        confidence_level=cfg.alpha,
+        horizon_days=max(1, int(cfg.horizon_days)),
+        mode=cfg.mode,
+        methodology_note=methodology_note,
+        fx_warning=fx_warning,
+        liquidity_model=cfg.liquidity_model,
         capital=capital,
         initial_margin=initial_m,
         variation_margin=variation_m,
         validation_log=validation_log,
     )
-

@@ -17,13 +17,69 @@ function downloadJson(filename: string, payload: unknown) {
   URL.revokeObjectURL(url);
 }
 
-function groupByField(log: ImportLogEntry[]) {
+function issueKey(entry: ImportLogEntry): string {
+  const msg = entry.message.toLowerCase();
+  if (msg.includes("iso")) return "format_iso";
+  if (msg.includes("дата")) return "date";
+  if (msg.includes("quantity") || msg.includes("количество")) return "quantity";
+  if (msg.includes("volatility") || msg.includes("волат")) return "volatility";
+  if (msg.includes("currency") || msg.includes("валют")) return "currency";
+  if (msg.includes("обязательно")) return "required";
+  return entry.field ? `field_${entry.field}` : "other";
+}
+
+function issueHint(key: string): { title: string; howToFix: string; example: string } {
+  const defaults = {
+    title: "Прочее",
+    howToFix: "Проверьте тип данных и соответствие шаблону CSV.",
+    example:
+      "option,pos_1,1,1,MOEX,RUB,100,95,0.2,2026-12-31,2026-01-01,0.05,call,european",
+  };
+  const map: Record<string, { title: string; howToFix: string; example: string }> = {
+    format_iso: {
+      title: "Формат даты/кода",
+      howToFix: "Используйте ISO-формат: дата YYYY-MM-DD, валюта из 3 букв (RUB/USD).",
+      example: "...,RUB,...,2026-12-31,2026-01-01,...",
+    },
+    date: {
+      title: "Ошибки даты",
+      howToFix: "Проверьте, что maturity_date позже valuation_date и обе даты валидны.",
+      example: "...,2026-12-31,2026-01-01,...",
+    },
+    quantity: {
+      title: "Ошибки quantity",
+      howToFix: "quantity должен быть числом и не равняться 0.",
+      example: "...,quantity=10,...",
+    },
+    volatility: {
+      title: "Ошибки volatility",
+      howToFix: "Для опциона volatility > 0; для forward/swap_ir volatility >= 0.",
+      example: "option,...,volatility=0.25,...",
+    },
+    currency: {
+      title: "Ошибки currency",
+      howToFix: "Используйте код ISO 4217 из 3 букв: RUB, USD, EUR.",
+      example: "...,currency=RUB,...",
+    },
+    required: {
+      title: "Пропущенные обязательные поля",
+      howToFix: "Заполните все обязательные колонки из шаблона CSV.",
+      example:
+        "instrument_type,position_id,quantity,notional,underlying_symbol,currency,underlying_price,strike,volatility,maturity_date,valuation_date,risk_free_rate,option_type,style",
+    },
+  };
+  return map[key] ?? defaults;
+}
+
+function groupByIssue(log: ImportLogEntry[]) {
   const map = new Map<string, ImportLogEntry[]>();
   for (const e of log) {
-    const key = e.field ?? "прочее";
+    const key = issueKey(e);
     map.set(key, [...(map.get(key) ?? []), e]);
   }
-  return Array.from(map.entries()).sort((a, b) => b[1].length - a[1].length);
+  return Array.from(map.entries())
+    .map(([key, entries]) => ({ key, entries, hint: issueHint(key) }))
+    .sort((a, b) => b.entries.length - a.entries.length);
 }
 
 export default function ValidatePage() {
@@ -100,18 +156,23 @@ export default function ValidatePage() {
         <div className="row wrap" style={{ justifyContent: "space-between" }}>
           <div>
             <div className="cardTitle">Лог ошибок</div>
-            <div className="cardSubtitle">Группировка по полю, чтобы было проще понять причину.</div>
+            <div className="cardSubtitle">Группировка по типам проблем + как исправить.</div>
           </div>
-          <Button
-            data-testid="go-market"
-            disabled={!canContinue}
-            onClick={() => {
-              dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Validate });
-              nav("/market");
-            }}
-          >
-            Продолжить: рыночные данные
-          </Button>
+          <div className="row wrap">
+            <a className="btn btn-secondary" href="/sample_portfolio.csv" download>
+              Скачать шаблон CSV
+            </a>
+            <Button
+              data-testid="go-market"
+              disabled={!canContinue}
+              onClick={() => {
+                dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Validate });
+                nav("/market");
+              }}
+            >
+              Продолжить: рыночные данные
+            </Button>
+          </div>
         </div>
 
         {log.length === 0 ? (
@@ -120,11 +181,17 @@ export default function ValidatePage() {
           </p>
         ) : (
           <div className="stack" style={{ marginTop: 12 }}>
-            {groupByField(log).map(([field, entries]) => (
-              <Card key={field}>
+            {groupByIssue(log).map(({ key, entries, hint }) => (
+              <Card key={key}>
                 <div className="row wrap" style={{ justifyContent: "space-between" }}>
-                  <div className="cardTitle">{field}</div>
+                  <div className="cardTitle">{hint.title}</div>
                   <div className="textMuted">{entries.length} шт.</div>
+                </div>
+                <div className="textMuted" style={{ marginTop: 8 }}>
+                  Как исправить: {hint.howToFix}
+                </div>
+                <div className="textMuted" style={{ marginTop: 6 }}>
+                  Пример строки: <span className="code">{hint.example}</span>
                 </div>
                 <div className="stack" style={{ marginTop: 10 }}>
                   {entries.slice(0, 6).map((e, idx) => (

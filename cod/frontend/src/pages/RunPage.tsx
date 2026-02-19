@@ -17,6 +17,10 @@ export default function RunPage() {
   const scenarios = dataState.scenarios;
   const selectedMetrics = wf.calcConfig.selectedMetrics;
   const alpha = Number(wf.calcConfig.params?.alpha ?? 0.99);
+  const horizonDays = Number(wf.calcConfig.params?.horizonDays ?? 10);
+  const baseCurrency = String(wf.calcConfig.params?.baseCurrency ?? "RUB").toUpperCase();
+  const fxRates = (wf.calcConfig.params?.fxRates as Record<string, number> | undefined) ?? undefined;
+  const liquidityModel = String(wf.calcConfig.params?.liquidityModel ?? "fraction_of_position_value");
 
   const canRun = useMemo(() => {
     return (
@@ -25,9 +29,21 @@ export default function RunPage() {
       wf.marketData.status === "ready" &&
       wf.marketData.missingFactors === 0 &&
       selectedMetrics.length > 0 &&
-      Number.isFinite(alpha)
+      Number.isFinite(alpha) &&
+      Number.isFinite(horizonDays) &&
+      horizonDays >= 1 &&
+      /^[A-Z]{3}$/.test(baseCurrency)
     );
-  }, [positions.length, wf.validation.criticalErrors, wf.marketData.status, wf.marketData.missingFactors, selectedMetrics.length, alpha]);
+  }, [
+    positions.length,
+    wf.validation.criticalErrors,
+    wf.marketData.status,
+    wf.marketData.missingFactors,
+    selectedMetrics.length,
+    alpha,
+    horizonDays,
+    baseCurrency,
+  ]);
 
   const isRunning = wf.calcRun.status === "running";
 
@@ -54,7 +70,11 @@ export default function RunPage() {
             <div>Сделок: <span className="code">{positions.length}</span></div>
             <div>Сценариев: <span className="code">{scenarios.length}</span></div>
             <div>Метрик: <span className="code">{selectedMetrics.length}</span></div>
-            <div>alpha: <span className="code">{alpha}</span></div>
+            <div>CL (alpha): <span className="code">{alpha}</span></div>
+            <div>Горизонт: <span className="code">{horizonDays} дн.</span></div>
+            <div>Базовая валюта: <span className="code">{baseCurrency}</span></div>
+            <div>FX пар: <span className="code">{Object.keys(fxRates ?? {}).length}</span></div>
+            <div>LC модель: <span className="code">{liquidityModel}</span></div>
             <div>Маржа/капитал: <span className="code">{wf.calcConfig.marginEnabled ? "включено" : "выключено"}</span></div>
           </div>
           {errorText && (
@@ -79,6 +99,10 @@ export default function RunPage() {
                     scenarios,
                     limits: dataState.limits ?? undefined,
                     alpha,
+                    horizonDays,
+                    baseCurrency,
+                    fxRates,
+                    liquidityModel,
                     selectedMetrics,
                     marginEnabled: wf.calcConfig.marginEnabled,
                   });

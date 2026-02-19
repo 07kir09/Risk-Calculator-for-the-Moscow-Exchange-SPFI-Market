@@ -162,7 +162,7 @@ export const scenarioPnL = (positions: OptionPosition[], s: MarketScenario): num
   const bumped = positions.map((p) => ({
     ...p,
     underlying_price: p.underlying_price * (1 + s.underlying_shift),
-    volatility: p.volatility * (1 + s.volatility_shift),
+    volatility: Math.max(1e-8, p.volatility * (1 + s.volatility_shift)),
     risk_free_rate: p.risk_free_rate + s.rate_shift,
   }));
   return portfolioValue(bumped) - portfolioValue(positions);
@@ -172,18 +172,18 @@ export const applyPnLDistribution = (positions: OptionPosition[], scenarios: Mar
 
 export const historicalVar = (pnls: number[], alpha = 0.99): number => {
   if (!pnls.length) throw new Error("Пустой массив PnL для VaR");
-  const losses = pnls.map((v) => -v).sort((a, b) => a - b);
-  const idx = Math.floor(alpha * (losses.length - 1));
-  return losses[idx];
+  const sortedPnls = [...pnls].sort((a, b) => a - b);
+  const k = Math.max(1, Math.ceil(sortedPnls.length * (1 - alpha)));
+  return Math.max(0, -sortedPnls[k - 1]);
 };
 
 export const historicalEs = (pnls: number[], alpha = 0.99): number => {
   if (!pnls.length) throw new Error("Пустой массив PnL для ES");
-  const losses = pnls.map((v) => -v).sort((a, b) => a - b);
-  const varLevel = historicalVar(pnls, alpha);
-  const tail = losses.filter((x) => x >= varLevel);
-  const sum = tail.reduce((a, b) => a + b, 0);
-  return sum / tail.length;
+  const sortedPnls = [...pnls].sort((a, b) => a - b);
+  const k = Math.max(1, Math.ceil(sortedPnls.length * (1 - alpha)));
+  const tail = sortedPnls.slice(0, k);
+  const tailMean = tail.reduce((a, b) => a + b, 0) / tail.length;
+  return Math.max(0, -tailMean);
 };
 
 export const parametricVar = (pnls: number[], alpha = 0.99): number => {
@@ -203,8 +203,18 @@ export const parametricEs = (pnls: number[], alpha = 0.99): number => {
   return -mu + sigma * (pdf / (1 - alpha));
 };
 
-export const liquidityAdjustedVar = (varValue: number, positions: OptionPosition[]): number => {
-  const charge = positions.reduce((acc, p) => acc + Math.abs(p.quantity) * (p.liquidity_haircut ?? 0), 0);
+export const liquidityAdjustedVar = (
+  varValue: number,
+  positions: OptionPosition[],
+  model: "fraction_of_position_value" | "half_spread_fraction" | "absolute_per_contract" = "fraction_of_position_value"
+): number => {
+  const charge = positions.reduce((acc, p) => {
+    const haircut = Math.max(0, p.liquidity_haircut ?? 0);
+    if (model === "absolute_per_contract") return acc + Math.abs(p.quantity) * haircut;
+    const positionValueAbs = Math.abs(pricePosition(p) * p.quantity);
+    if (model === "half_spread_fraction") return acc + 0.5 * haircut * positionValueAbs;
+    return acc + haircut * positionValueAbs;
+  }, 0);
   return varValue + charge;
 };
 

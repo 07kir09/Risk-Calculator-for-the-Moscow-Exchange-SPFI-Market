@@ -21,9 +21,9 @@ type MetricKey =
   | "margin_capital";
 
 const metricCards: Array<{ key: MetricKey; title: string; hint: string }> = [
-  { key: "var_hist", title: "VaR (исторический)", hint: "Потенциальный убыток по историческим изменениям рынка." },
+  { key: "var_hist", title: "VaR (simulated/demo)", hint: "Потенциальный убыток по сценарному PnL (в демо это не исторический ряд рынка)." },
   { key: "var_param", title: "VaR (параметрический)", hint: "VaR по предположению о распределении (нормальное — демо)." },
-  { key: "es_hist", title: "ES (исторический)", hint: "Средний убыток в худших случаях (хвост распределения)." },
+  { key: "es_hist", title: "ES (simulated/demo)", hint: "Средний убыток в худшем хвосте сценарного распределения." },
   { key: "es_param", title: "ES (параметрический)", hint: "ES по параметрическому распределению (демо)." },
   { key: "lc_var", title: "LC VaR", hint: "VaR + надбавка за ликвидность (если задана в сделках)." },
   { key: "greeks", title: "Чувствительности (Greeks + DV01)", hint: "Показывает, что сильнее всего влияет на стоимость портфеля." },
@@ -46,6 +46,13 @@ export default function ConfigurePage() {
   const [alpha, setAlpha] = useState<number>(() => Number(wf.calcConfig.params?.alpha ?? 0.99));
   const [horizonDays, setHorizonDays] = useState<number>(() => Number(wf.calcConfig.params?.horizonDays ?? 10));
   const [historyDays, setHistoryDays] = useState<number>(() => Number(wf.calcConfig.params?.historyDays ?? 250));
+  const [baseCurrency, setBaseCurrency] = useState<string>(() => String(wf.calcConfig.params?.baseCurrency ?? "RUB").toUpperCase());
+  const [liquidityModel, setLiquidityModel] = useState<string>(() => String(wf.calcConfig.params?.liquidityModel ?? "fraction_of_position_value"));
+  const [fxRatesText, setFxRatesText] = useState<string>(() => {
+    const raw = wf.calcConfig.params?.fxRates;
+    if (!raw || typeof raw !== "object") return "{}";
+    return JSON.stringify(raw, null, 2);
+  });
 
   useEffect(() => {
     if (!dataState.scenarios.length) {
@@ -57,21 +64,56 @@ export default function ConfigurePage() {
     setSelected((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   };
 
+  const fxRatesResult = useMemo(() => {
+    const text = fxRatesText.trim();
+    if (!text) return { value: undefined as Record<string, number> | undefined, error: "" };
+    try {
+      const parsed = JSON.parse(text);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return { value: undefined, error: "FX rates должен быть JSON-объектом вида {\"USD\": 90.5}" };
+      }
+      const out: Record<string, number> = {};
+      for (const [k, v] of Object.entries(parsed)) {
+        const n = Number(v);
+        if (!Number.isFinite(n) || n <= 0) {
+          return { value: undefined, error: `Неверный FX для ${k}: ожидается положительное число` };
+        }
+        out[String(k).toUpperCase()] = n;
+      }
+      return { value: out, error: "" };
+    } catch {
+      return { value: undefined, error: "Некорректный JSON в FX rates" };
+    }
+  }, [fxRatesText]);
+
   const readiness = useMemo(() => {
     const hasPortfolio = dataState.portfolio.positions.length > 0;
     const noCritical = wf.validation.criticalErrors === 0;
     const marketOk = wf.marketData.status === "ready" && wf.marketData.missingFactors === 0;
     const hasMetrics = selected.length > 0;
     const alphaOk = alpha > 0.5 && alpha < 0.9999;
+    const baseCurrencyOk = /^[A-Z]{3}$/.test(baseCurrency);
+    const fxOk = fxRatesResult.error === "";
     return {
       hasPortfolio,
       noCritical,
       marketOk,
       hasMetrics,
       alphaOk,
-      ready: hasPortfolio && noCritical && marketOk && hasMetrics && alphaOk,
+      baseCurrencyOk,
+      fxOk,
+      ready: hasPortfolio && noCritical && marketOk && hasMetrics && alphaOk && baseCurrencyOk && fxOk,
     };
-  }, [dataState.portfolio.positions.length, wf.validation.criticalErrors, wf.marketData.status, wf.marketData.missingFactors, selected.length, alpha]);
+  }, [
+    dataState.portfolio.positions.length,
+    wf.validation.criticalErrors,
+    wf.marketData.status,
+    wf.marketData.missingFactors,
+    selected.length,
+    alpha,
+    baseCurrency,
+    fxRatesResult.error,
+  ]);
 
   return (
     <Card>
@@ -131,6 +173,29 @@ export default function ConfigurePage() {
               Окно истории (дней) <HelpTooltip text="Сколько дней истории используем для исторического VaR/ES (демо)." />
               <input type="number" min={30} value={historyDays} onChange={(e) => setHistoryDays(Number(e.target.value))} />
             </label>
+            <label>
+              Базовая валюта отчёта
+              <input
+                type="text"
+                value={baseCurrency}
+                maxLength={3}
+                onChange={(e) => setBaseCurrency(e.target.value.toUpperCase())}
+              />
+            </label>
+            <label>
+              FX коэффициенты (JSON, опционально){" "}
+              <HelpTooltip text='Пример: {"USD": 90.5, "EUR": 98.2}. Курс = сколько единиц базовой валюты за 1 единицу валюты позиции.' />
+              <textarea rows={4} value={fxRatesText} onChange={(e) => setFxRatesText(e.target.value)} />
+            </label>
+            {fxRatesResult.error && <div className="badge danger">{fxRatesResult.error}</div>}
+            <label>
+              LC VaR модель ликвидности
+              <select value={liquidityModel} onChange={(e) => setLiquidityModel(e.target.value)}>
+                <option value="fraction_of_position_value">Haircut как доля от стоимости позиции</option>
+                <option value="half_spread_fraction">Haircut как half-spread доля</option>
+                <option value="absolute_per_contract">Haircut как абсолют на контракт</option>
+              </select>
+            </label>
           </div>
         </Card>
 
@@ -164,7 +229,14 @@ export default function ConfigurePage() {
               dispatch({
                 type: "SET_CALC_CONFIG",
                 selectedMetrics: selected,
-                params: { alpha, horizonDays, historyDays },
+                params: {
+                  alpha,
+                  horizonDays,
+                  historyDays,
+                  baseCurrency,
+                  fxRates: fxRatesResult.value,
+                  liquidityModel,
+                },
                 marginEnabled: selected.includes("margin_capital"),
               });
               dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Configure });
@@ -183,6 +255,8 @@ export default function ConfigurePage() {
               { label: "Рыночные данные привязаны", done: readiness.marketOk },
               { label: `Метрики выбраны (${selected.length})`, done: readiness.hasMetrics },
               { label: "Параметры корректны", done: readiness.alphaOk, hint: readiness.alphaOk ? undefined : "Проверьте alpha" },
+              { label: "Базовая валюта корректна", done: readiness.baseCurrencyOk, hint: readiness.baseCurrencyOk ? undefined : "Ожидается код ISO 4217" },
+              { label: "FX JSON корректен", done: readiness.fxOk, hint: readiness.fxOk ? undefined : fxRatesResult.error || "Проверьте JSON" },
             ]}
           />
         </div>

@@ -1,0 +1,29 @@
+severity,message,row,field
+ERROR,"3 validation errors for OptionPosition
+fixed_rate
+  fixed_rate должен быть конечным числом (type=value_error)
+float_rate
+  float_rate должен быть конечным числом (type=value_error)
+day_count
+  day_count должен быть конечным числом (type=value_error)",2,
+ERROR,"3 validation errors for OptionPosition
+fixed_rate
+  fixed_rate должен быть конечным числом (type=value_error)
+float_rate
+  float_rate должен быть конечным числом (type=value_error)
+day_count
+  day_count должен быть конечным числом (type=value_error)",3,
+ERROR,"3 validation errors for OptionPosition
+fixed_rate
+  fixed_rate должен быть конечным числом (type=value_error)
+float_rate
+  float_rate должен быть конечным числом (type=value_error)
+day_count
+  day_count должен быть конечным числом (type=value_error)",4,
+ERROR,"3 validation errors for OptionPosition
+fixed_rate
+  fixed_rate должен быть конечным числом (type=value_error)
+float_rate
+  float_rate должен быть конечным числом (type=value_error)
+day_count
+  day_count должен быть конечным числом (type=value_error)",5,

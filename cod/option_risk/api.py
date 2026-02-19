@@ -19,6 +19,11 @@ class PortfolioRequest(BaseModel):
     scenarios: list[MarketScenario]
     limits: dict | None = None
     alpha: float = 0.99
+    horizon_days: int = 1
+    base_currency: str = "RUB"
+    fx_rates: dict[str, float] | None = None
+    liquidity_model: str = "fraction_of_position_value"
+    mode: str = "demo"
     calc_sensitivities: bool = True
     calc_var_es: bool = True
     calc_stress: bool = True
@@ -100,6 +105,11 @@ def compute_metrics(req: PortfolioRequest):
             calc_stress=req.calc_stress,
             calc_margin_capital=req.calc_margin_capital,
             alpha=req.alpha,
+            horizon_days=req.horizon_days,
+            base_currency=req.base_currency,
+            fx_rates=req.fx_rates,
+            liquidity_model=req.liquidity_model,
+            mode=req.mode,
         )
         result = run_calculation(portfolio, req.scenarios, req.limits, cfg)
         return result.__dict__

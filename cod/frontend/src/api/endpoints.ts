@@ -8,6 +8,11 @@ export async function fetchMetrics(payload: {
   scenarios: z.infer<typeof scenarioSchema>[];
   limits?: Record<string, unknown>;
   alpha?: number;
+  horizon_days?: number;
+  base_currency?: string;
+  fx_rates?: Record<string, number>;
+  liquidity_model?: string;
+  mode?: "demo" | "api";
   calc_sensitivities?: boolean;
   calc_var_es?: boolean;
   calc_stress?: boolean;

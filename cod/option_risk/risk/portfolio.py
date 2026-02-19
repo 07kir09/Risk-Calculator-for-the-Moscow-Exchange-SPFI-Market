@@ -54,7 +54,10 @@ def greeks_summary(portfolio: Portfolio) -> Dict[str, float]:
 def apply_scenario(position: OptionPosition, scenario: MarketScenario) -> OptionPosition:
     """Возвращает позицию с измененными параметрами по сценарию."""
     bumped_price = position.underlying_price * (1 + scenario.underlying_shift)
-    bumped_vol = position.volatility * (1 + scenario.volatility_shift)
+    raw_bumped_vol = position.volatility * (1 + scenario.volatility_shift)
+    # Для опционов волатильность должна оставаться положительной, для прочих инструментов допускаем 0.
+    vol_floor = 1e-8 if position.instrument_type == InstrumentType.OPTION else 0.0
+    bumped_vol = max(vol_floor, raw_bumped_vol)
     bumped_rate = position.risk_free_rate + scenario.rate_shift
     return position.copy(
         update={

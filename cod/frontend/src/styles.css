@@ -748,6 +748,67 @@ textarea:focus {
   min-width: 0;
 }
 
+.chart-box--interactive {
+  width: 100%;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(10, 132, 255, 0.06), transparent 36%);
+}
+
+.chartSelector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chartSelectorBtn {
+  border: 1px solid var(--chip-border);
+  background: var(--chip-bg);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, transform 80ms ease;
+}
+
+.chartSelectorBtn:hover:not(:disabled) {
+  background: rgba(10, 132, 255, 0.12);
+  border-color: rgba(10, 132, 255, 0.35);
+}
+
+.chartSelectorBtn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.chartSelectorBtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.18);
+}
+
+.chartSelectorBtn--active {
+  background: rgba(10, 132, 255, 0.18);
+  border-color: rgba(10, 132, 255, 0.42);
+}
+
+.chartSelectorBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chartEmpty {
+  height: 360px;
+  border-radius: 14px;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  background: var(--panel);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 16px;
+}
+
 /* ===== Badges ===== */
 .badge {
   display: inline-flex;
@@ -839,6 +900,25 @@ textarea:focus {
 
 .step.locked {
   opacity: 0.55;
+}
+
+.summaryBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.summaryItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 @media (max-width: 1200px) {

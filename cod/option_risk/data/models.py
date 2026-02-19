@@ -71,7 +71,10 @@ class OptionPosition(BaseModel):
     currency: str = Field("RUB", description="Валюта расчета по ISO 4217")
     liquidity_haircut: float = Field(
         0.0,
-        description="Ликвидностная надбавка/спред на контракт (денежный, абсолютный)",
+        description=(
+            "Параметр ликвидностной надбавки. Единицы зависят от выбранной liquidity модели: "
+            "доля от стоимости позиции, half-spread в долях, либо абсолют на контракт."
+        ),
     )
     model: Optional[str] = Field(
         None, description="Предпочитаемая модель оценки (black_scholes|binomial|mc)"
@@ -99,12 +102,12 @@ class OptionPosition(BaseModel):
         return value
 
     @validator("underlying_price", "strike")
-    def _positive_prices(cls, value: float, field) -> float:
+    def _positive_prices(cls, value: float) -> float:
         value = float(value)
         if not math.isfinite(value):
-            raise ValueError(f"{field.name} должен быть конечным числом")
+            raise ValueError("Цена/страйк должны быть конечным числом")
         if value <= 0:
-            raise ValueError(f"{field.name} должен быть больше нуля")
+            raise ValueError("Цена/страйк должны быть больше нуля")
         return value
 
     @validator("volatility")
@@ -149,15 +152,15 @@ class OptionPosition(BaseModel):
         return value
 
     @validator("fixed_rate", "float_rate", "day_count")
-    def _validate_optional_floats(cls, value: Optional[float], field) -> Optional[float]:
+    def _validate_optional_floats(cls, value: Optional[float]) -> Optional[float]:
         if value is None:
             return None
         value = float(value)
         if not math.isfinite(value):
-            raise ValueError(f"{field.name} должен быть конечным числом")
+            raise ValueError("Параметр должен быть конечным числом")
         return value
 
-    @root_validator
+    @root_validator(skip_on_failure=True)
     def _check_dates(cls, values):
         maturity_date = values.get("maturity_date")
         valuation_date = values.get("valuation_date")

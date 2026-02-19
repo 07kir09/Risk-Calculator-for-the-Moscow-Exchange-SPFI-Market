@@ -15,6 +15,7 @@ export default function StressPage() {
   const { state: wf, dispatch } = useWorkflow();
   const metrics = dataState.results.metrics;
   const stress = metrics?.stress || [];
+  const topStressContributors = metrics?.top_contributors?.stress ?? [];
   const [status, setStatus] = useState<string>("");
   const [isRecalc, setIsRecalc] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -32,6 +33,10 @@ export default function StressPage() {
   const [draftDesc, setDraftDesc] = useState("Пользовательский сценарий");
 
   const alpha = Number(wf.calcConfig.params?.alpha ?? 0.99);
+  const horizonDays = Number(wf.calcConfig.params?.horizonDays ?? 10);
+  const baseCurrency = String(wf.calcConfig.params?.baseCurrency ?? "RUB").toUpperCase();
+  const fxRates = (wf.calcConfig.params?.fxRates as Record<string, number> | undefined) ?? undefined;
+  const liquidityModel = String(wf.calcConfig.params?.liquidityModel ?? "fraction_of_position_value");
   const selectedMetrics = wf.calcConfig.selectedMetrics;
 
   const recalcNow = async () => {
@@ -46,6 +51,10 @@ export default function StressPage() {
         scenarios: dataState.scenarios,
         limits: dataState.limits ?? undefined,
         alpha,
+        horizonDays,
+        baseCurrency,
+        fxRates,
+        liquidityModel,
         selectedMetrics,
         marginEnabled: wf.calcConfig.marginEnabled,
       });
@@ -154,24 +163,41 @@ export default function StressPage() {
             {status && <div className="badge ok" style={{ marginTop: 12 }}>{status}</div>}
 
             <Card style={{ marginTop: 12 }}>
-              <div className="cardTitle">Топ‑вкладчики (демо)</div>
-              <div className="cardSubtitle">Пока нет разложений по сделкам, показываем “прокси” по чувствительностям.</div>
-              <div className="row wrap" style={{ marginTop: 12 }}>
-                {Object.entries(metrics?.greeks ?? {})
-                  .slice(0, 6)
-                  .map(([k, v]) => (
-                    <span key={k} className="badge warn" title={String(v)}>
-                      {k.toUpperCase()}: {formatNumber(v, 4)}
-                    </span>
-                  ))}
-                {!Object.keys(metrics?.greeks ?? {}).length && <span className="textMuted">Нет Greeks — включите в настройках.</span>}
+              <div className="cardTitle">Топ‑вкладчики в худший стресс</div>
+              <div className="cardSubtitle">Сортировка по |ΔPnL| для худшего сценария.</div>
+              <div className="table-wrap" style={{ marginTop: 12 }}>
+                <table className="table sticky">
+                  <thead>
+                    <tr>
+                      <th>Position</th>
+                      <th>Scenario</th>
+                      <th>ΔPnL</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topStressContributors.map((row, idx) => (
+                      <tr key={`${row.position_id}-${idx}`}>
+                        <td>{row.position_id}</td>
+                        <td>{row.scenario_id ?? "—"}</td>
+                        <td>{formatNumber(row.pnl_contribution, 2)}</td>
+                      </tr>
+                    ))}
+                    {!topStressContributors.length && (
+                      <tr>
+                        <td colSpan={3} className="textMuted">Нет разложения по позициям для стресса.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </Card>
           </Card>
 
           <Card>
             <div className="cardTitle">Каталог сценариев</div>
-            <div className="cardSubtitle">Шок по цене/волатильности/ставке. Пример: -0.10 = падение цены на 10%.</div>
+            <div className="cardSubtitle">
+              Шок по цене/волатильности/ставке. `rate_shift` трактуется как абсолютный сдвиг ставки (в долях), `volatility` после шока ограничивается снизу.
+            </div>
 
             <div className="stack" style={{ marginTop: 12 }}>
               <label>

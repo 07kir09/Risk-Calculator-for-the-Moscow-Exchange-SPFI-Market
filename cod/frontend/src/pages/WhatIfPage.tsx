@@ -72,15 +72,16 @@ export default function WhatIfPage() {
   const compareRows = useMemo(() => {
     const before = baseMetrics;
     const after = afterMetrics;
+    const unit = before?.base_currency ?? dataState.portfolio.positions[0]?.currency;
     const rows: Array<{ key: string; label: string; unit?: string; before?: number; after?: number }> = [
-      { key: "base_value", label: "Стоимость портфеля", unit: dataState.portfolio.positions[0]?.currency, before: before?.base_value, after: after?.base_value },
-      { key: "var_hist", label: "VaR (hist)", unit: dataState.portfolio.positions[0]?.currency, before: before?.var_hist, after: after?.var_hist },
-      { key: "es_hist", label: "ES (hist)", unit: dataState.portfolio.positions[0]?.currency, before: before?.es_hist, after: after?.es_hist },
-      { key: "lc_var", label: "LC VaR", unit: dataState.portfolio.positions[0]?.currency, before: before?.lc_var, after: after?.lc_var },
+      { key: "base_value", label: "Стоимость портфеля", unit, before: before?.base_value, after: after?.base_value },
+      { key: "var_hist", label: "VaR (hist)", unit, before: before?.var_hist, after: after?.var_hist },
+      { key: "es_hist", label: "ES (hist)", unit, before: before?.es_hist, after: after?.es_hist },
+      { key: "lc_var", label: "LC VaR", unit, before: before?.lc_var, after: after?.lc_var },
       { key: "delta", label: "Delta", before: before?.greeks?.delta, after: after?.greeks?.delta },
       { key: "vega", label: "Vega", before: before?.greeks?.vega, after: after?.greeks?.vega },
       { key: "dv01", label: "DV01", before: before?.greeks?.dv01, after: after?.greeks?.dv01 },
-      { key: "initial_margin", label: "Initial Margin", unit: dataState.portfolio.positions[0]?.currency, before: before?.initial_margin, after: after?.initial_margin },
+      { key: "initial_margin", label: "Initial Margin", unit, before: before?.initial_margin, after: after?.initial_margin },
     ];
     return rows;
   }, [afterMetrics, baseMetrics, dataState.portfolio.positions]);
@@ -296,11 +297,19 @@ export default function WhatIfPage() {
                 setIsRunning(true);
                 try {
                   const alpha = Number(wf.calcConfig.params?.alpha ?? 0.99);
+                  const horizonDays = Number(wf.calcConfig.params?.horizonDays ?? 10);
+                  const baseCurrency = String(wf.calcConfig.params?.baseCurrency ?? "RUB").toUpperCase();
+                  const fxRates = (wf.calcConfig.params?.fxRates as Record<string, number> | undefined) ?? undefined;
+                  const liquidityModel = String(wf.calcConfig.params?.liquidityModel ?? "fraction_of_position_value");
                   const metrics = await runRiskCalculation({
                     positions: afterPositions,
                     scenarios,
                     limits: dataState.limits ?? undefined,
                     alpha,
+                    horizonDays,
+                    baseCurrency,
+                    fxRates,
+                    liquidityModel,
                     selectedMetrics: wf.calcConfig.selectedMetrics,
                     marginEnabled: wf.calcConfig.marginEnabled,
                   });
