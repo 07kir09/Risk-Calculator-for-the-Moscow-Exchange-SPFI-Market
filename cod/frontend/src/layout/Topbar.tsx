@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useMemo, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -13,20 +13,12 @@ function MenuIcon() {
   );
 }
 
-function formatId(id?: string) {
-  if (!id) return "—";
-  if (id.length <= 16) return id;
-  return `${id.slice(0, 8)}…${id.slice(-4)}`;
-}
-
 export default function Topbar({
   title,
-  onOpenMobileMenu,
-  onToggleCollapsed,
+  onToggleNavigation,
 }: {
   title: string;
-  onOpenMobileMenu: () => void;
-  onToggleCollapsed: () => void;
+  onToggleNavigation: () => void;
 }) {
   const nav = useNavigate();
   const { state, dispatch } = useWorkflow();
@@ -41,19 +33,6 @@ export default function Topbar({
     danger?: boolean;
     action: () => void;
   } | null>(null);
-
-  const calcBadge = useMemo(() => {
-    switch (state.calcRun.status) {
-      case "running":
-        return <span className="badge warn">Считаем…</span>;
-      case "success":
-        return <span className="badge ok">Готово</span>;
-      case "error":
-        return <span className="badge danger">Ошибка</span>;
-      default:
-        return <span className="badge">Не запускали</span>;
-    }
-  }, [state.calcRun.status]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -75,19 +54,13 @@ export default function Topbar({
         }}
       />
       <div className="topbarLeft">
-        <button className="btn btn-secondary" onClick={onOpenMobileMenu} aria-label="Открыть меню">
-          <MenuIcon /> Меню
-        </button>
-        <button className="btn btn-ghost" onClick={onToggleCollapsed} aria-label="Свернуть сайдбар">
-          Свернуть
+        <button className="btn btn-secondary" onClick={onToggleNavigation} aria-label="Управление навигацией">
+          <MenuIcon /> Навигация
         </button>
         <div className="topbarTitle">{title}</div>
       </div>
 
       <div className="topbarMeta">
-        <span className="code topbarCode">snapshot: {formatId(state.snapshotId)}</span>
-        <span className="code topbarCode">run: {formatId(state.calcRun.calcRunId)}</span>
-        {calcBadge}
         {(dataState.portfolio.positions.length > 0 || Boolean(dataState.results.metrics) || Boolean(state.snapshotId)) && (
           <Button
             variant="secondary"

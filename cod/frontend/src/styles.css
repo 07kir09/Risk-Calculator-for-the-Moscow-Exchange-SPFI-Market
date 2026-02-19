@@ -152,11 +152,21 @@ a:hover {
   gap: 10px;
 }
 
+.appSidebarHeader--collapsed {
+  padding: 10px 8px;
+  justify-content: center;
+}
+
 .brand {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
+}
+
+.appSidebarHeader--collapsed .brand {
+  justify-content: center;
+  width: 100%;
 }
 
 .brandMark {

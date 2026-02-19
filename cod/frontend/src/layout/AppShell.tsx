@@ -62,6 +62,14 @@ export default function AppShell({ children }: { children: ReactNode }) {
     };
   }, [dataState.portfolio.positions.length, dataState.results.metrics, wf.calcConfig.params]);
 
+  const handleToggleNavigation = () => {
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 980px)").matches) {
+      setMobileOpen((v) => !v);
+      return;
+    }
+    setCollapsed((v) => !v);
+  };
+
   return (
     <div className={`app ${collapsed ? "app--collapsed" : ""}`}>
       <OnboardingModal />
@@ -69,13 +77,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <Sidebar
         collapsed={collapsed}
         mobileOpen={mobileOpen}
-        onToggleCollapsed={() => setCollapsed((v) => !v)}
         onCloseMobile={() => setMobileOpen(false)}
       />
       <Topbar
         title={pageTitle}
-        onOpenMobileMenu={() => setMobileOpen(true)}
-        onToggleCollapsed={() => setCollapsed((v) => !v)}
+        onToggleNavigation={handleToggleNavigation}
       />
       <main className="appMain">
         <div className="appMainScroll">

@@ -48,12 +48,10 @@ function DotIcon() {
 export default function Sidebar({
   collapsed,
   mobileOpen,
-  onToggleCollapsed,
   onCloseMobile,
 }: {
   collapsed: boolean;
   mobileOpen: boolean;
-  onToggleCollapsed: () => void;
   onCloseMobile: () => void;
 }) {
   const items = useMemo(() => workflowItems, []);
@@ -72,7 +70,7 @@ export default function Sidebar({
 
   return (
     <aside className={`appSidebar ${mobileOpen ? "appSidebar--mobileOpen" : ""}`} aria-label="Навигация">
-      <div className="appSidebarHeader">
+      <div className={`appSidebarHeader ${collapsed ? "appSidebarHeader--collapsed" : ""}`}>
         <div className="brand" title="Риск‑калькулятор СПФИ (MOEX)">
           <div className="brandMark">R</div>
           {!collapsed && (
@@ -82,9 +80,6 @@ export default function Sidebar({
             </div>
           )}
         </div>
-        <button className="btn btn-secondary" onClick={onToggleCollapsed} aria-label="Свернуть меню">
-          {collapsed ? "›" : "‹"}
-        </button>
       </div>
 
       <div className="appSidebarScroll">
