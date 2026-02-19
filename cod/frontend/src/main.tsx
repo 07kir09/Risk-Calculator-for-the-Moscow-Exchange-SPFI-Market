@@ -5,6 +5,8 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { WorkflowProvider } from "./workflow/workflowStore";
 import { AppDataProvider } from "./state/appDataStore";
+import ErrorBoundary from "./ui/ErrorBoundary";
+import { ToastProvider } from "./ui/Toast";
 import "./styles.css";
 
 const storedTheme = localStorage.getItem("theme");
@@ -33,9 +35,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={client}>
       <WorkflowProvider>
         <AppDataProvider>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
+          <ToastProvider>
+            <BrowserRouter>
+              <ErrorBoundary>
+                <App />
+              </ErrorBoundary>
+            </BrowserRouter>
+          </ToastProvider>
         </AppDataProvider>
       </WorkflowProvider>
     </QueryClientProvider>

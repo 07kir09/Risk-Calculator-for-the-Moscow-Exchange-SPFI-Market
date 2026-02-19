@@ -1,6 +1,17 @@
-import { ReactNode } from "react";
+import { HTMLAttributes, ReactNode } from "react";
 import classNames from "classnames";
 
-export default function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={classNames("card", className)}>{children}</div>;
+export default function Card({
+  children,
+  className,
+  ...rest
+}: {
+  children: ReactNode;
+  className?: string;
+} & HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={classNames("card", className)} {...rest}>
+      {children}
+    </div>
+  );
 }
