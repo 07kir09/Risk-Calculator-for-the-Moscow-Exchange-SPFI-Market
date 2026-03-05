@@ -85,3 +85,19 @@ test("keeps valid optional numeric fields", () => {
   expect(positions[0].float_rate).toBeCloseTo(0.04);
   expect(positions[0].day_count).toBeCloseTo(0.5);
 });
+
+test("parses russian trade-export format without critical errors", () => {
+  const tradeCsv = [
+    "Номер в клиринговой системе,Номер в торговой системе,Дата регистрации,Продукт,Инструмент,Направление,Цена,Стоимость,Курс,Начало,Окончание,Сумма 1,Валюта 1,Сумма 2,Валюта 2,Страйк",
+    "6150,6150,05.03.2026,FX Fwd,FX Fwd EUR/RUB 2W,Sell,91.921,594884.96,,19.03.2026,19.03.2026,1000000,EUR,91921000,RUB,",
+    "4457,4457,13.02.2026,IRS,IRS TOD/2Y RUB KeyRate,Pay Fixed,0.17,-14791.7,,13.02.2026,12.02.2028,1000000,RUB,1000000,RUB,",
+    "4449,4449,11.02.2026,Cap,Cap TOM/3M RUB KeyRate R 16.5,Pay Fixed,0.012,21888.38,,12.02.2026,12.05.2026,50000000,RUB,50000000,RUB,0.165",
+  ].join("\n");
+
+  const { positions, log } = parsePortfolioCsv(tradeCsv);
+  expect(log.filter((x) => x.severity === "ERROR")).toHaveLength(0);
+  expect(positions).toHaveLength(3);
+  expect(positions[0].instrument_type).toBe("forward");
+  expect(positions[1].instrument_type).toBe("swap_ir");
+  expect(positions[2].instrument_type).toBe("option");
+});

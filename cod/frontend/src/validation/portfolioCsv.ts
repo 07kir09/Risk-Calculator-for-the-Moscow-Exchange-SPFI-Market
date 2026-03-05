@@ -7,13 +7,38 @@ function normalizeNumber(value: unknown): number {
   if (typeof value !== "string") return Number(value);
   const trimmed = value.trim();
   if (!trimmed) return Number.NaN;
-  const normalized = trimmed.replace(",", ".");
+  const normalized = trimmed.replace(/\u00A0/g, "").replace(/\s+/g, "").replace(",", ".");
   return Number(normalized);
 }
 
 function normalizeString(value: unknown): string {
   if (value === null || value === undefined) return "";
   return String(value).trim();
+}
+
+function parseFlexibleDate(value: string): Date | null {
+  const text = normalizeString(value);
+  if (!text) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) {
+    const d = new Date(text);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const m = text.match(/^(\d{2})[./-](\d{2})[./-](\d{4})$/);
+  if (!m) return null;
+  const day = Number(m[1]);
+  const month = Number(m[2]);
+  const year = Number(m[3]);
+  const d = new Date(Date.UTC(year, month - 1, day));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function toIsoDate(value: string): string {
+  const d = parseFlexibleDate(value);
+  if (!d) return "";
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function isIsoDate(value: string): boolean {
@@ -31,13 +56,162 @@ function assertRequired(row: Record<string, unknown>, key: string, rowNum: numbe
   return v;
 }
 
+function safePositive(value: number, fallback: number): number {
+  if (!Number.isFinite(value) || value <= 0) return fallback;
+  return value;
+}
+
+function directionToQuantity(direction: string): number {
+  const text = direction.toLowerCase();
+  if (text.includes("sell") || text.includes("pay fixed")) return -1;
+  return 1;
+}
+
+function extractUnderlyingSymbol(instrument: string, ccy1: string, ccy2: string): string {
+  const m = instrument.toUpperCase().match(/([A-Z]{3}\s*\/\s*[A-Z]{3})/);
+  if (m?.[1]) return m[1].replace(/\s+/g, "");
+  if (ccy1 && ccy2 && ccy1 !== ccy2) return `${ccy1}/${ccy2}`;
+  return instrument || "UNKNOWN";
+}
+
+function isTradeExportFormat(row: Record<string, unknown>): boolean {
+  const hasProduct = normalizeString(row["Продукт"]) !== "";
+  const hasInstrument = normalizeString(row["Инструмент"]) !== "";
+  const hasId = normalizeString(row["Номер в клиринговой системе"]) !== "" || normalizeString(row["Номер в торговой системе"]) !== "";
+  return hasProduct && hasInstrument && hasId;
+}
+
+function parseTradeRow(row: Record<string, unknown>, rowNum: number, rowLog: ImportLogEntry[]): PositionDTO | null {
+  const product = normalizeString(row["Продукт"]);
+  const productLower = product.toLowerCase();
+  const instrument = normalizeString(row["Инструмент"]) || product;
+  const direction = normalizeString(row["Направление"]) || "Buy";
+  const position_id = normalizeString(row["Номер в клиринговой системе"]) || normalizeString(row["Номер в торговой системе"]);
+  if (!position_id) {
+    rowLog.push({ severity: "ERROR", row: rowNum, field: "Номер в клиринговой системе", message: "Не задан ID сделки" });
+    return null;
+  }
+
+  const valuationRaw = normalizeString(row["Дата регистрации"]) || normalizeString(row["Начало"]);
+  const maturityRaw = normalizeString(row["Окончание"]) || normalizeString(row["Начало"]);
+  const valuationDateIso = toIsoDate(valuationRaw);
+  let maturityDateIso = toIsoDate(maturityRaw);
+  if (!valuationDateIso || !maturityDateIso) {
+    rowLog.push({ severity: "ERROR", row: rowNum, field: "Дата регистрации", message: "Не удалось распознать даты (ожидается DD.MM.YYYY или YYYY-MM-DD)" });
+    return null;
+  }
+  if (Date.parse(maturityDateIso) <= Date.parse(valuationDateIso)) {
+    const d = new Date(Date.parse(valuationDateIso) + 24 * 3600 * 1000);
+    maturityDateIso = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+    rowLog.push({ severity: "WARNING", row: rowNum, field: "Окончание", message: "Окончание <= дата регистрации, maturity сдвинута на +1 день" });
+  }
+
+  const ccy1 = normalizeString(row["Валюта 1"]).toUpperCase();
+  const ccy2 = normalizeString(row["Валюта 2"]).toUpperCase();
+  const currency = ccy2 || ccy1 || "RUB";
+
+  const sum1 = normalizeNumber(row["Сумма 1"]);
+  const sum2 = normalizeNumber(row["Сумма 2"]);
+  const notional = safePositive(Math.abs(sum1), 1);
+  const quoteRatio = Number.isFinite(sum1) && sum1 !== 0 && Number.isFinite(sum2) ? Math.abs(sum2 / sum1) : Number.NaN;
+
+  const price = normalizeNumber(row["Цена"]);
+  const strikeCol = normalizeNumber(row["Страйк"]);
+  const spotCol = normalizeNumber(row["Курс"]);
+  const mtm = normalizeNumber(row["Стоимость"]);
+  const quantity = directionToQuantity(direction);
+  const underlyingSymbol = extractUnderlyingSymbol(instrument, ccy1, ccy2);
+
+  const t = Math.max(1 / 365, (Date.parse(maturityDateIso) - Date.parse(valuationDateIso)) / (365 * 24 * 3600 * 1000));
+
+  if (productLower.includes("cap") || productLower.includes("floor")) {
+    const option_type: "call" | "put" = productLower.includes("cap") ? "call" : "put";
+    const underlying_price = safePositive(price, safePositive(strikeCol, 0.01));
+    const strike = safePositive(strikeCol, underlying_price);
+    rowLog.push({ severity: "WARNING", row: rowNum, field: "Продукт", message: "Cap/Floor импортирован как option (упрощенная модель)" });
+    return {
+      instrument_type: "option",
+      position_id,
+      option_type,
+      style: "european",
+      quantity,
+      notional,
+      underlying_symbol: underlyingSymbol,
+      underlying_price,
+      strike,
+      volatility: 0.2,
+      maturity_date: maturityDateIso,
+      valuation_date: valuationDateIso,
+      risk_free_rate: 0.05,
+      dividend_yield: 0,
+      currency,
+      liquidity_haircut: 0,
+      model: "black_scholes",
+    };
+  }
+
+  if (["irs", "ois", "xccy"].some((tag) => productLower.includes(tag))) {
+    const fixedRate = Number.isFinite(price) ? price : 0;
+    const riskFreeRate = fixedRate >= 0 && fixedRate <= 1 ? fixedRate : 0.05;
+    const discount = Math.exp(-riskFreeRate * t);
+    const denom = notional * t * discount;
+    const floatRate = Math.abs(denom) > 1e-12 && Number.isFinite(mtm) ? fixedRate + mtm / quantity / denom : riskFreeRate;
+    const strike = safePositive(Math.abs(fixedRate), 1e-8);
+    return {
+      instrument_type: "swap_ir",
+      position_id,
+      option_type: "call",
+      style: "european",
+      quantity,
+      notional,
+      underlying_symbol: underlyingSymbol,
+      underlying_price: 1,
+      strike,
+      volatility: 0,
+      maturity_date: maturityDateIso,
+      valuation_date: valuationDateIso,
+      risk_free_rate: riskFreeRate,
+      dividend_yield: 0,
+      currency,
+      liquidity_haircut: 0,
+      fixed_rate: fixedRate,
+      float_rate: floatRate,
+      day_count: t,
+    };
+  }
+
+  const strike = safePositive(price, safePositive(quoteRatio, safePositive(spotCol, 1)));
+  const riskFreeRate = 0.05;
+  const discount = Math.exp(-riskFreeRate * t);
+  const impliedUnderlying = strike + (Number.isFinite(mtm) ? mtm / quantity / (notional * discount) : 0);
+  const underlying_price = safePositive(impliedUnderlying, safePositive(spotCol, strike));
+  return {
+    instrument_type: "forward",
+    position_id,
+    option_type: "call",
+    style: "european",
+    quantity,
+    notional,
+    underlying_symbol: underlyingSymbol,
+    underlying_price,
+    strike,
+    volatility: 0,
+    maturity_date: maturityDateIso,
+    valuation_date: valuationDateIso,
+    risk_free_rate: riskFreeRate,
+    dividend_yield: 0,
+    currency,
+    liquidity_haircut: 0,
+  };
+}
+
 export function parsePortfolioCsv(text: string): { positions: PositionDTO[]; log: ImportLogEntry[] } {
   const log: ImportLogEntry[] = [];
   const parsed = Papa.parse<Record<string, unknown>>(text, {
     header: true,
     skipEmptyLines: true,
     dynamicTyping: false,
-    transformHeader: (h) => h.trim(),
+    transformHeader: (h) => h.replace(/^\uFEFF/, "").trim(),
   });
 
   if (parsed.errors?.length) {
@@ -53,10 +227,19 @@ export function parsePortfolioCsv(text: string): { positions: PositionDTO[]; log
   }
 
   const positions: PositionDTO[] = [];
+  const tradeMode = rows.some((row) => isTradeExportFormat(row));
 
   rows.forEach((row, i) => {
     const rowNum = i + 2; // 1 — header
     const rowLog: ImportLogEntry[] = [];
+
+    if (tradeMode) {
+      const pos = parseTradeRow(row, rowNum, rowLog);
+      const hasErrors = rowLog.some((x) => x.severity === "ERROR");
+      log.push(...rowLog);
+      if (!hasErrors && pos) positions.push(pos);
+      return;
+    }
 
     const instrument_type = assertRequired(row, "instrument_type", rowNum, rowLog).toLowerCase();
     const position_id = assertRequired(row, "position_id", rowNum, rowLog);

@@ -11,6 +11,58 @@ import { useAppData } from "../state/appDataStore";
 import { demoPositions } from "../mock/demoData";
 import { parsePortfolioCsv } from "../validation/portfolioCsv";
 
+type ParseOutcome = ReturnType<typeof parsePortfolioCsv> & { encoding: string };
+
+function collectLogStats(log: ReturnType<typeof parsePortfolioCsv>["log"]) {
+  return {
+    errors: log.filter((x) => x.severity === "ERROR").length,
+    warnings: log.filter((x) => x.severity === "WARNING").length,
+  };
+}
+
+function compareParseOutcome(a: ParseOutcome, b: ParseOutcome): number {
+  if (a.positions.length !== b.positions.length) return b.positions.length - a.positions.length;
+  const aStats = collectLogStats(a.log);
+  const bStats = collectLogStats(b.log);
+  if (aStats.errors !== bStats.errors) return aStats.errors - bStats.errors;
+  if (aStats.warnings !== bStats.warnings) return aStats.warnings - bStats.warnings;
+  if (a.encoding === "utf-8" && b.encoding !== "utf-8") return -1;
+  if (b.encoding === "utf-8" && a.encoding !== "utf-8") return 1;
+  return 0;
+}
+
+async function parsePortfolioCsvFromFile(file: File) {
+  const readAsText = (encoding?: string) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ""));
+      reader.onerror = () => reject(reader.error ?? new Error("Не удалось прочитать CSV-файл"));
+      if (encoding) reader.readAsText(file, encoding);
+      else reader.readAsText(file);
+    });
+
+  const encodings = ["utf-8", "windows-1251"];
+  const outcomes: ParseOutcome[] = [];
+
+  for (const encoding of encodings) {
+    try {
+      const text = await readAsText(encoding);
+      outcomes.push({ ...parsePortfolioCsv(text), encoding });
+    } catch {
+      // Пропускаем неподдерживаемую кодировку и идем дальше.
+    }
+  }
+
+  if (!outcomes.length) {
+    const text = await readAsText();
+    return parsePortfolioCsv(text);
+  }
+
+  outcomes.sort(compareParseOutcome);
+  const best = outcomes[0];
+  return { positions: best.positions, log: best.log };
+}
+
 export default function ImportPage() {
   const nav = useNavigate();
   const { dispatch } = useWorkflow();
@@ -34,14 +86,11 @@ export default function ImportPage() {
     dispatch({ type: "SET_VALIDATION", criticalErrors: 0, warnings: 0, acknowledged: false });
   };
 
-  const importFile = (file: File) => {
+  const importFile = async (file: File) => {
     setLoading(true);
     setLastFilename(file.name);
-    const reader = new FileReader();
-    reader.onload = () => {
-      const text = String(reader.result ?? "");
-      const { positions, log } = parsePortfolioCsv(text);
-
+    try {
+      const { positions, log } = await parsePortfolioCsvFromFile(file);
       dataDispatch({ type: "SET_PORTFOLIO", positions, source: "csv", filename: file.name });
       dataDispatch({ type: "SET_VALIDATION_LOG", log });
 
@@ -54,9 +103,9 @@ export default function ImportPage() {
         dispatch({ type: "SET_SNAPSHOT", snapshotId: crypto.randomUUID() });
         dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Import });
       }
+    } finally {
       setLoading(false);
-    };
-    reader.readAsText(file);
+    }
   };
 
   const positions = dataState.portfolio.positions;
@@ -149,6 +198,9 @@ export default function ImportPage() {
             <div className="textMuted">
               Поддерживаемые типы: <span className="code">option</span>, <span className="code">forward</span>,{" "}
               <span className="code">swap_ir</span>.
+            </div>
+            <div className="textMuted">
+              Также поддерживается trade-export CSV с русскими колонками (Продукт/Инструмент/Направление и т.д.).
             </div>
             {lastFilename && <div className="textMuted">Последний файл: {lastFilename}</div>}
           </div>
