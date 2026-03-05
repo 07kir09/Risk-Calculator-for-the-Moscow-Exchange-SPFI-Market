@@ -58,7 +58,7 @@ export function parsePortfolioCsv(text: string): { positions: PositionDTO[]; log
     const rowNum = i + 2; // 1 — header
     const rowLog: ImportLogEntry[] = [];
 
-    const instrument_type = assertRequired(row, "instrument_type", rowNum, rowLog);
+    const instrument_type = assertRequired(row, "instrument_type", rowNum, rowLog).toLowerCase();
     const position_id = assertRequired(row, "position_id", rowNum, rowLog);
     const currency = assertRequired(row, "currency", rowNum, rowLog).toUpperCase();
     const underlying_symbol = assertRequired(row, "underlying_symbol", rowNum, rowLog);
@@ -72,8 +72,10 @@ export function parsePortfolioCsv(text: string): { positions: PositionDTO[]; log
     const maturity_date = assertRequired(row, "maturity_date", rowNum, rowLog);
     const valuation_date = assertRequired(row, "valuation_date", rowNum, rowLog);
 
-    const option_type_raw = normalizeString(row["option_type"]) || "call";
-    const style_raw = normalizeString(row["style"]) || "european";
+    const option_type_input = normalizeString(row["option_type"]);
+    const style_input = normalizeString(row["style"]);
+    const option_type_raw = (option_type_input || "call").toLowerCase();
+    const style_raw = (style_input || "european").toLowerCase();
 
     const instrumentTypes = new Set(["option", "forward", "swap_ir"]);
     if (instrument_type && !instrumentTypes.has(instrument_type)) {
@@ -98,6 +100,8 @@ export function parsePortfolioCsv(text: string): { positions: PositionDTO[]; log
     }
     if (!Number.isFinite(risk_free_rate)) {
       rowLog.push({ severity: "ERROR", row: rowNum, field: "risk_free_rate", message: "risk_free_rate должен быть числом" });
+    } else if (risk_free_rate < -1) {
+      rowLog.push({ severity: "ERROR", row: rowNum, field: "risk_free_rate", message: "risk_free_rate не может быть меньше -1" });
     }
 
     if (maturity_date && !isIsoDate(maturity_date)) {
@@ -114,18 +118,17 @@ export function parsePortfolioCsv(text: string): { positions: PositionDTO[]; log
 
     const optionTypes = new Set(["call", "put"]);
     const styles = new Set(["european", "american"]);
-    if (instrument_type === "option") {
-      if (!optionTypes.has(option_type_raw)) {
-        rowLog.push({ severity: "ERROR", row: rowNum, field: "option_type", message: `option_type должен быть call/put, получено: "${option_type_raw}"` });
-      }
-      if (!styles.has(style_raw)) {
-        rowLog.push({ severity: "ERROR", row: rowNum, field: "style", message: `style должен быть european/american, получено: "${style_raw}"` });
-      }
-    } else {
-      if (normalizeString(row["option_type"]) === "") {
+    if (!optionTypes.has(option_type_raw)) {
+      rowLog.push({ severity: "ERROR", row: rowNum, field: "option_type", message: `option_type должен быть call/put, получено: "${option_type_raw}"` });
+    }
+    if (!styles.has(style_raw)) {
+      rowLog.push({ severity: "ERROR", row: rowNum, field: "style", message: `style должен быть european/american, получено: "${style_raw}"` });
+    }
+    if (instrument_type !== "option") {
+      if (option_type_input === "") {
         rowLog.push({ severity: "WARNING", row: rowNum, field: "option_type", message: "option_type не задан — оставили значение по умолчанию (call)" });
       }
-      if (normalizeString(row["style"]) === "") {
+      if (style_input === "") {
         rowLog.push({ severity: "WARNING", row: rowNum, field: "style", message: "style не задан — оставили значение по умолчанию (european)" });
       }
     }
@@ -149,6 +152,62 @@ export function parsePortfolioCsv(text: string): { positions: PositionDTO[]; log
     const float_rate = normalizeString(row["float_rate"]);
     const day_count = normalizeString(row["day_count"]);
 
+    let dividendYieldValue: number | undefined;
+    if (dividend_yield !== "") {
+      const value = normalizeNumber(dividend_yield);
+      if (!Number.isFinite(value)) {
+        rowLog.push({ severity: "ERROR", row: rowNum, field: "dividend_yield", message: "dividend_yield должен быть числом" });
+      } else if (value < 0) {
+        rowLog.push({ severity: "ERROR", row: rowNum, field: "dividend_yield", message: "dividend_yield не может быть отрицательным" });
+      } else {
+        dividendYieldValue = value;
+      }
+    }
+
+    let liquidityHaircutValue: number | undefined;
+    if (liquidity_haircut !== "") {
+      const value = normalizeNumber(liquidity_haircut);
+      if (!Number.isFinite(value)) {
+        rowLog.push({ severity: "ERROR", row: rowNum, field: "liquidity_haircut", message: "liquidity_haircut должен быть числом" });
+      } else if (value < 0) {
+        rowLog.push({ severity: "ERROR", row: rowNum, field: "liquidity_haircut", message: "liquidity_haircut не может быть отрицательным" });
+      } else {
+        liquidityHaircutValue = value;
+      }
+    }
+
+    let fixedRateValue: number | undefined;
+    if (fixed_rate !== "") {
+      const value = normalizeNumber(fixed_rate);
+      if (!Number.isFinite(value)) {
+        rowLog.push({ severity: "ERROR", row: rowNum, field: "fixed_rate", message: "fixed_rate должен быть числом" });
+      } else {
+        fixedRateValue = value;
+      }
+    }
+
+    let floatRateValue: number | undefined;
+    if (float_rate !== "") {
+      const value = normalizeNumber(float_rate);
+      if (!Number.isFinite(value)) {
+        rowLog.push({ severity: "ERROR", row: rowNum, field: "float_rate", message: "float_rate должен быть числом" });
+      } else {
+        floatRateValue = value;
+      }
+    }
+
+    let dayCountValue: number | undefined;
+    if (day_count !== "") {
+      const value = normalizeNumber(day_count);
+      if (!Number.isFinite(value)) {
+        rowLog.push({ severity: "ERROR", row: rowNum, field: "day_count", message: "day_count должен быть числом" });
+      } else if (instrument_type === "swap_ir" && value <= 0) {
+        rowLog.push({ severity: "ERROR", row: rowNum, field: "day_count", message: "day_count для swap_ir должен быть > 0" });
+      } else {
+        dayCountValue = value;
+      }
+    }
+
     const hasErrors = rowLog.some((x) => x.severity === "ERROR");
     log.push(...rowLog);
     if (hasErrors) return;
@@ -170,12 +229,12 @@ export function parsePortfolioCsv(text: string): { positions: PositionDTO[]; log
       currency,
     };
 
-    if (dividend_yield !== "") pos.dividend_yield = normalizeNumber(dividend_yield);
-    if (liquidity_haircut !== "") pos.liquidity_haircut = normalizeNumber(liquidity_haircut);
+    if (dividendYieldValue !== undefined) pos.dividend_yield = dividendYieldValue;
+    if (liquidityHaircutValue !== undefined) pos.liquidity_haircut = liquidityHaircutValue;
     if (model !== "") pos.model = model;
-    if (fixed_rate !== "") pos.fixed_rate = normalizeNumber(fixed_rate);
-    if (float_rate !== "") pos.float_rate = normalizeNumber(float_rate);
-    if (day_count !== "") pos.day_count = normalizeNumber(day_count);
+    if (fixedRateValue !== undefined) pos.fixed_rate = fixedRateValue;
+    if (floatRateValue !== undefined) pos.float_rate = floatRateValue;
+    if (dayCountValue !== undefined) pos.day_count = dayCountValue;
 
     positions.push(pos);
   });

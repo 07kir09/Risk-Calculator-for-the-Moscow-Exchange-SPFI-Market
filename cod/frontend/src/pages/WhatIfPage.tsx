@@ -298,6 +298,7 @@ export default function WhatIfPage() {
                 try {
                   const alpha = Number(wf.calcConfig.params?.alpha ?? 0.99);
                   const horizonDays = Number(wf.calcConfig.params?.horizonDays ?? 10);
+                  const parametricTailModel = String(wf.calcConfig.params?.parametricTailModel ?? "cornish_fisher");
                   const baseCurrency = String(wf.calcConfig.params?.baseCurrency ?? "RUB").toUpperCase();
                   const fxRates = (wf.calcConfig.params?.fxRates as Record<string, number> | undefined) ?? undefined;
                   const liquidityModel = String(wf.calcConfig.params?.liquidityModel ?? "fraction_of_position_value");
@@ -307,6 +308,7 @@ export default function WhatIfPage() {
                     limits: dataState.limits ?? undefined,
                     alpha,
                     horizonDays,
+                    parametricTailModel,
                     baseCurrency,
                     fxRates,
                     liquidityModel,

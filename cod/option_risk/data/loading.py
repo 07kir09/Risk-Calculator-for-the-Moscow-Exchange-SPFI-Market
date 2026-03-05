@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Tuple
@@ -31,12 +32,40 @@ def _parse_date(value: str) -> dt.date:
         raise ValueError(f"Некорректная дата (ожидается ISO 8601): {value}") from exc
 
 
+def _is_missing(value: object) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.strip() == ""
+    if isinstance(value, float):
+        return not math.isfinite(value)
+    return False
+
+
+def _opt_float(value: object) -> float | None:
+    if _is_missing(value):
+        return None
+    return float(value)
+
+
+def _opt_str(value: object) -> str | None:
+    if _is_missing(value):
+        return None
+    return str(value).strip()
+
+
+def _str_with_default(value: object, default: str) -> str:
+    if _is_missing(value):
+        return default
+    return str(value).strip()
+
+
 def _row_to_position(row: dict) -> OptionPosition:
     mapped = {
-        "instrument_type": str(row.get("instrument_type", "option")).lower(),
+        "instrument_type": _str_with_default(row.get("instrument_type"), "option").lower(),
         "position_id": str(row["position_id"]),
-        "option_type": str(row.get("option_type", "call")).lower(),
-        "style": str(row.get("style", "european")).lower(),
+        "option_type": _str_with_default(row.get("option_type"), "call").lower(),
+        "style": _str_with_default(row.get("style"), "european").lower(),
         "quantity": float(row["quantity"]),
         "notional": float(row.get("notional", 1.0)),
         "underlying_symbol": str(row["underlying_symbol"]),
@@ -46,13 +75,17 @@ def _row_to_position(row: dict) -> OptionPosition:
         "maturity_date": _parse_date(str(row["maturity_date"])),
         "valuation_date": _parse_date(str(row["valuation_date"])),
         "risk_free_rate": float(row["risk_free_rate"]),
-        "dividend_yield": float(row.get("dividend_yield", 0.0)),
-        "currency": row.get("currency", "RUB"),
-        "liquidity_haircut": float(row.get("liquidity_haircut", 0.0)),
-        "model": row.get("model"),
-        "fixed_rate": float(row.get("fixed_rate")) if row.get("fixed_rate") not in (None, "") else None,
-        "float_rate": float(row.get("float_rate")) if row.get("float_rate") not in (None, "") else None,
-        "day_count": float(row.get("day_count")) if row.get("day_count") not in (None, "") else None,
+        "dividend_yield": float(row.get("dividend_yield", 0.0))
+        if not _is_missing(row.get("dividend_yield"))
+        else 0.0,
+        "currency": _str_with_default(row.get("currency"), "RUB"),
+        "liquidity_haircut": float(row.get("liquidity_haircut", 0.0))
+        if not _is_missing(row.get("liquidity_haircut"))
+        else 0.0,
+        "model": _opt_str(row.get("model")),
+        "fixed_rate": _opt_float(row.get("fixed_rate")),
+        "float_rate": _opt_float(row.get("float_rate")),
+        "day_count": _opt_float(row.get("day_count")),
     }
     return OptionPosition(**mapped)
 
@@ -133,6 +166,11 @@ def load_scenarios_from_csv(path: Path) -> List[MarketScenario]:
                 underlying_shift=float(row.get("underlying_shift", 0.0)),
                 volatility_shift=float(row.get("volatility_shift", 0.0)),
                 rate_shift=float(row.get("rate_shift", 0.0)),
+                probability=(
+                    float(row.get("probability"))
+                    if "probability" in df.columns and not _is_missing(row.get("probability"))
+                    else None
+                ),
             )
         )
     return scenarios
@@ -150,6 +188,11 @@ def load_scenarios_from_json(path: Path) -> List[MarketScenario]:
                 underlying_shift=float(row.get("underlying_shift", 0.0)),
                 volatility_shift=float(row.get("volatility_shift", 0.0)),
                 rate_shift=float(row.get("rate_shift", 0.0)),
+                probability=(
+                    float(row.get("probability"))
+                    if not _is_missing(row.get("probability"))
+                    else None
+                ),
             )
         )
     return scenarios

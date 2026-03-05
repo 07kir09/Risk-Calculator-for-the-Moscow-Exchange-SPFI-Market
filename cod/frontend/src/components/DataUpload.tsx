@@ -71,6 +71,7 @@ export default function DataUpload({ onPortfolio, onScenarios, onLimits }: Props
       underlying_shift: Number(r.underlying_shift || 0),
       volatility_shift: Number(r.volatility_shift || 0),
       rate_shift: Number(r.rate_shift || 0),
+      probability: r.probability === undefined || r.probability === "" ? undefined : Number(r.probability),
     }));
     onScenarios(scenarios);
   };

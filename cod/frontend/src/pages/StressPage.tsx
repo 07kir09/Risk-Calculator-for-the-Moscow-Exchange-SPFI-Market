@@ -30,10 +30,12 @@ export default function StressPage() {
   const [draftS, setDraftS] = useState(0);
   const [draftVol, setDraftVol] = useState(0);
   const [draftR, setDraftR] = useState(0);
+  const [draftProb, setDraftProb] = useState<number | "">("");
   const [draftDesc, setDraftDesc] = useState("Пользовательский сценарий");
 
   const alpha = Number(wf.calcConfig.params?.alpha ?? 0.99);
   const horizonDays = Number(wf.calcConfig.params?.horizonDays ?? 10);
+  const parametricTailModel = String(wf.calcConfig.params?.parametricTailModel ?? "cornish_fisher");
   const baseCurrency = String(wf.calcConfig.params?.baseCurrency ?? "RUB").toUpperCase();
   const fxRates = (wf.calcConfig.params?.fxRates as Record<string, number> | undefined) ?? undefined;
   const liquidityModel = String(wf.calcConfig.params?.liquidityModel ?? "fraction_of_position_value");
@@ -52,6 +54,7 @@ export default function StressPage() {
         limits: dataState.limits ?? undefined,
         alpha,
         horizonDays,
+        parametricTailModel,
         baseCurrency,
         fxRates,
         liquidityModel,
@@ -71,11 +74,12 @@ export default function StressPage() {
 
   const handleCreate = () => {
     if (!draftId.trim()) return;
+    const probability = draftProb === "" ? undefined : Number(draftProb);
     dataDispatch({
       type: "SET_SCENARIOS",
       scenarios: [
         ...dataState.scenarios.filter((s) => s.scenario_id !== draftId.trim()),
-        { scenario_id: draftId.trim(), underlying_shift: draftS, volatility_shift: draftVol, rate_shift: draftR, description: draftDesc },
+        { scenario_id: draftId.trim(), underlying_shift: draftS, volatility_shift: draftVol, rate_shift: draftR, probability, description: draftDesc },
       ],
     });
     setStatus("Сценарий добавлен. Нажмите «Обновить результаты», чтобы увидеть новый P&L.");
@@ -217,6 +221,10 @@ export default function StressPage() {
                   Δr (rate_shift)
                   <input type="number" step="0.001" value={draftR} onChange={(e) => setDraftR(Number(e.target.value))} />
                 </label>
+                <label>
+                  Probability (опц.)
+                  <input type="number" step="0.0001" min={0} value={draftProb} onChange={(e) => setDraftProb(e.target.value === "" ? "" : Number(e.target.value))} />
+                </label>
               </div>
               <label>
                 Описание
@@ -235,6 +243,7 @@ export default function StressPage() {
                     <th>ΔS</th>
                     <th>ΔVol</th>
                     <th>Δr</th>
+                    <th>Prob</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -245,6 +254,7 @@ export default function StressPage() {
                       <td>{s.underlying_shift}</td>
                       <td>{s.volatility_shift}</td>
                       <td>{s.rate_shift}</td>
+                      <td>{s.probability ?? "—"}</td>
                       <td>
                         <Button variant="secondary" onClick={() => setConfirmDelete(s.scenario_id)}>Удалить</Button>
                       </td>
@@ -252,7 +262,7 @@ export default function StressPage() {
                   ))}
                   {dataState.scenarios.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="textMuted">Сценариев нет. Добавьте сверху или вернитесь в настройки.</td>
+                      <td colSpan={6} className="textMuted">Сценариев нет. Добавьте сверху или вернитесь в настройки.</td>
                     </tr>
                   )}
                 </tbody>

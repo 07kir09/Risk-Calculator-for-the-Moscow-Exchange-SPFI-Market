@@ -199,6 +199,25 @@ class MarketScenario(BaseModel):
         0.0, description="Относительное изменение волатильности (0.1 для +10%)"
     )
     rate_shift: float = Field(0.0, description="Абсолютное изменение ставки (в долях)")
+    probability: Optional[float] = Field(
+        None,
+        description=(
+            "Вероятность сценария (необязательная). "
+            "Если хотя бы у одного сценария задана, то должна быть задана у всех; "
+            "в расчете значения нормализуются на сумму."
+        ),
+    )
+
+    @validator("probability")
+    def _validate_probability(cls, value: Optional[float]) -> Optional[float]:
+        if value is None:
+            return None
+        prob = float(value)
+        if not math.isfinite(prob):
+            raise ValueError("Вероятность сценария должна быть конечным числом")
+        if prob < 0.0:
+            raise ValueError("Вероятность сценария не может быть отрицательной")
+        return prob
 
 
 class Portfolio(BaseModel):

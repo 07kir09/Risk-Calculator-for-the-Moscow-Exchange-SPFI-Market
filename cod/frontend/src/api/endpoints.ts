@@ -9,6 +9,7 @@ export async function fetchMetrics(payload: {
   limits?: Record<string, unknown>;
   alpha?: number;
   horizon_days?: number;
+  parametric_tail_model?: string;
   base_currency?: string;
   fx_rates?: Record<string, number>;
   liquidity_model?: string;
@@ -17,6 +18,7 @@ export async function fetchMetrics(payload: {
   calc_var_es?: boolean;
   calc_stress?: boolean;
   calc_margin_capital?: boolean;
+  calc_correlations?: boolean;
 }) {
   const { data } = await client.post("/metrics", payload);
   return metricsSchema.parse(data);

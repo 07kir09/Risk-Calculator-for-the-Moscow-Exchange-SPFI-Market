@@ -28,10 +28,12 @@ function genRequestId(): string {
 
 const viteEnv = ((import.meta as any).env ?? {}) as Record<string, any>;
 const baseURL = viteEnv.VITE_API_BASE_URL ?? "/api";
+const configuredTimeout = Number(viteEnv.VITE_API_TIMEOUT_MS ?? 180_000);
+const requestTimeoutMs = Number.isFinite(configuredTimeout) && configuredTimeout > 0 ? configuredTimeout : 180_000;
 
 const client = axios.create({
   baseURL,
-  timeout: 15000,
+  timeout: requestTimeoutMs,
 });
 
 client.interceptors.request.use((cfg) => {

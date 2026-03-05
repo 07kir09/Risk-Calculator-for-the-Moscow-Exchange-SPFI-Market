@@ -45,6 +45,7 @@ export default function ConfigurePage() {
   });
   const [alpha, setAlpha] = useState<number>(() => Number(wf.calcConfig.params?.alpha ?? 0.99));
   const [horizonDays, setHorizonDays] = useState<number>(() => Number(wf.calcConfig.params?.horizonDays ?? 10));
+  const [parametricTailModel, setParametricTailModel] = useState<string>(() => String(wf.calcConfig.params?.parametricTailModel ?? "cornish_fisher"));
   const [historyDays, setHistoryDays] = useState<number>(() => Number(wf.calcConfig.params?.historyDays ?? 250));
   const [baseCurrency, setBaseCurrency] = useState<string>(() => String(wf.calcConfig.params?.baseCurrency ?? "RUB").toUpperCase());
   const [liquidityModel, setLiquidityModel] = useState<string>(() => String(wf.calcConfig.params?.liquidityModel ?? "fraction_of_position_value"));
@@ -92,6 +93,7 @@ export default function ConfigurePage() {
     const marketOk = wf.marketData.status === "ready" && wf.marketData.missingFactors === 0;
     const hasMetrics = selected.length > 0;
     const alphaOk = alpha > 0.5 && alpha < 0.9999;
+    const tailModelOk = ["normal", "cornish_fisher"].includes(parametricTailModel);
     const baseCurrencyOk = /^[A-Z]{3}$/.test(baseCurrency);
     const fxOk = fxRatesResult.error === "";
     return {
@@ -100,9 +102,10 @@ export default function ConfigurePage() {
       marketOk,
       hasMetrics,
       alphaOk,
+      tailModelOk,
       baseCurrencyOk,
       fxOk,
-      ready: hasPortfolio && noCritical && marketOk && hasMetrics && alphaOk && baseCurrencyOk && fxOk,
+      ready: hasPortfolio && noCritical && marketOk && hasMetrics && alphaOk && tailModelOk && baseCurrencyOk && fxOk,
     };
   }, [
     dataState.portfolio.positions.length,
@@ -111,6 +114,7 @@ export default function ConfigurePage() {
     wf.marketData.missingFactors,
     selected.length,
     alpha,
+    parametricTailModel,
     baseCurrency,
     fxRatesResult.error,
   ]);
@@ -168,6 +172,13 @@ export default function ConfigurePage() {
             <label>
               Горизонт (дней) <HelpTooltip text="Сколько дней «держим позицию» в расчёте риска. Для демо — параметр отчёта." />
               <input type="number" min={1} value={horizonDays} onChange={(e) => setHorizonDays(Number(e.target.value))} />
+            </label>
+            <label>
+              Tail-модель для параметрического VaR/ES
+              <select value={parametricTailModel} onChange={(e) => setParametricTailModel(e.target.value)}>
+                <option value="cornish_fisher">Cornish-Fisher (усиленный хвост)</option>
+                <option value="normal">Normal</option>
+              </select>
             </label>
             <label>
               Окно истории (дней) <HelpTooltip text="Сколько дней истории используем для исторического VaR/ES (демо)." />
@@ -232,6 +243,7 @@ export default function ConfigurePage() {
                 params: {
                   alpha,
                   horizonDays,
+                  parametricTailModel,
                   historyDays,
                   baseCurrency,
                   fxRates: fxRatesResult.value,
@@ -255,6 +267,7 @@ export default function ConfigurePage() {
               { label: "Рыночные данные привязаны", done: readiness.marketOk },
               { label: `Метрики выбраны (${selected.length})`, done: readiness.hasMetrics },
               { label: "Параметры корректны", done: readiness.alphaOk, hint: readiness.alphaOk ? undefined : "Проверьте alpha" },
+              { label: "Tail-модель корректна", done: readiness.tailModelOk, hint: readiness.tailModelOk ? undefined : "Выберите normal или cornish_fisher" },
               { label: "Базовая валюта корректна", done: readiness.baseCurrencyOk, hint: readiness.baseCurrencyOk ? undefined : "Ожидается код ISO 4217" },
               { label: "FX JSON корректен", done: readiness.fxOk, hint: readiness.fxOk ? undefined : fxRatesResult.error || "Проверьте JSON" },
             ]}

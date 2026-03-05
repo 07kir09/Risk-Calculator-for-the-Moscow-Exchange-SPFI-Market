@@ -26,6 +26,7 @@ export const scenarioSchema = z.object({
   underlying_shift: z.number(),
   volatility_shift: z.number(),
   rate_shift: z.number(),
+  probability: z.number().nonnegative().optional(),
   description: z.string().optional(),
 });
 
@@ -56,6 +57,7 @@ export const metricsSchema = z.object({
   base_currency: z.string().optional(),
   confidence_level: nOpt(),
   horizon_days: z.number().int().nullable().optional(),
+  parametric_tail_model: z.string().optional(),
   mode: z.string().optional(),
   methodology_note: z.string().nullable().optional(),
   fx_warning: z.string().nullable().optional(),

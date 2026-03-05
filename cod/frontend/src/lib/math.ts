@@ -170,37 +170,124 @@ export const scenarioPnL = (positions: OptionPosition[], s: MarketScenario): num
 
 export const applyPnLDistribution = (positions: OptionPosition[], scenarios: MarketScenario[]): number[] => scenarios.map((s) => scenarioPnL(positions, s));
 
-export const historicalVar = (pnls: number[], alpha = 0.99): number => {
+const normalizeScenarioWeights = (weights: number[] | undefined, n: number): number[] | undefined => {
+  if (!weights) return undefined;
+  if (weights.length !== n) throw new Error("Количество весов должно совпадать с количеством PnL наблюдений");
+  const clean = weights.map((w) => Number(w));
+  if (clean.some((w) => !Number.isFinite(w) || w < 0)) throw new Error("Веса сценариев должны быть неотрицательными конечными числами");
+  const total = clean.reduce((a, b) => a + b, 0);
+  if (total <= 0) throw new Error("Сумма весов сценариев должна быть положительной");
+  return clean.map((w) => w / total);
+};
+
+export const historicalVar = (pnls: number[], alpha = 0.99, scenarioWeights?: number[]): number => {
   if (!pnls.length) throw new Error("Пустой массив PnL для VaR");
-  const sortedPnls = [...pnls].sort((a, b) => a - b);
-  const k = Math.max(1, Math.ceil(sortedPnls.length * (1 - alpha)));
-  return Math.max(0, -sortedPnls[k - 1]);
+  const weights = normalizeScenarioWeights(scenarioWeights, pnls.length);
+  if (!weights) {
+    const sortedPnls = [...pnls].sort((a, b) => a - b);
+    const k = Math.max(1, Math.ceil(sortedPnls.length * (1 - alpha)));
+    return Math.max(0, -sortedPnls[k - 1]);
+  }
+  const sorted = pnls.map((pnl, idx) => ({ pnl, w: weights[idx] })).sort((a, b) => a.pnl - b.pnl);
+  const tailProb = 1 - alpha;
+  let cum = 0;
+  for (const row of sorted) {
+    cum += row.w;
+    if (cum >= tailProb) return Math.max(0, -row.pnl);
+  }
+  return Math.max(0, -sorted[sorted.length - 1].pnl);
 };
 
-export const historicalEs = (pnls: number[], alpha = 0.99): number => {
+export const historicalEs = (pnls: number[], alpha = 0.99, scenarioWeights?: number[]): number => {
   if (!pnls.length) throw new Error("Пустой массив PnL для ES");
-  const sortedPnls = [...pnls].sort((a, b) => a - b);
-  const k = Math.max(1, Math.ceil(sortedPnls.length * (1 - alpha)));
-  const tail = sortedPnls.slice(0, k);
-  const tailMean = tail.reduce((a, b) => a + b, 0) / tail.length;
-  return Math.max(0, -tailMean);
+  const weights = normalizeScenarioWeights(scenarioWeights, pnls.length);
+  if (!weights) {
+    const sortedPnls = [...pnls].sort((a, b) => a - b);
+    const k = Math.max(1, Math.ceil(sortedPnls.length * (1 - alpha)));
+    const tail = sortedPnls.slice(0, k);
+    const tailMean = tail.reduce((a, b) => a + b, 0) / tail.length;
+    return Math.max(0, -tailMean);
+  }
+  const sorted = pnls.map((pnl, idx) => ({ pnl, w: weights[idx] })).sort((a, b) => a.pnl - b.pnl);
+  const tailProb = 1 - alpha;
+  let remaining = tailProb;
+  let tailSum = 0;
+  for (const row of sorted) {
+    if (remaining <= 0) break;
+    const take = Math.min(row.w, remaining);
+    tailSum += row.pnl * take;
+    remaining -= take;
+  }
+  return Math.max(0, -(tailSum / tailProb));
 };
 
-export const parametricVar = (pnls: number[], alpha = 0.99): number => {
+const sampleSkewExcessKurtosis = (arr: number[]): { skew: number; excessKurtosis: number } => {
+  if (arr.length < 3) return { skew: 0, excessKurtosis: 0 };
+  const m = mean(arr);
+  const s = std(arr);
+  if (!Number.isFinite(s) || s <= 0) return { skew: 0, excessKurtosis: 0 };
+  const z = arr.map((x) => (x - m) / s);
+  const skew = z.reduce((acc, x) => acc + x ** 3, 0) / z.length;
+  if (arr.length < 4) return { skew: Number.isFinite(skew) ? skew : 0, excessKurtosis: 0 };
+  const exKurt = z.reduce((acc, x) => acc + x ** 4, 0) / z.length - 3;
+  return {
+    skew: Number.isFinite(skew) ? skew : 0,
+    excessKurtosis: Number.isFinite(exKurt) ? exKurt : 0,
+  };
+};
+
+const cornishFisherZ = (z: number, skew: number, excessKurtosis: number): number => {
+  const z2 = z * z;
+  const z3 = z2 * z;
+  return z + ((z2 - 1) * skew) / 6 + ((z3 - 3 * z) * excessKurtosis) / 24 - ((2 * z3 - 5 * z) * skew * skew) / 36;
+};
+
+const tailZ = (pnls: number[], alpha: number, tailModel: "normal" | "cornish_fisher"): number => {
+  const z = invNorm(alpha);
+  if (tailModel === "normal" || pnls.length < 3) return z;
+  const losses = pnls.map((x) => -x);
+  const { skew, excessKurtosis } = sampleSkewExcessKurtosis(losses);
+  const zCf = cornishFisherZ(z, skew, excessKurtosis);
+  if (!Number.isFinite(zCf)) return z;
+  return Math.max(z, zCf);
+};
+
+export const parametricVar = (
+  pnls: number[],
+  alpha = 0.99,
+  horizonDays = 1,
+  tailModel: "normal" | "cornish_fisher" = "normal"
+): number => {
   if (!pnls.length) throw new Error("Пустой массив PnL для параметрического VaR");
   const mu = mean(pnls);
   const sigma = std(pnls);
-  const z = invNorm(alpha);
-  return -mu + sigma * z;
+  const horizon = Math.max(1, Number(horizonDays));
+  const muH = mu * horizon;
+  const sigmaH = sigma * Math.sqrt(horizon);
+  const z = tailZ(pnls, alpha, tailModel);
+  return Math.max(0, -muH + sigmaH * z);
 };
 
-export const parametricEs = (pnls: number[], alpha = 0.99): number => {
+export const parametricEs = (
+  pnls: number[],
+  alpha = 0.99,
+  horizonDays = 1,
+  tailModel: "normal" | "cornish_fisher" = "normal"
+): number => {
   if (!pnls.length) throw new Error("Пустой массив PnL для параметрического ES");
   const mu = mean(pnls);
   const sigma = std(pnls);
-  const z = invNorm(alpha);
+  const horizon = Math.max(1, Number(horizonDays));
+  const muH = mu * horizon;
+  const sigmaH = sigma * Math.sqrt(horizon);
+  if (sigmaH === 0) return Math.max(0, -muH);
+  const z = tailZ(pnls, alpha, tailModel);
   const pdf = (1 / Math.sqrt(2 * Math.PI)) * Math.exp(-0.5 * z * z);
-  return -mu + sigma * (pdf / (1 - alpha));
+  if (tailModel === "normal") {
+    return Math.max(0, -muH + sigmaH * (pdf / (1 - alpha)));
+  }
+  const alphaEff = Math.min(1 - 1e-12, Math.max(alpha, normCdf(z)));
+  return Math.max(0, -muH + sigmaH * (pdf / (1 - alphaEff)));
 };
 
 export const liquidityAdjustedVar = (
@@ -220,8 +307,10 @@ export const liquidityAdjustedVar = (
 
 const mean = (arr: number[]): number => arr.reduce((a, b) => a + b, 0) / arr.length;
 const std = (arr: number[]): number => {
+  if (arr.length < 2) return 0;
   const m = mean(arr);
   const v = arr.reduce((acc, x) => acc + (x - m) * (x - m), 0) / (arr.length - 1);
+  if (!Number.isFinite(v) || v < 0) return 0;
   return Math.sqrt(v);
 };
 

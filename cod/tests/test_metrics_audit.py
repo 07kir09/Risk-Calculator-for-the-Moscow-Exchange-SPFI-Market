@@ -81,12 +81,42 @@ def test_historical_es_uses_left_tail_and_includes_var_point():
     assert es60 == pytest.approx(7.5)
 
 
+def test_weighted_historical_var_es_by_scenario_probabilities():
+    pnls = [-100.0, -10.0, 5.0]
+    probs = [0.01, 0.94, 0.05]
+    var95 = historical_var(pnls, alpha=0.95, scenario_weights=probs)
+    es95 = historical_es(pnls, alpha=0.95, scenario_weights=probs)
+    assert var95 == pytest.approx(10.0)
+    assert es95 == pytest.approx(28.0)
+    # Без весов будет другая дискретная точка хвоста.
+    assert historical_var(pnls, alpha=0.95) == pytest.approx(100.0)
+
+
+def test_weighted_historical_var_rejects_invalid_weights():
+    pnls = [-10.0, 0.0, 10.0]
+    with pytest.raises(ValueError):
+        historical_var(pnls, alpha=0.95, scenario_weights=[1.0, 2.0])  # length mismatch
+    with pytest.raises(ValueError):
+        historical_var(pnls, alpha=0.95, scenario_weights=[1.0, -1.0, 1.0])  # negative weight
+
+
 def test_parametric_var_es_scale_with_horizon():
     pnls = [-10.0, 0.0, 10.0]  # mu=0, sample sigma=10
     var95_t4 = parametric_var(pnls, alpha=0.95, horizon_days=4)
     es95_t4 = parametric_es(pnls, alpha=0.95, horizon_days=4)
     assert var95_t4 == pytest.approx(32.89707253902944, rel=1e-9)
     assert es95_t4 == pytest.approx(41.25425615014856, rel=1e-9)
+
+
+def test_cornish_fisher_tail_is_not_weaker_than_normal():
+    pnls = [-200.0, -20.0, -10.0, -5.0, 0.0, 10.0, 15.0, 20.0, 25.0, 30.0]
+    var_n = parametric_var(pnls, alpha=0.99, horizon_days=1, tail_model="normal")
+    es_n = parametric_es(pnls, alpha=0.99, horizon_days=1, tail_model="normal")
+    var_cf = parametric_var(pnls, alpha=0.99, horizon_days=1, tail_model="cornish_fisher")
+    es_cf = parametric_es(pnls, alpha=0.99, horizon_days=1, tail_model="cornish_fisher")
+    assert var_cf >= var_n
+    assert es_cf >= es_n
+    assert es_cf >= var_cf
 
 
 def test_lc_var_addon_dimension_is_money():

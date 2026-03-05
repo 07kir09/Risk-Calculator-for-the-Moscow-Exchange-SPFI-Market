@@ -18,6 +18,7 @@ export default function RunPage() {
   const selectedMetrics = wf.calcConfig.selectedMetrics;
   const alpha = Number(wf.calcConfig.params?.alpha ?? 0.99);
   const horizonDays = Number(wf.calcConfig.params?.horizonDays ?? 10);
+  const parametricTailModel = String(wf.calcConfig.params?.parametricTailModel ?? "cornish_fisher");
   const baseCurrency = String(wf.calcConfig.params?.baseCurrency ?? "RUB").toUpperCase();
   const fxRates = (wf.calcConfig.params?.fxRates as Record<string, number> | undefined) ?? undefined;
   const liquidityModel = String(wf.calcConfig.params?.liquidityModel ?? "fraction_of_position_value");
@@ -72,6 +73,7 @@ export default function RunPage() {
             <div>Метрик: <span className="code">{selectedMetrics.length}</span></div>
             <div>CL (alpha): <span className="code">{alpha}</span></div>
             <div>Горизонт: <span className="code">{horizonDays} дн.</span></div>
+            <div>Tail-модель: <span className="code">{parametricTailModel}</span></div>
             <div>Базовая валюта: <span className="code">{baseCurrency}</span></div>
             <div>FX пар: <span className="code">{Object.keys(fxRates ?? {}).length}</span></div>
             <div>LC модель: <span className="code">{liquidityModel}</span></div>
@@ -100,6 +102,7 @@ export default function RunPage() {
                     limits: dataState.limits ?? undefined,
                     alpha,
                     horizonDays,
+                    parametricTailModel,
                     baseCurrency,
                     fxRates,
                     liquidityModel,

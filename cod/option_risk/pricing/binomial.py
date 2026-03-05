@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
+
 from ..data.models import OptionPosition, OptionStyle, OptionType
 
 
@@ -27,31 +29,28 @@ def price(position: OptionPosition, steps: int = 200) -> float:
     if p < 0 or p > 1:
         raise ValueError("Риск-нейтральная вероятность вышла за пределы [0,1]")
 
-    prices = [0.0] * (steps + 1)
-    values = [0.0] * (steps + 1)
     s0 = position.underlying_price
     k = position.strike
+    # Векторизованный backward induction: быстрее при больших портфелях/многих сценариях.
+    j = np.arange(steps + 1, dtype=np.float64)
+    prices = s0 * (u ** (steps - j)) * (d**j)
+    if position.option_type == OptionType.CALL:
+        values = np.maximum(prices - k, 0.0)
+    else:
+        values = np.maximum(k - prices, 0.0)
 
-    for i in range(steps + 1):
-        prices[i] = s0 * (u ** (steps - i)) * (d**i)
-        if position.option_type == OptionType.CALL:
-            values[i] = max(prices[i] - k, 0.0)
-        else:
-            values[i] = max(k - prices[i], 0.0)
-
-    for step in range(steps - 1, -1, -1):
-        for i in range(step + 1):
-            continuation = disc * (p * values[i] + (1 - p) * values[i + 1])
+    for _ in range(steps - 1, -1, -1):
+        continuation = disc * (p * values[:-1] + (1.0 - p) * values[1:])
+        prices = prices[:-1] / u
+        if position.style == OptionStyle.AMERICAN:
             if position.option_type == OptionType.CALL:
-                exercise = max(prices[i] / u - k, 0.0)
+                exercise = np.maximum(prices - k, 0.0)
             else:
-                exercise = max(k - prices[i] / u, 0.0)
-            if position.style == OptionStyle.AMERICAN:
-                values[i] = max(continuation, exercise)
-            else:
-                values[i] = continuation
-            prices[i] = prices[i] / u
-    return values[0]
+                exercise = np.maximum(k - prices, 0.0)
+            values = np.maximum(continuation, exercise)
+        else:
+            values = continuation
+    return float(values[0])
 
 
 __all__ = ["price"]

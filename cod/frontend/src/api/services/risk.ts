@@ -9,6 +9,7 @@ export async function runRiskCalculation(params: {
   limits?: Record<string, unknown>;
   alpha: number;
   horizonDays: number;
+  parametricTailModel?: string;
   baseCurrency: string;
   fxRates?: Record<string, number>;
   liquidityModel: string;
@@ -18,18 +19,21 @@ export async function runRiskCalculation(params: {
   const viteEnv = ((import.meta as any).env ?? {}) as Record<string, any>;
   const demoMode = (viteEnv.VITE_DEMO_MODE ?? "1") === "1";
   if (demoMode) {
+    const tailModel = params.parametricTailModel ?? "cornish_fisher";
     const metrics = await mockFetchMetrics();
     return {
       ...metrics,
       confidence_level: params.alpha,
       horizon_days: params.horizonDays,
+      parametric_tail_model: tailModel,
       base_currency: params.baseCurrency,
       liquidity_model: params.liquidityModel,
       mode: "demo",
     };
   }
 
-  const needsVarEs = params.selectedMetrics.some((m) => ["var_hist", "var_param", "es_hist", "es_param", "lc_var", "correlations"].includes(m));
+  const needsVarEs = params.selectedMetrics.some((m) => ["var_hist", "var_param", "es_hist", "es_param", "lc_var"].includes(m));
+  const needsCorrelations = params.selectedMetrics.includes("correlations");
   const needsGreeks = params.selectedMetrics.includes("greeks");
   const needsStress = params.selectedMetrics.includes("stress");
   const needsMargin = params.marginEnabled;
@@ -40,6 +44,7 @@ export async function runRiskCalculation(params: {
     limits: params.limits,
     alpha: params.alpha,
     horizon_days: params.horizonDays,
+    parametric_tail_model: params.parametricTailModel ?? "cornish_fisher",
     base_currency: params.baseCurrency,
     fx_rates: params.fxRates,
     liquidity_model: params.liquidityModel,
@@ -48,5 +53,6 @@ export async function runRiskCalculation(params: {
     calc_var_es: needsVarEs,
     calc_stress: needsStress,
     calc_margin_capital: needsMargin,
+    calc_correlations: needsCorrelations,
   });
 }

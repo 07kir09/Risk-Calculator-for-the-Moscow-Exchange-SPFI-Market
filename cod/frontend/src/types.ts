@@ -24,6 +24,7 @@ export interface MarketScenario {
   underlying_shift: number;
   volatility_shift: number;
   rate_shift: number;
+  probability?: number;
   description?: string;
 }
 

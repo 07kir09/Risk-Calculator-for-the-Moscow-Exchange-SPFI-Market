@@ -33,11 +33,16 @@ class CalculationConfig:
     calc_margin_capital: bool = True
     alpha: float = 0.99
     horizon_days: int = 1
+    parametric_tail_model: str = "normal"
     base_currency: str = "RUB"
     fx_rates: Optional[Dict[str, float]] = None
     liquidity_model: str = "fraction_of_position_value"
     mode: str = "demo"  # demo | api
     aggregations: Optional[List[str]] = None  # например ["currency"]
+    calc_correlations: bool = True
+    max_correlation_positions: int = 2000
+    max_pnl_matrix_cells: int = 100_000
+    max_lc_breakdown_rows: int = 500
 
 
 @dataclass
@@ -61,6 +66,7 @@ class CalculationResult:
     base_currency: str = "RUB"
     confidence_level: float = 0.99
     horizon_days: int = 1
+    parametric_tail_model: str = "normal"
     mode: str = "demo"
     methodology_note: Optional[str] = None
     fx_warning: Optional[str] = None
@@ -129,6 +135,41 @@ def _resolve_fx_rates(
             )
         )
     return np.asarray(rates, dtype=np.float64)
+
+
+def _resolve_scenario_weights(
+    scenarios: List[MarketScenario],
+    validation_log: List[ValidationMessage],
+) -> Optional[List[float]]:
+    if not scenarios:
+        return None
+    probs = [s.probability for s in scenarios]
+    if all(prob is None for prob in probs):
+        return None
+    if any(prob is None for prob in probs):
+        raise ValueError("Если probability задана хотя бы у одного сценария, она должна быть задана у всех сценариев")
+
+    arr = np.asarray([float(prob) for prob in probs], dtype=np.float64)
+    if not np.isfinite(arr).all():
+        raise ValueError("Вероятности сценариев должны быть конечными числами")
+    if np.any(arr < 0.0):
+        raise ValueError("Вероятности сценариев не могут быть отрицательными")
+    total = float(np.sum(arr, dtype=np.float64))
+    if total <= 0.0:
+        raise ValueError("Сумма вероятностей сценариев должна быть положительной")
+
+    normalized = arr / total
+    if not math.isclose(total, 1.0, rel_tol=1e-9, abs_tol=1e-12):
+        validation_log.append(
+            ValidationMessage(
+                severity="INFO",
+                message=(
+                    "Вероятности сценариев нормализованы на сумму "
+                    f"{total:.12g}."
+                ),
+            )
+        )
+    return normalized.tolist()
 
 
 def _tail_count(n_obs: int, confidence_level: float) -> int:
@@ -212,6 +253,7 @@ def run_calculation(
     validation_log: List[ValidationMessage] = []
     position_ids = [p.position_id for p in portfolio.positions]
     fx_rates = _resolve_fx_rates(portfolio, base_currency, cfg.fx_rates, validation_log)
+    scenario_weights = _resolve_scenario_weights(scenarios, validation_log) if (cfg.calc_var_es and scenarios) else None
     base_values = np.asarray([position_value(p) for p in portfolio.positions], dtype=np.float64)
     base_values_converted = base_values * fx_rates
     base_value = float(np.sum(base_values_converted, dtype=np.float64))
@@ -223,11 +265,23 @@ def run_calculation(
     pnl_dist: List[float] = []
     pnl_mat = None
     position_pnl_base = np.zeros((len(portfolio.positions), len(scenarios)), dtype=np.float64)
-    if (cfg.calc_stress or cfg.calc_var_es) and scenarios:
+    if (cfg.calc_stress or cfg.calc_var_es or cfg.calc_correlations) and scenarios:
         position_pnl = pnl_matrix(portfolio, scenarios)
         position_pnl_base = position_pnl * fx_rates[:, None]
         pnl_dist = np.sum(position_pnl_base, axis=0, dtype=np.float64).tolist()
-        pnl_mat = position_pnl_base.tolist()
+        if position_pnl_base.size <= max(0, int(cfg.max_pnl_matrix_cells)):
+            pnl_mat = position_pnl_base.tolist()
+        else:
+            validation_log.append(
+                ValidationMessage(
+                    severity="WARNING",
+                    message=(
+                        "Матрица PnL слишком большая для API-ответа "
+                        f"({position_pnl_base.shape[0]}x{position_pnl_base.shape[1]}). "
+                        "Поле pnl_matrix пропущено."
+                    ),
+                )
+            )
 
     stress = (
         run_stress_tests(
@@ -245,10 +299,20 @@ def run_calculation(
     lc_breakdown = None
     top_contributors = None
     if cfg.calc_var_es and pnl_dist:
-        var_h = historical_var(pnl_dist, cfg.alpha)
-        es_h = historical_es(pnl_dist, cfg.alpha)
-        var_p = parametric_var(pnl_dist, cfg.alpha, horizon_days=cfg.horizon_days)
-        es_p = parametric_es(pnl_dist, cfg.alpha, horizon_days=cfg.horizon_days)
+        var_h = historical_var(pnl_dist, cfg.alpha, scenario_weights=scenario_weights)
+        es_h = historical_es(pnl_dist, cfg.alpha, scenario_weights=scenario_weights)
+        var_p = parametric_var(
+            pnl_dist,
+            cfg.alpha,
+            horizon_days=cfg.horizon_days,
+            tail_model=cfg.parametric_tail_model,
+        )
+        es_p = parametric_es(
+            pnl_dist,
+            cfg.alpha,
+            horizon_days=cfg.horizon_days,
+            tail_model=cfg.parametric_tail_model,
+        )
         liq_inputs = [
             LiquidityInput(
                 position_id=position_ids[idx],
@@ -258,8 +322,22 @@ def run_calculation(
             )
             for idx, p in enumerate(portfolio.positions)
         ]
-        lc_addon, lc_break_rows = liquidity_addon_breakdown(liq_inputs, model=cfg.liquidity_model)
+        lc_addon, lc_break_rows = liquidity_addon_breakdown(
+            liq_inputs,
+            model=cfg.liquidity_model,
+            max_rows=max(0, int(cfg.max_lc_breakdown_rows)) or None,
+        )
         lc_breakdown = [row.to_dict() for row in lc_break_rows]
+        if len(liq_inputs) > len(lc_break_rows):
+            validation_log.append(
+                ValidationMessage(
+                    severity="WARNING",
+                    message=(
+                        "LC VaR breakdown сокращен для ответа API: "
+                        f"показаны top-{len(lc_break_rows)} позиций по add-on."
+                    ),
+                )
+            )
         lc_var = liquidity_adjusted_var(var_h, lc_addon)
         top_contributors = _build_top_contributors(
             portfolio=portfolio,
@@ -290,8 +368,34 @@ def run_calculation(
 
     # Корреляции
     corr = None
-    if pnl_dist and len(scenarios) > 1 and position_pnl_base.shape[0] > 1 and position_pnl_base.shape[1] > 1:
-        corr = np.corrcoef(position_pnl_base).tolist()
+    if cfg.calc_correlations and pnl_dist and len(scenarios) > 1 and position_pnl_base.shape[0] > 1 and position_pnl_base.shape[1] > 1:
+        if position_pnl_base.shape[0] > max(1, int(cfg.max_correlation_positions)):
+            validation_log.append(
+                ValidationMessage(
+                    severity="WARNING",
+                    message=(
+                        "Расчет корреляций пропущен: слишком много позиций "
+                        f"({position_pnl_base.shape[0]} > {int(cfg.max_correlation_positions)})."
+                    ),
+                )
+            )
+        else:
+            corr_matrix = np.asarray(np.corrcoef(position_pnl_base), dtype=np.float64)
+            if not np.isfinite(corr_matrix).all():
+                # При нулевой дисперсии ряда корреляция формально не определена (NaN).
+                # Для API возвращаем численно устойчивую матрицу: диагональ=1, прочее=0.
+                corr_matrix = np.nan_to_num(corr_matrix, nan=0.0, posinf=0.0, neginf=0.0)
+                np.fill_diagonal(corr_matrix, 1.0)
+                validation_log.append(
+                    ValidationMessage(
+                        severity="WARNING",
+                        message=(
+                            "Матрица корреляций содержала нечисловые значения (NaN/Inf) "
+                            "из-за вырожденных сценариев; выполнена стабилизация значений."
+                        ),
+                    )
+                )
+            corr = corr_matrix.tolist()
 
     # 9 Маржа и капитал
     capital = initial_m = variation_m = None
@@ -330,6 +434,7 @@ def run_calculation(
         base_currency=base_currency,
         confidence_level=cfg.alpha,
         horizon_days=max(1, int(cfg.horizon_days)),
+        parametric_tail_model=cfg.parametric_tail_model,
         mode=cfg.mode,
         methodology_note=methodology_note,
         fx_warning=fx_warning,
