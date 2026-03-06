@@ -7,6 +7,7 @@ from option_risk.data.models import MarketScenario, OptionPosition, OptionStyle,
 from option_risk.risk.limits import check_limits
 from option_risk.risk.pipeline import CalculationConfig, run_calculation
 from option_risk.risk.correlations import correlation_matrix
+from option_risk.risk.var_es import historical_var
 from option_risk.pricing import mc_price
 
 
@@ -92,3 +93,179 @@ def test_monte_carlo_is_deterministic_with_seed():
     p1 = mc_price(position, n_paths=5000, seed=123)
     p2 = mc_price(position, n_paths=5000, seed=123)
     assert p1 == p2
+
+
+def test_run_calculation_sanitizes_nan_correlations():
+    portfolio = Portfolio(
+        positions=[
+            make_position(
+                position_id="f1",
+                instrument_type="forward",
+                volatility=0.0,
+                underlying_price=100.0,
+                strike=100.0,
+                notional=1.0,
+            ),
+            make_position(
+                position_id="f2",
+                instrument_type="forward",
+                volatility=0.0,
+                underlying_price=100.0,
+                strike=100.0,
+                notional=1.0,
+            ),
+        ]
+    )
+    scenarios = [
+        MarketScenario(scenario_id="s1", underlying_shift=0.0, volatility_shift=0.0, rate_shift=0.0),
+        MarketScenario(scenario_id="s2", underlying_shift=0.0, volatility_shift=0.0, rate_shift=0.0),
+    ]
+    cfg = CalculationConfig(calc_sensitivities=True, calc_var_es=True, calc_stress=True, calc_margin_capital=True, alpha=0.99)
+    result = run_calculation(portfolio, scenarios, limits_cfg=None, config=cfg)
+
+    assert result.correlations is not None
+    corr = np.asarray(result.correlations, dtype=np.float64)
+    assert np.isfinite(corr).all()
+    assert np.allclose(np.diag(corr), 1.0)
+    assert any("корреляц" in msg.message.lower() for msg in result.validation_log)
+
+
+def test_run_calculation_skips_correlations_when_disabled():
+    portfolio = Portfolio(positions=[make_position(position_id="a"), make_position(position_id="b", strike=95)])
+    scenarios = [
+        MarketScenario(scenario_id="s1", underlying_shift=-0.01, volatility_shift=0.0, rate_shift=0.0),
+        MarketScenario(scenario_id="s2", underlying_shift=0.01, volatility_shift=0.0, rate_shift=0.0),
+    ]
+    cfg = CalculationConfig(calc_sensitivities=True, calc_var_es=True, calc_stress=True, calc_margin_capital=True, calc_correlations=False)
+    result = run_calculation(portfolio, scenarios, limits_cfg=None, config=cfg)
+
+    assert result.correlations is None
+
+
+def test_run_calculation_skips_correlations_when_position_count_exceeds_limit():
+    positions = [
+        make_position(
+            position_id=f"f{i}",
+            instrument_type="forward",
+            volatility=0.0,
+            underlying_price=100.0 + (i % 3),
+            strike=100.0,
+            notional=1.0,
+        )
+        for i in range(6)
+    ]
+    portfolio = Portfolio(positions=positions)
+    scenarios = [
+        MarketScenario(scenario_id="s1", underlying_shift=-0.01, volatility_shift=0.0, rate_shift=0.0),
+        MarketScenario(scenario_id="s2", underlying_shift=0.01, volatility_shift=0.0, rate_shift=0.0),
+    ]
+    cfg = CalculationConfig(
+        calc_sensitivities=False,
+        calc_var_es=True,
+        calc_stress=False,
+        calc_margin_capital=False,
+        calc_correlations=True,
+        max_correlation_positions=4,
+    )
+    result = run_calculation(portfolio, scenarios, limits_cfg=None, config=cfg)
+
+    assert result.correlations is None
+    assert any("корреляц" in msg.message.lower() and "пропущен" in msg.message.lower() for msg in result.validation_log)
+
+
+def test_run_calculation_truncates_lc_breakdown_rows():
+    portfolio = Portfolio(
+        positions=[
+            make_position(position_id=f"p{i}", liquidity_haircut=0.5 + i * 0.1, notional=100.0 + i * 10.0)
+            for i in range(8)
+        ]
+    )
+    scenarios = [MarketScenario(scenario_id="s1", underlying_shift=-0.02, volatility_shift=0.0, rate_shift=0.0)]
+    cfg = CalculationConfig(
+        calc_sensitivities=False,
+        calc_var_es=True,
+        calc_stress=False,
+        calc_margin_capital=False,
+        max_lc_breakdown_rows=3,
+    )
+    result = run_calculation(portfolio, scenarios, limits_cfg=None, config=cfg)
+
+    assert result.lc_var_breakdown is not None
+    assert len(result.lc_var_breakdown) == 3
+    assert any("breakdown" in msg.message.lower() and "top-3" in msg.message.lower() for msg in result.validation_log)
+
+
+def test_run_calculation_omits_large_pnl_matrix_from_response():
+    portfolio = Portfolio(
+        positions=[
+            make_position(
+                position_id=f"f{i}",
+                instrument_type="forward",
+                volatility=0.0,
+                underlying_price=100.0 + i,
+                strike=100.0,
+                notional=1.0,
+            )
+            for i in range(6)
+        ]
+    )
+    scenarios = [
+        MarketScenario(scenario_id="s1", underlying_shift=-0.01, volatility_shift=0.0, rate_shift=0.0),
+        MarketScenario(scenario_id="s2", underlying_shift=0.0, volatility_shift=0.0, rate_shift=0.0),
+        MarketScenario(scenario_id="s3", underlying_shift=0.01, volatility_shift=0.0, rate_shift=0.0),
+    ]
+    cfg = CalculationConfig(
+        calc_sensitivities=False,
+        calc_var_es=True,
+        calc_stress=False,
+        calc_margin_capital=False,
+        max_pnl_matrix_cells=10,
+    )
+    result = run_calculation(portfolio, scenarios, limits_cfg=None, config=cfg)
+
+    assert result.pnl_matrix is None
+    assert any("pnl_matrix" in msg.message.lower() for msg in result.validation_log)
+
+
+def test_run_calculation_uses_weighted_historical_var_when_probabilities_provided():
+    portfolio = Portfolio(
+        positions=[
+            make_position(
+                instrument_type="forward",
+                volatility=0.0,
+                underlying_price=100.0,
+                strike=100.0,
+                notional=1.0,
+            )
+        ]
+    )
+    scenarios = [
+        MarketScenario(
+            scenario_id="rare_crash",
+            underlying_shift=-0.5,
+            volatility_shift=0.0,
+            rate_shift=0.0,
+            probability=0.01,
+        ),
+        MarketScenario(
+            scenario_id="common_move",
+            underlying_shift=-0.01,
+            volatility_shift=0.0,
+            rate_shift=0.0,
+            probability=0.99,
+        ),
+    ]
+    cfg = CalculationConfig(
+        calc_sensitivities=False,
+        calc_var_es=True,
+        calc_stress=False,
+        calc_margin_capital=False,
+        calc_correlations=False,
+        alpha=0.95,
+    )
+    result = run_calculation(portfolio, scenarios, limits_cfg=None, config=cfg)
+
+    assert result.pnl_distribution is not None
+    unweighted_var = historical_var(result.pnl_distribution, alpha=0.95)
+    assert result.var_hist is not None
+    assert result.var_hist < unweighted_var

@@ -72,6 +72,13 @@ def main() -> None:
     parser.add_argument("--scenarios", type=Path, default=None, help="Путь к файлу сценариев (CSV/JSON). Если не задан — используются встроенные шоки.")
     parser.add_argument("--output", type=Path, default=base_dir / "output", help="Каталог для выгрузок")
     parser.add_argument("--limits", type=Path, default=None, help="JSON с лимитами вида {\"var_hist\": 100000, \"es_hist\": 120000}")
+    parser.add_argument(
+        "--parametric-tail-model",
+        type=str,
+        default="normal",
+        choices=["normal", "cornish_fisher"],
+        help="Tail-модель для параметрического VaR/ES (normal|cornish_fisher)",
+    )
     parser.add_argument("--no-var", action="store_true", help="Не считать VaR/ES")
     parser.add_argument("--no-stress", action="store_true", help="Не считать стресс-сценарии")
     parser.add_argument("--no-margin", action="store_true", help="Не считать маржу/капитал")
@@ -87,6 +94,7 @@ def main() -> None:
         calc_var_es=not args.no_var,
         calc_stress=not args.no_stress,
         calc_margin_capital=not args.no_margin,
+        parametric_tail_model=args.parametric_tail_model,
     )
     result = run_calculation(portfolio, scenarios, limits, cfg)
 
@@ -99,7 +107,13 @@ def main() -> None:
         lc_var=result.lc_var or 0.0,
         greeks=result.greeks or {},
     )
-    tables = build_tables(portfolio, result.pnl_matrix or [], metrics, result.stress or [], validation_log + (result.validation_log or []))
+    tables = build_tables(
+        portfolio,
+        result.pnl_distribution or [],
+        metrics,
+        result.stress or [],
+        validation_log + (result.validation_log or []),
+    )
     if result.limits:
         import pandas as pd
 
@@ -119,9 +133,8 @@ def main() -> None:
     save_csv(tables, out_dir / "csv")
     save_excel(tables, out_dir / "report.xlsx")
     save_json(tables, out_dir / "report.json")
-    if result.var_hist is not None and result.pnl_matrix:
-        # используем первую колонку PnL матрицы как дистрибутив
-        plot_pnl_distribution([row[0] for row in result.pnl_matrix], result.var_hist, out_dir / "pnl_hist.png")
+    if result.var_hist is not None and result.pnl_distribution:
+        plot_pnl_distribution(result.pnl_distribution, result.var_hist, out_dir / "pnl_hist.png")
 
     print("Базовая стоимость портфеля:", result.base_value)
     if result.var_hist is not None:

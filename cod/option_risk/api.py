@@ -1,8 +1,13 @@
 """Простейший FastAPI для расчётов портфеля."""
 from __future__ import annotations
 
+import math
 import logging
 import uuid
+import json
+from dataclasses import asdict, is_dataclass
+from functools import lru_cache
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi import HTTPException, Request
@@ -10,6 +15,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from .data.loading import load_scenarios_from_csv
 from .data.models import MarketScenario, OptionPosition, Portfolio
 from .risk.pipeline import CalculationConfig, run_calculation
 
@@ -20,6 +26,7 @@ class PortfolioRequest(BaseModel):
     limits: dict | None = None
     alpha: float = 0.99
     horizon_days: int = 1
+    parametric_tail_model: str = "normal"
     base_currency: str = "RUB"
     fx_rates: dict[str, float] | None = None
     liquidity_model: str = "fraction_of_position_value"
@@ -28,10 +35,40 @@ class PortfolioRequest(BaseModel):
     calc_var_es: bool = True
     calc_stress: bool = True
     calc_margin_capital: bool = True
+    calc_correlations: bool = True
 
 
 app = FastAPI(title="Option Risk API", version="0.1.0")
 logger = logging.getLogger("option_risk.api")
+ROOT_DIR = Path(__file__).resolve().parents[1]
+DEFAULT_SCENARIOS_CSV = ROOT_DIR / "examples" / "scenarios.csv"
+DEFAULT_LIMITS_JSON = ROOT_DIR / "examples" / "limits.json"
+
+
+def _json_safe(value):
+    if isinstance(value, float):
+        return value if math.isfinite(value) else 0.0
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    if is_dataclass(value):
+        return _json_safe(asdict(value))
+    return value
+
+
+@lru_cache(maxsize=1)
+def _default_limits() -> dict:
+    if not DEFAULT_LIMITS_JSON.exists():
+        return {}
+    return json.loads(DEFAULT_LIMITS_JSON.read_text(encoding="utf-8"))
+
+
+@lru_cache(maxsize=1)
+def _default_scenarios() -> list[MarketScenario]:
+    if not DEFAULT_SCENARIOS_CSV.exists():
+        return []
+    return load_scenarios_from_csv(DEFAULT_SCENARIOS_CSV)
 
 
 @app.middleware("http")
@@ -104,17 +141,29 @@ def compute_metrics(req: PortfolioRequest):
             calc_var_es=req.calc_var_es,
             calc_stress=req.calc_stress,
             calc_margin_capital=req.calc_margin_capital,
+            calc_correlations=req.calc_correlations,
             alpha=req.alpha,
             horizon_days=req.horizon_days,
+            parametric_tail_model=req.parametric_tail_model,
             base_currency=req.base_currency,
             fx_rates=req.fx_rates,
             liquidity_model=req.liquidity_model,
             mode=req.mode,
         )
         result = run_calculation(portfolio, req.scenarios, req.limits, cfg)
-        return result.__dict__
+        return _json_safe(result.__dict__)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/limits")
+def get_limits():
+    return _json_safe(_default_limits())
+
+
+@app.get("/scenarios")
+def get_scenarios():
+    return _json_safe(_default_scenarios())
 
 
 @app.get("/health")

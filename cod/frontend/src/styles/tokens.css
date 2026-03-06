@@ -1,0 +1,73 @@
+:root {
+  --bg-main: #0a1020;
+  --bg-panel: #141c2f;
+  --bg-card: #182238;
+  --bg-input: #1a2234;
+  --border-default: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --text-primary: #f2f5fb;
+  --text-secondary: #a9b2c2;
+  --text-muted: #7f8998;
+  --blue-accent: #63b6ff;
+  --blue-accent-rgb: 99, 182, 255;
+  --blue-bright: #4ea6ff;
+  --cyan-accent: #6dd2ff;
+  --green-positive: #67d58c;
+  --red-negative: #e86a63;
+  --red-negative-rgb: 232, 106, 99;
+  --orange-warning: #f0a867;
+  --light-card-bg: #f4f6f8;
+  --light-table-bg: #f7f8fa;
+  --dark-on-light: #202a38;
+  --text-on-accent: #08101d;
+
+  --state-info-soft: rgba(99, 182, 255, 0.18);
+  --state-info-border: rgba(109, 210, 255, 0.5);
+  --state-danger-soft: rgba(232, 106, 99, 0.12);
+  --state-danger-border: rgba(232, 106, 99, 0.4);
+  --state-warning-soft: rgba(240, 168, 103, 0.12);
+  --state-warning-border: rgba(240, 168, 103, 0.4);
+  --state-success-soft: rgba(103, 213, 140, 0.14);
+  --state-success-border: rgba(103, 213, 140, 0.5);
+
+  --overlay-backdrop: rgba(0, 0, 0, 0.55);
+  --overlay-shadow: -12px 0 32px rgba(0, 0, 0, 0.35);
+  --table-bg: rgba(9, 14, 26, 0.6);
+  --table-header-bg: rgba(15, 23, 42, 0.95);
+  --sidebar-bg: rgba(10, 16, 32, 0.95);
+  --bg-gradient-left: rgba(109, 210, 255, 0.08);
+  --bg-gradient-right: rgba(99, 182, 255, 0.1);
+  --panel-gradient-top: rgba(24, 34, 56, 0.96);
+  --panel-gradient-bottom: rgba(20, 28, 47, 0.96);
+  --button-bg: rgba(255, 255, 255, 0.04);
+  --button-primary-border: rgba(255, 255, 255, 0.22);
+  --input-error-shadow: rgba(232, 106, 99, 0.25);
+
+  --chart-grid: rgba(255, 255, 255, 0.06);
+  --chart-axis: #a9b2c2;
+  --chart-tooltip-bg: #141c2f;
+  --chart-tooltip-border: rgba(255, 255, 255, 0.12);
+  --chart-base-fill: rgba(99, 182, 255, 0.22);
+  --chart-base-stroke: #63b6ff;
+  --chart-stress-fill: rgba(232, 106, 99, 0.2);
+  --chart-stress-stroke: #e86a63;
+
+  --radius-card: 12px;
+  --radius-control: 10px;
+  --shadow-card: 0 12px 32px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+
+  --font-family: "Inter", "Segoe UI", "SF Pro Text", system-ui, sans-serif;
+  --font-size-page-title: 20px;
+  --font-size-panel-title: 14px;
+  --font-size-body: 12px;
+  --font-size-label: 11px;
+  --font-size-helper: 10px;
+  --font-size-kpi: 22px;
+
+  --sidebar-width: 208px;
+  --topbar-height: 56px;
+  --content-padding: 22px;
+  --gap-main: 16px;
+  --control-height: 34px;
+  --button-height: 38px;
+}

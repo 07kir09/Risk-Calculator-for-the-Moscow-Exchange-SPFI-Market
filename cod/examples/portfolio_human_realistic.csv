@@ -1,0 +1,15 @@
+instrument_type,position_id,option_type,style,quantity,notional,underlying_symbol,underlying_price,strike,volatility,maturity_date,valuation_date,risk_free_rate,dividend_yield,currency,liquidity_haircut,model,fixed_rate,float_rate,day_count
+option,opt_moex_call_jun,call,european,15,1,MOEX,3180,3250,0.24,2026-06-19,2026-03-06,0.155,0,RUB,0.06,black_scholes,,,
+option,opt_moex_put_sep,put,european,10,1,MOEX,3180,3000,0.27,2026-09-18,2026-03-06,0.155,0,RUB,0.07,black_scholes,,,
+option,opt_sber_call_dec,call,european,120,1,SBER,327.4,340,0.31,2026-12-18,2026-03-06,0.152,0.06,RUB,0.08,binomial,,,
+option,opt_gazp_put_jul,put,american,-80,1,GAZP,182.6,175,0.29,2026-07-17,2026-03-06,0.153,0.1,RUB,0.09,binomial,,,
+option,opt_lkoh_call_mar27,call,european,40,1,LKOH,7210,7600,0.26,2027-03-19,2026-03-06,0.151,0.08,RUB,0.07,mc,,,
+forward,fwd_usdrub_3m,,,-250000,250000,USDRUB,91.85,93.1,0.11,2026-06-10,2026-03-06,0.145,0,RUB,0.03,,,,
+forward,fwd_eurrub_6m,,,150000,150000,EURRUB,99.2,101.4,0.12,2026-09-09,2026-03-06,0.147,0,EUR,0.03,,,,
+forward,ndf_usdcny_2m,,,-200000,200000,USDCNY,7.23,7.28,0.09,2026-05-07,2026-03-06,0.041,0,USD,0.025,,,,
+swap_ir,irs_rub_pay_2y,,,-5,50000000,RUONIA,1,0.157,0.02,2028-03-06,2026-03-06,0.15,0,RUB,0.02,,0.157,0.149,0.5
+swap_ir,irs_rub_receive_3y,,,4,40000000,RUONIA,1,0.149,0.02,2029-03-06,2026-03-06,0.151,0,RUB,0.02,,0.149,0.151,0.5
+swap_ir,ois_rub_1y,,,6,30000000,RUONIA,1,0.145,0.015,2027-03-06,2026-03-06,0.149,0,RUB,0.015,,0.145,0.148,0.25
+swap_ir,xccy_usd_rub_18m,,,-3,15000000,USDRUB,91.85,92.4,0.13,2027-09-06,2026-03-06,0.143,0,RUB,0.04,,0.102,0.098,0.5
+option,opt_usdrub_call_oct,call,european,25,1000,USDRUB,91.85,95,0.22,2026-10-16,2026-03-06,0.143,0,USD,0.05,black_scholes,,,
+option,opt_usdrub_put_aug,put,european,-30,1000,USDRUB,91.85,88,0.25,2026-08-20,2026-03-06,0.143,0,USD,0.05,mc,,,
