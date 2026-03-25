@@ -7,8 +7,9 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from ..data.loading import ValidationMessage
 from ..data.models import MarketScenario, Portfolio
+from ..data.validation import ValidationMessage
+from ..pricing.market import MarketDataContext
 from .correlations import pnl_matrix
 from .limits import check_limits
 from .portfolio import greeks_summary, position_value
@@ -77,11 +78,15 @@ class CalculationResult:
     validation_log: List[ValidationMessage] = field(default_factory=list)
 
 
-def aggregate_buckets(portfolio: Portfolio, agg_keys: Optional[List[str]] = None) -> Dict[str, Dict[str, float]]:
+def aggregate_buckets(
+    portfolio: Portfolio,
+    agg_keys: Optional[List[str]] = None,
+    market: MarketDataContext | None = None,
+) -> Dict[str, Dict[str, float]]:
     """Простая агрегация экспозиций и чувствительностей по валюте/тикеру."""
     agg_keys = agg_keys or ["currency"]
     buckets: Dict[str, Dict[str, float]] = {}
-    greeks = greeks_summary(portfolio)
+    greeks = greeks_summary(portfolio, market=market)
     for p in portfolio.positions:
         for key in agg_keys:
             group = getattr(p, key, "default")
@@ -247,6 +252,7 @@ def run_calculation(
     scenarios: List[MarketScenario],
     limits_cfg: Dict | None = None,
     config: CalculationConfig | None = None,
+    market: MarketDataContext | None = None,
 ) -> CalculationResult:
     cfg = config or CalculationConfig()
     base_currency = _normalize_currency(cfg.base_currency)
@@ -254,19 +260,19 @@ def run_calculation(
     position_ids = [p.position_id for p in portfolio.positions]
     fx_rates = _resolve_fx_rates(portfolio, base_currency, cfg.fx_rates, validation_log)
     scenario_weights = _resolve_scenario_weights(scenarios, validation_log) if (cfg.calc_var_es and scenarios) else None
-    base_values = np.asarray([position_value(p) for p in portfolio.positions], dtype=np.float64)
+    base_values = np.asarray([position_value(p, market=market) for p in portfolio.positions], dtype=np.float64)
     base_values_converted = base_values * fx_rates
     base_value = float(np.sum(base_values_converted, dtype=np.float64))
 
     # 4A Sensitivities
-    greeks = greeks_summary(portfolio) if cfg.calc_sensitivities else None
+    greeks = greeks_summary(portfolio, market=market) if cfg.calc_sensitivities else None
 
     # 6 Сценарии и стресс
     pnl_dist: List[float] = []
     pnl_mat = None
     position_pnl_base = np.zeros((len(portfolio.positions), len(scenarios)), dtype=np.float64)
     if (cfg.calc_stress or cfg.calc_var_es or cfg.calc_correlations) and scenarios:
-        position_pnl = pnl_matrix(portfolio, scenarios)
+        position_pnl = pnl_matrix(portfolio, scenarios, market=market)
         position_pnl_base = position_pnl * fx_rates[:, None]
         pnl_dist = np.sum(position_pnl_base, axis=0, dtype=np.float64).tolist()
         if position_pnl_base.size <= max(0, int(cfg.max_pnl_matrix_cells)):
@@ -289,6 +295,7 @@ def run_calculation(
             scenarios,
             limits=(limits_cfg or {}).get("stress") if limits_cfg else None,
             precomputed_pnls=pnl_dist if pnl_dist else None,
+            market=market,
         )
         if cfg.calc_stress
         else None
@@ -364,7 +371,7 @@ def run_calculation(
     )
 
     # 5 buckets
-    buckets = aggregate_buckets(portfolio, cfg.aggregations)
+    buckets = aggregate_buckets(portfolio, cfg.aggregations, market=market)
 
     # Корреляции
     corr = None

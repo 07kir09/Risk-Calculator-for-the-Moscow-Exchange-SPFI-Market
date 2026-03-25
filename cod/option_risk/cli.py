@@ -5,22 +5,16 @@ import argparse
 from pathlib import Path
 from typing import List
 
+from .data.bootstrap import build_bootstrapped_market_data
 from .data.loading import (
-    ValidationMessage,
     load_portfolio_from_csv,
     load_portfolio_from_json,
     load_scenarios_from_csv,
     load_scenarios_from_json,
 )
+from .data.market_data import MarketDataBundle, load_market_data_bundle_from_directory
 from .data.models import MarketScenario, Portfolio
-from .reporting.generator import (
-    PortfolioMetrics,
-    build_tables,
-    plot_pnl_distribution,
-    save_csv,
-    save_excel,
-    save_json,
-)
+from .data.validation import ValidationMessage
 from .risk.pipeline import CalculationConfig, run_calculation
 
 
@@ -39,9 +33,13 @@ def _default_scenarios() -> List[MarketScenario]:
     return scenarios
 
 
-def _load_portfolio(path: Path) -> tuple[Portfolio, List[ValidationMessage]]:
+def _load_portfolio(
+    path: Path,
+    *,
+    market_bootstrap=None,
+) -> tuple[Portfolio, List[ValidationMessage]]:
     if path.suffix.lower() == ".csv":
-        return load_portfolio_from_csv(path)
+        return load_portfolio_from_csv(path, market_bootstrap=market_bootstrap)
     if path.suffix.lower() == ".json":
         return load_portfolio_from_json(path)
     raise ValueError("Поддерживаются только CSV или JSON для портфеля")
@@ -65,6 +63,26 @@ def _load_limits(path: Path | None) -> dict:
     return json.loads(Path(path).read_text())
 
 
+def _print_market_data_bundle_summary(bundle: MarketDataBundle) -> None:
+    print("Market data bundle:")
+    print("  discount_curves:", len(bundle.discount_curves))
+    print("  forward_curves:", len(bundle.forward_curves))
+    print("  fixings:", len(bundle.fixings))
+    print("  calibration_instruments:", len(bundle.calibration_instruments))
+    print("  fx_history:", len(bundle.fx_history))
+    if not bundle.validation_log:
+        print("  validation_log: no findings")
+        return
+    print("  validation_log:")
+    for msg in bundle.validation_log:
+        suffix = ""
+        if msg.field:
+            suffix += f" field={msg.field}"
+        if msg.row is not None:
+            suffix += f" row={msg.row}"
+        print(f"    - [{msg.severity}] {msg.message}{suffix}")
+
+
 def main() -> None:
     base_dir = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description="Риск-калькулятор опционов (портфельный)")
@@ -72,6 +90,8 @@ def main() -> None:
     parser.add_argument("--scenarios", type=Path, default=None, help="Путь к файлу сценариев (CSV/JSON). Если не задан — используются встроенные шоки.")
     parser.add_argument("--output", type=Path, default=base_dir / "output", help="Каталог для выгрузок")
     parser.add_argument("--limits", type=Path, default=None, help="JSON с лимитами вида {\"var_hist\": 100000, \"es_hist\": 120000}")
+    parser.add_argument("--market-data-dir", type=Path, default=None, help="Каталог с Excel market data bundle (curveForward/curveDiscount/fixing/RC/calibrationInstrument)")
+    parser.add_argument("--validate-market-data-only", action="store_true", help="Проверить Excel market data bundle и завершить без расчёта портфеля")
     parser.add_argument(
         "--parametric-tail-model",
         type=str,
@@ -84,10 +104,34 @@ def main() -> None:
     parser.add_argument("--no-margin", action="store_true", help="Не считать маржу/капитал")
     args = parser.parse_args()
 
+    market_data_bundle = None
+    bootstrapped_market_data = None
+    market_context = None
+    if args.market_data_dir is not None:
+        market_data_bundle = load_market_data_bundle_from_directory(args.market_data_dir)
+        _print_market_data_bundle_summary(market_data_bundle)
+        if args.validate_market_data_only:
+            raise SystemExit(1 if market_data_bundle.has_errors() else 0)
+        bootstrapped_market_data = build_bootstrapped_market_data(market_data_bundle)
+        market_context = bootstrapped_market_data.market_context
+    elif args.validate_market_data_only:
+        raise SystemExit("Для --validate-market-data-only нужно указать --market-data-dir")
+
     portfolio_path = args.portfolio
-    portfolio, validation_log = _load_portfolio(portfolio_path)
+    portfolio, validation_log = _load_portfolio(portfolio_path, market_bootstrap=bootstrapped_market_data)
+    if bootstrapped_market_data is not None and bootstrapped_market_data.validation_log:
+        validation_log = validation_log + bootstrapped_market_data.validation_log
     scenarios = _load_scenarios(args.scenarios)
     limits = _load_limits(args.limits)
+
+    from .reporting.generator import (
+        PortfolioMetrics,
+        build_tables,
+        plot_pnl_distribution,
+        save_csv,
+        save_excel,
+        save_json,
+    )
 
     cfg = CalculationConfig(
         calc_sensitivities=True,
@@ -96,7 +140,7 @@ def main() -> None:
         calc_margin_capital=not args.no_margin,
         parametric_tail_model=args.parametric_tail_model,
     )
-    result = run_calculation(portfolio, scenarios, limits, cfg)
+    result = run_calculation(portfolio, scenarios, limits, cfg, market=market_context)
 
     metrics = PortfolioMetrics(
         base_value=result.base_value,
@@ -150,7 +194,17 @@ def main() -> None:
     if validation_log:
         print("Замечания валидации:")
         for msg in validation_log:
-            print(f"- [{msg.severity}] строка {msg.row}: {msg.message}")
+            prefix = f"- [{msg.severity}]"
+            if msg.row is not None:
+                prefix += f" строка {msg.row}:"
+            else:
+                prefix += ""
+            print(f"{prefix} {msg.message}")
+    if market_data_bundle is not None:
+        print(
+            "Примечание: Excel market data bundle провалидирован; OIS и IRS/FRA curves перестраиваются из calibrationInstrument, "
+            "forward curves дополняются latest fixings, а trade-import автоматически подставляет curve refs и leg settings."
+        )
 
 
 if __name__ == "__main__":

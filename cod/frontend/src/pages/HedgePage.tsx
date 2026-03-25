@@ -240,7 +240,7 @@ export default function HedgePage() {
                         selectedMetrics: ["greeks"],
                         marginEnabled: false,
                       });
-                      const unitExposure = perUnit.greeks?.[s.metricKey as string];
+                      const unitExposure = perUnit.greeks?.[s.metricKey as string] ?? Number.NaN;
                       if (!Number.isFinite(unitExposure) || unitExposure === 0) {
                         throw new Error(`Не удалось оценить «единичную» экспозицию для ${s.metricKey}.`);
                       }

@@ -21,6 +21,48 @@ export interface PositionDTO {
   fixed_rate?: number | null;
   float_rate?: number | null;
   day_count?: number | null;
+  start_date?: string | null;
+  settlement_date?: string | null;
+  collateral_currency?: string | null;
+  discount_curve_ref?: string | null;
+  projection_curve_ref?: string | null;
+  fixing_index_ref?: string | null;
+  day_count_convention?: string | null;
+  business_day_convention?: string | null;
+  reset_convention?: string | null;
+  payment_lag_days?: number | null;
+  fixed_leg_frequency_months?: number | null;
+  float_leg_frequency_months?: number | null;
+  float_spread?: number;
+  pay_currency?: string | null;
+  receive_currency?: string | null;
+  pay_leg_notional?: number | null;
+  receive_leg_notional?: number | null;
+  pay_discount_curve_ref?: string | null;
+  receive_discount_curve_ref?: string | null;
+  pay_projection_curve_ref?: string | null;
+  receive_projection_curve_ref?: string | null;
+  pay_day_count_convention?: string | null;
+  receive_day_count_convention?: string | null;
+  pay_business_day_convention?: string | null;
+  receive_business_day_convention?: string | null;
+  pay_calendar?: string | null;
+  receive_calendar?: string | null;
+  pay_fixing_calendar?: string | null;
+  receive_fixing_calendar?: string | null;
+  pay_fixed_rate?: number | null;
+  receive_fixed_rate?: number | null;
+  pay_spread?: number;
+  receive_spread?: number;
+  fixing_days_lag?: number | null;
+  pay_fixing_days_lag?: number | null;
+  receive_fixing_days_lag?: number | null;
+  pay_payment_lag_days?: number | null;
+  receive_payment_lag_days?: number | null;
+  pay_reset_convention?: string | null;
+  receive_reset_convention?: string | null;
+  exchange_principal?: boolean;
+  spot_fx?: number | null;
 }
 
 export interface ImportLogEntry {

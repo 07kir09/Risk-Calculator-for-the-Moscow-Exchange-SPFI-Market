@@ -73,7 +73,7 @@ export default function WhatIfPage() {
     const before = baseMetrics;
     const after = afterMetrics;
     const unit = before?.base_currency ?? dataState.portfolio.positions[0]?.currency;
-    const rows: Array<{ key: string; label: string; unit?: string; before?: number; after?: number }> = [
+    const rows: Array<{ key: string; label: string; unit?: string; before?: number | null; after?: number | null }> = [
       { key: "base_value", label: "Стоимость портфеля", unit, before: before?.base_value, after: after?.base_value },
       { key: "var_hist", label: "VaR (hist)", unit, before: before?.var_hist, after: after?.var_hist },
       { key: "es_hist", label: "ES (hist)", unit, before: before?.es_hist, after: after?.es_hist },
@@ -340,12 +340,16 @@ export default function WhatIfPage() {
             </thead>
             <tbody>
               {compareRows.map((r) => {
-                const diff = r.after !== undefined && r.before !== undefined ? r.after - r.before : undefined;
+                const hasBefore = r.before !== undefined && r.before !== null;
+                const hasAfter = r.after !== undefined && r.after !== null;
+                const beforeValue: number | undefined = hasBefore ? (r.before as number) : undefined;
+                const afterValue: number | undefined = hasAfter ? (r.after as number) : undefined;
+                const diff = afterValue !== undefined && beforeValue !== undefined ? afterValue - beforeValue : undefined;
                 return (
                   <tr key={r.key}>
                     <td>{r.label}{r.unit ? ` (${r.unit})` : ""}</td>
-                    <td title={r.before !== undefined ? String(r.before) : undefined}>{r.before !== undefined ? formatNumber(r.before) : "—"}</td>
-                    <td title={r.after !== undefined ? String(r.after) : undefined}>{r.after !== undefined ? formatNumber(r.after) : "—"}</td>
+                    <td title={beforeValue !== undefined ? String(beforeValue) : undefined}>{beforeValue !== undefined ? formatNumber(beforeValue) : "—"}</td>
+                    <td title={afterValue !== undefined ? String(afterValue) : undefined}>{afterValue !== undefined ? formatNumber(afterValue) : "—"}</td>
                     <td title={diff !== undefined ? String(diff) : undefined}>{diff !== undefined ? formatNumber(diff) : "—"}</td>
                   </tr>
                 );

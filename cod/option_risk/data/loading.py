@@ -5,25 +5,18 @@ import datetime as dt
 import json
 import math
 import re
-from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple
+from typing import TYPE_CHECKING, List, Tuple
 
 import pandas as pd
 from pydantic import ValidationError
 
 from .models import OptionPosition, Portfolio
 from .models import MarketScenario
+from .validation import ValidationMessage
 
-
-@dataclass
-class ValidationMessage:
-    """Сообщение в журнале проверки данных."""
-
-    severity: str  # INFO | WARNING | ERROR
-    message: str
-    row: int | None = None
-    field: str | None = None
+if TYPE_CHECKING:
+    from .bootstrap import BootstrappedMarketData
 
 
 def _parse_date(value: str) -> dt.date:
@@ -110,7 +103,12 @@ def _extract_underlying_symbol(instrument: str, ccy1: str, ccy2: str) -> str:
     return base if base else "UNKNOWN"
 
 
-def _trade_row_to_position(row: dict) -> OptionPosition:
+def _trade_row_to_position(
+    row: dict,
+    *,
+    market_bootstrap: BootstrappedMarketData | None = None,
+) -> tuple[OptionPosition, List[ValidationMessage]]:
+    messages: List[ValidationMessage] = []
     product = _str_with_default(row.get("Продукт"), "").strip()
     product_lower = product.lower()
     instrument = _str_with_default(row.get("Инструмент"), product).strip()
@@ -128,6 +126,7 @@ def _trade_row_to_position(row: dict) -> OptionPosition:
             _str_with_default(row.get("Начало"), ""),
         )
     )
+    start_date = _parse_date(_str_with_default(row.get("Начало"), valuation_date.isoformat()))
     maturity_raw = _str_with_default(
         row.get("Окончание"),
         _str_with_default(row.get("Начало"), ""),
@@ -181,9 +180,9 @@ def _trade_row_to_position(row: dict) -> OptionPosition:
             currency=currency,
             liquidity_haircut=0.0,
             model="black_scholes",
-        )
+        ), messages
 
-    if any(tag in product_lower for tag in ("irs", "ois", "xccy")):
+    if any(tag in product_lower for tag in ("irs", "ois", "xccy", "basis")):
         fixed_rate = price if math.isfinite(price) else 0.0
         risk_free_rate = fixed_rate if 0.0 <= fixed_rate <= 1.0 else 0.05
         discount = math.exp(-risk_free_rate * time_to_maturity)
@@ -194,7 +193,7 @@ def _trade_row_to_position(row: dict) -> OptionPosition:
         else:
             float_rate = risk_free_rate
         strike = _safe_positive(abs(fixed_rate), fallback=1e-8)
-        return OptionPosition(
+        position = OptionPosition(
             instrument_type="swap_ir",
             position_id=str(position_id),
             option_type="call",
@@ -215,6 +214,19 @@ def _trade_row_to_position(row: dict) -> OptionPosition:
             float_rate=float_rate,
             day_count=day_count,
         )
+        if market_bootstrap is not None:
+            position, bootstrap_messages = market_bootstrap.enrich_trade_position(
+                position,
+                product_text=product,
+                instrument_text=instrument,
+                ccy1=ccy1,
+                ccy2=ccy2,
+                notional_1=notional_1,
+                notional_2=notional_2,
+                start_date=start_date,
+            )
+            messages.extend(bootstrap_messages)
+        return position, messages
 
     strike = _safe_positive(
         _opt_float(row.get("Цена")),
@@ -224,7 +236,7 @@ def _trade_row_to_position(row: dict) -> OptionPosition:
     discount = math.exp(-risk_free_rate * time_to_maturity)
     underlying_price = strike + (mtm_value / quantity) / (notional * discount)
     underlying_price = _safe_positive(underlying_price, fallback=_safe_positive(spot_col, fallback=strike))
-    return OptionPosition(
+    position = OptionPosition(
         instrument_type="forward",
         position_id=str(position_id),
         option_type="call",
@@ -242,6 +254,19 @@ def _trade_row_to_position(row: dict) -> OptionPosition:
         currency=currency,
         liquidity_haircut=0.0,
     )
+    if market_bootstrap is not None:
+        position, bootstrap_messages = market_bootstrap.enrich_trade_position(
+            position,
+            product_text=product,
+            instrument_text=instrument,
+            ccy1=ccy1,
+            ccy2=ccy2,
+            notional_1=notional_1,
+            notional_2=notional_2,
+            start_date=start_date,
+        )
+        messages.extend(bootstrap_messages)
+    return position, messages
 
 
 def _row_to_position(row: dict) -> OptionPosition:
@@ -270,11 +295,83 @@ def _row_to_position(row: dict) -> OptionPosition:
         "fixed_rate": _opt_float(row.get("fixed_rate")),
         "float_rate": _opt_float(row.get("float_rate")),
         "day_count": _opt_float(row.get("day_count")),
+        "start_date": _parse_date(str(row["start_date"])) if not _is_missing(row.get("start_date")) else None,
+        "settlement_date": _parse_date(str(row["settlement_date"]))
+        if not _is_missing(row.get("settlement_date"))
+        else None,
+        "collateral_currency": _opt_str(row.get("collateral_currency")),
+        "discount_curve_ref": _opt_str(row.get("discount_curve_ref")),
+        "projection_curve_ref": _opt_str(row.get("projection_curve_ref")),
+        "fixing_index_ref": _opt_str(row.get("fixing_index_ref")),
+        "day_count_convention": _opt_str(row.get("day_count_convention")),
+        "business_day_convention": _opt_str(row.get("business_day_convention")),
+        "reset_convention": _opt_str(row.get("reset_convention")),
+        "payment_lag_days": int(_opt_float(row.get("payment_lag_days")))
+        if not _is_missing(row.get("payment_lag_days"))
+        else None,
+        "fixed_leg_frequency_months": int(_opt_float(row.get("fixed_leg_frequency_months")))
+        if not _is_missing(row.get("fixed_leg_frequency_months"))
+        else None,
+        "float_leg_frequency_months": int(_opt_float(row.get("float_leg_frequency_months")))
+        if not _is_missing(row.get("float_leg_frequency_months"))
+        else None,
+        "float_spread": _opt_float(row.get("float_spread", 0.0))
+        if not _is_missing(row.get("float_spread"))
+        else 0.0,
+        "pay_currency": _opt_str(row.get("pay_currency")),
+        "receive_currency": _opt_str(row.get("receive_currency")),
+        "pay_leg_notional": _opt_float(row.get("pay_leg_notional")),
+        "receive_leg_notional": _opt_float(row.get("receive_leg_notional")),
+        "pay_discount_curve_ref": _opt_str(row.get("pay_discount_curve_ref")),
+        "receive_discount_curve_ref": _opt_str(row.get("receive_discount_curve_ref")),
+        "pay_projection_curve_ref": _opt_str(row.get("pay_projection_curve_ref")),
+        "receive_projection_curve_ref": _opt_str(row.get("receive_projection_curve_ref")),
+        "pay_day_count_convention": _opt_str(row.get("pay_day_count_convention")),
+        "receive_day_count_convention": _opt_str(row.get("receive_day_count_convention")),
+        "pay_business_day_convention": _opt_str(row.get("pay_business_day_convention")),
+        "receive_business_day_convention": _opt_str(row.get("receive_business_day_convention")),
+        "pay_calendar": _opt_str(row.get("pay_calendar")),
+        "receive_calendar": _opt_str(row.get("receive_calendar")),
+        "pay_fixing_calendar": _opt_str(row.get("pay_fixing_calendar")),
+        "receive_fixing_calendar": _opt_str(row.get("receive_fixing_calendar")),
+        "pay_fixed_rate": _opt_float(row.get("pay_fixed_rate")),
+        "receive_fixed_rate": _opt_float(row.get("receive_fixed_rate")),
+        "pay_spread": _opt_float(row.get("pay_spread", 0.0))
+        if not _is_missing(row.get("pay_spread"))
+        else 0.0,
+        "receive_spread": _opt_float(row.get("receive_spread", 0.0))
+        if not _is_missing(row.get("receive_spread"))
+        else 0.0,
+        "fixing_days_lag": int(_opt_float(row.get("fixing_days_lag")))
+        if not _is_missing(row.get("fixing_days_lag"))
+        else None,
+        "pay_fixing_days_lag": int(_opt_float(row.get("pay_fixing_days_lag")))
+        if not _is_missing(row.get("pay_fixing_days_lag"))
+        else None,
+        "receive_fixing_days_lag": int(_opt_float(row.get("receive_fixing_days_lag")))
+        if not _is_missing(row.get("receive_fixing_days_lag"))
+        else None,
+        "pay_payment_lag_days": int(_opt_float(row.get("pay_payment_lag_days")))
+        if not _is_missing(row.get("pay_payment_lag_days"))
+        else None,
+        "receive_payment_lag_days": int(_opt_float(row.get("receive_payment_lag_days")))
+        if not _is_missing(row.get("receive_payment_lag_days"))
+        else None,
+        "pay_reset_convention": _opt_str(row.get("pay_reset_convention")),
+        "receive_reset_convention": _opt_str(row.get("receive_reset_convention")),
+        "exchange_principal": bool(row.get("exchange_principal"))
+        if not _is_missing(row.get("exchange_principal"))
+        else False,
+        "spot_fx": _opt_float(row.get("spot_fx")),
     }
     return OptionPosition(**mapped)
 
 
-def load_portfolio_from_csv(path: Path) -> Tuple[Portfolio, List[ValidationMessage]]:
+def load_portfolio_from_csv(
+    path: Path,
+    *,
+    market_bootstrap: BootstrappedMarketData | None = None,
+) -> Tuple[Portfolio, List[ValidationMessage]]:
     """Загрузка портфеля из CSV. Возвращает портфель и журнал валидации."""
     messages: List[ValidationMessage] = []
     df = _normalize_columns(pd.read_csv(path))
@@ -304,7 +401,20 @@ def load_portfolio_from_csv(path: Path) -> Tuple[Portfolio, List[ValidationMessa
     positions: List[OptionPosition] = []
     for idx, row in df.iterrows():
         try:
-            position = _trade_row_to_position(row) if trade_mode else _row_to_position(row)
+            row_messages: List[ValidationMessage] = []
+            if trade_mode:
+                position, row_messages = _trade_row_to_position(row, market_bootstrap=market_bootstrap)
+            else:
+                position = _row_to_position(row)
+            for row_message in row_messages:
+                messages.append(
+                    ValidationMessage(
+                        severity=row_message.severity,
+                        message=row_message.message,
+                        row=row_message.row if row_message.row is not None else int(idx + 2),
+                        field=row_message.field,
+                    )
+                )
             positions.append(position)
         except (ValidationError, ValueError) as exc:
             messages.append(

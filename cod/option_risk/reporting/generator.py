@@ -9,8 +9,8 @@ from typing import Dict, List, Optional
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from ..data.loading import ValidationMessage
 from ..data.models import Portfolio
+from ..data.validation import ValidationMessage
 from ..risk.stress import StressResult
 
 

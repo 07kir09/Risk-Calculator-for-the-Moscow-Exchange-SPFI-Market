@@ -1,10 +1,12 @@
 import { ReactNode, useMemo, useState } from "react";
+import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 import Checklist from "../components/Checklist";
 import ConfirmDialog from "../components/ConfirmDialog";
 import FileDropzone from "../components/FileDropzone";
 import Card from "../ui/Card";
+import { ImportLogEntry } from "../api/types";
 import { useWorkflow } from "../workflow/workflowStore";
 import { WorkflowStep } from "../workflow/workflowTypes";
 import { useAppData } from "../state/appDataStore";
@@ -63,6 +65,45 @@ async function parsePortfolioCsvFromFile(file: File) {
   return { positions: best.positions, log: best.log };
 }
 
+function isExcelFile(file: File): boolean {
+  return /\.(xlsx|xls)$/i.test(file.name);
+}
+
+async function parsePortfolioExcelFromFile(file: File) {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+  const sheetName = workbook.SheetNames.find((name) => {
+    const sheet = workbook.Sheets[name];
+    return sheet && Object.keys(sheet).length > 0;
+  });
+
+  if (!sheetName) {
+    throw new Error("Excel-файл не содержит листов с данными.");
+  }
+
+  const sheet = workbook.Sheets[sheetName];
+  const text = XLSX.utils.sheet_to_csv(sheet, {
+    FS: ",",
+    RS: "\n",
+    blankrows: false,
+    strip: true,
+    dateNF: "yyyy-mm-dd",
+  });
+
+  if (!text.trim()) {
+    throw new Error(`Лист "${sheetName}" не содержит данных.`);
+  }
+
+  return parsePortfolioCsv(text);
+}
+
+async function parsePortfolioFile(file: File) {
+  if (isExcelFile(file)) {
+    return parsePortfolioExcelFromFile(file);
+  }
+  return parsePortfolioCsvFromFile(file);
+}
+
 export default function ImportPage() {
   const nav = useNavigate();
   const { dispatch } = useWorkflow();
@@ -90,7 +131,7 @@ export default function ImportPage() {
     setLoading(true);
     setLastFilename(file.name);
     try {
-      const { positions, log } = await parsePortfolioCsvFromFile(file);
+      const { positions, log } = await parsePortfolioFile(file);
       dataDispatch({ type: "SET_PORTFOLIO", positions, source: "csv", filename: file.name });
       dataDispatch({ type: "SET_VALIDATION_LOG", log });
 
@@ -103,6 +144,13 @@ export default function ImportPage() {
         dispatch({ type: "SET_SNAPSHOT", snapshotId: crypto.randomUUID() });
         dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Import });
       }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Не удалось прочитать файл портфеля.";
+      const log: ImportLogEntry[] = [{ severity: "ERROR", field: "file", message }];
+      dataDispatch({ type: "SET_PORTFOLIO", positions: [], source: "csv", filename: file.name });
+      dataDispatch({ type: "SET_VALIDATION_LOG", log });
+      dispatch({ type: "RESET_ALL" });
+      dispatch({ type: "SET_VALIDATION", criticalErrors: 1, warnings: 0, acknowledged: false });
     } finally {
       setLoading(false);
     }
@@ -135,7 +183,7 @@ export default function ImportPage() {
         <div className="pageHeaderText">
           <h1 className="pageTitle">Шаг 1. Импорт сделок</h1>
           <p className="pageHint">
-            Загрузите CSV с портфелем. Если вы не уверены в формате — скачайте шаблон и заполните его по примеру.
+            Загрузите CSV или Excel с портфелем. Если вы не уверены в формате — скачайте шаблон и заполните его по примеру.
           </p>
         </div>
         <div className="pageActions">
@@ -161,21 +209,27 @@ export default function ImportPage() {
           <a className="btn btn-secondary" href="/sample_portfolio.csv" download>
             Скачать шаблон CSV
           </a>
+          <a className="btn btn-secondary" href="/sample_portfolio.xlsx" download>
+            Скачать шаблон Excel
+          </a>
+          <a className="btn btn-secondary" href="/sample_portfolio_full.xlsx" download>
+            Скачать полный Excel
+          </a>
         </div>
       </div>
 
       <div className="grid">
         <Card>
           <div className="row wrap" style={{ justifyContent: "space-between" }}>
-            <span className="code">CSV портфеля</span>
+            <span className="code">Файл портфеля</span>
             {isLoading ? <span className="badge warn">Читаем файл…</span> : <span className="badge ok">Готово</span>}
           </div>
           <div className="stack" style={{ marginTop: 10 }}>
             <FileDropzone
-              accept=".csv"
+              accept=".csv,.xlsx,.xls"
               inputTestId="portfolio-file"
               disabled={isLoading}
-              title="Перетащите CSV с портфелем сюда"
+              title="Перетащите CSV или Excel с портфелем сюда"
               subtitle="или нажмите, чтобы выбрать файл"
               onFile={(file) => {
                 const go = () => importFile(file);
@@ -200,7 +254,10 @@ export default function ImportPage() {
               <span className="code">swap_ir</span>.
             </div>
             <div className="textMuted">
-              Также поддерживается trade-export CSV с русскими колонками (Продукт/Инструмент/Направление и т.д.).
+              Поддерживаются <span className="code">.csv</span>, <span className="code">.xlsx</span> и <span className="code">.xls</span>.
+            </div>
+            <div className="textMuted">
+              Также поддерживается trade-export с русскими колонками (Продукт/Инструмент/Направление и т.д.).
             </div>
             {lastFilename && <div className="textMuted">Последний файл: {lastFilename}</div>}
           </div>
@@ -242,7 +299,7 @@ export default function ImportPage() {
 
         {positions.length === 0 ? (
           <p className="textMuted" style={{ marginTop: 10 }}>
-            Пока нет данных. Загрузите CSV или нажмите «Загрузить демо».
+            Пока нет данных. Загрузите CSV/Excel или нажмите «Загрузить демо».
           </p>
         ) : (
           <div className="table-wrap" style={{ marginTop: 12 }}>

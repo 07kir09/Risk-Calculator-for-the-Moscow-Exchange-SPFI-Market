@@ -1,6 +1,6 @@
-import { ReactNode } from "react";
+import { CSSProperties, ReactNode } from "react";
 import classNames from "classnames";
 
-export default function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={classNames("card", className)}>{children}</div>;
+export default function Card({ children, className, style }: { children: ReactNode; className?: string; style?: CSSProperties }) {
+  return <div className={classNames("card", className)} style={style}>{children}</div>;
 }

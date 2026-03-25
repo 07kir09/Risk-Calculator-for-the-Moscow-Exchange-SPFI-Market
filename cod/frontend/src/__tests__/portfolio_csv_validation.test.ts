@@ -98,6 +98,52 @@ test("parses russian trade-export format without critical errors", () => {
   expect(log.filter((x) => x.severity === "ERROR")).toHaveLength(0);
   expect(positions).toHaveLength(3);
   expect(positions[0].instrument_type).toBe("forward");
+  expect(positions[0].receive_currency).toBe("EUR");
+  expect(positions[0].pay_currency).toBe("RUB");
+  expect(positions[0].collateral_currency).toBe("RUB");
+  expect(positions[0].receive_discount_curve_ref).toBe("EUR-DISCOUNT-RUB-CSA");
+  expect(positions[0].pay_discount_curve_ref).toBe("RUB-DISCOUNT-RUB-CSA");
+  expect(positions[0].pay_calendar).toBe("RUB+TARGET");
   expect(positions[1].instrument_type).toBe("swap_ir");
+  expect(positions[1].collateral_currency).toBe("RUB");
+  expect(positions[1].discount_curve_ref).toBe("RUB-DISCOUNT-RUB-CSA");
+  expect(positions[1].projection_curve_ref).toBe("RUB-CBR-KEY-RATE");
+  expect(positions[1].fixing_index_ref).toBe("RUB KeyRate");
+  expect(positions[1].fixing_days_lag).toBe(0);
+  expect(positions[1].business_day_convention).toBe("modified_following");
   expect(positions[2].instrument_type).toBe("option");
+});
+
+test("parses basis trade-export rows as cross-currency floating swaps", () => {
+  const tradeCsv = [
+    "Номер в клиринговой системе,Номер в торговой системе,Дата регистрации,Продукт,Инструмент,Направление,Цена,Стоимость,Курс,Начало,Окончание,Сумма 1,Валюта 1,Сумма 2,Валюта 2,Страйк",
+    "7001,7001,05.03.2026,Basis,Basis Swap Spot/1Y. Libor USD 3m / Euribor EUR 3m,Buy,-0.0015,0,,05.03.2026,05.03.2027,1000000,USD,1200000,EUR,",
+  ].join("\n");
+
+  const { positions, log } = parsePortfolioCsv(tradeCsv);
+
+  expect(log.filter((x) => x.severity === "ERROR")).toHaveLength(0);
+  expect(positions).toHaveLength(1);
+  expect(positions[0].instrument_type).toBe("swap_ir");
+  expect(positions[0].pay_currency).toBe("USD");
+  expect(positions[0].receive_currency).toBe("EUR");
+  expect(positions[0].collateral_currency).toBe("USD");
+  expect(positions[0].pay_discount_curve_ref).toBe("USD-DISCOUNT-USD-CSA");
+  expect(positions[0].receive_discount_curve_ref).toBe("EUR-DISCOUNT-USD-CSA");
+  expect(positions[0].pay_projection_curve_ref).toBe("USD-OISFX");
+  expect(positions[0].receive_projection_curve_ref).toBe("EUR-EURIBOR-Act/365-3M");
+  expect(positions[0].pay_calendar).toBe("TARGET+USD");
+  expect(positions[0].receive_calendar).toBe("TARGET+USD");
+  expect(positions[0].pay_fixing_calendar).toBe("USD");
+  expect(positions[0].receive_fixing_calendar).toBe("TARGET");
+  expect(positions[0].pay_spread).toBeCloseTo(-0.0015);
+  expect(positions[0].fixed_rate).toBeNull();
+  expect(positions[0].pay_fixed_rate).toBeNull();
+  expect(positions[0].receive_fixed_rate).toBeNull();
+  expect(positions[0].pay_fixing_days_lag).toBe(2);
+  expect(positions[0].receive_fixing_days_lag).toBe(2);
+  expect(positions[0].pay_reset_convention).toBe("in_advance");
+  expect(positions[0].receive_reset_convention).toBe("in_advance");
+  expect(positions[0].float_leg_frequency_months).toBe(3);
+  expect(positions[0].fixed_leg_frequency_months).toBe(3);
 });
