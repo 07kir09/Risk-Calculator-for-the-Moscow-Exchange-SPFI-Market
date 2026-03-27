@@ -1,5 +1,7 @@
-import { screen } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import * as XLSX from "xlsx";
 import App from "../App";
 import { renderWithProviders } from "./testUtils";
@@ -72,4 +74,32 @@ test("импорт Excel на главной странице работает �
   await screen.findByText(/Загружено позиций: 1/i);
   const continueBtn = screen.getByRole("button", { name: /продолжить: проверка данных/i });
   expect(continueBtn).toBeEnabled();
+});
+
+test.each([
+  { filename: "sample_portfolio.xlsx", expectedPositions: 7 },
+  { filename: "sample_portfolio_full.xlsx", expectedPositions: 18 },
+])("публичный шаблон %s импортируется без критических ошибок", async ({ filename, expectedPositions }) => {
+  cleanup();
+  localStorage.clear();
+  const user = userEvent.setup();
+  renderWithProviders(<App />, { route: "/import" });
+
+  const input = screen.getByTestId("portfolio-file") as HTMLInputElement;
+  const filePath = path.resolve(process.cwd(), "public", filename);
+  const bytes = new Uint8Array(readFileSync(filePath));
+  const file = new File([bytes], filename, {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+
+  await user.upload(input, file);
+
+  await waitFor(() => {
+    const text = document.body.textContent ?? "";
+    expect(text).toContain(`Загружено позиций: ${expectedPositions}`);
+  });
+
+  const text = document.body.textContent ?? "";
+  expect(text).toContain("Критических ошибок: 0");
+  expect(text).toContain("Предупреждений: 0");
 });

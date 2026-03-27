@@ -65,12 +65,31 @@ async function parsePortfolioCsvFromFile(file: File) {
   return { positions: best.positions, log: best.log };
 }
 
+async function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
+  if (typeof file.arrayBuffer === "function") {
+    return file.arrayBuffer();
+  }
+
+  return new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (reader.result instanceof ArrayBuffer) {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("Не удалось прочитать Excel-файл"));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Не удалось прочитать Excel-файл"));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
 function isExcelFile(file: File): boolean {
   return /\.(xlsx|xls)$/i.test(file.name);
 }
 
 async function parsePortfolioExcelFromFile(file: File) {
-  const buffer = await file.arrayBuffer();
+  const buffer = await readFileAsArrayBuffer(file);
   const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
   const sheetName = workbook.SheetNames.find((name) => {
     const sheet = workbook.Sheets[name];
@@ -86,7 +105,6 @@ async function parsePortfolioExcelFromFile(file: File) {
     FS: ",",
     RS: "\n",
     blankrows: false,
-    strip: true,
     dateNF: "yyyy-mm-dd",
   });
 
