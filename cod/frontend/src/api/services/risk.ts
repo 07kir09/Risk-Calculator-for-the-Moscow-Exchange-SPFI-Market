@@ -19,7 +19,7 @@ export async function runRiskCalculation(params: {
 }): Promise<MetricsResponse> {
   const viteEnv = ((import.meta as any).env ?? {}) as Record<string, any>;
   const demoMode = (viteEnv.VITE_DEMO_MODE ?? "1") === "1";
-  if (demoMode && !params.marketDataSessionId) {
+  if (demoMode) {
     const tailModel = params.parametricTailModel ?? "cornish_fisher";
     const metrics = await mockFetchMetrics();
     return {

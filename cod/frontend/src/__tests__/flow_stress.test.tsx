@@ -2,33 +2,23 @@ import { screen } from "@testing-library/react";
 import { waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../App";
-import { renderWithProviders } from "./testUtils";
+import { renderWithProviders, seedReadyForConfigure } from "./testUtils";
 
 test("стресс: запуск → показ топ‑вкладчиков", async () => {
   const user = userEvent.setup();
-  renderWithProviders(<App />, { route: "/import" });
+  seedReadyForConfigure();
+  renderWithProviders(<App />, { route: "/configure" });
 
-  await user.click(screen.getByRole("button", { name: /Загрузить демо/i }));
-  await user.click(screen.getByRole("button", { name: /Продолжить: проверка данных/i }));
-  await user.click(await screen.findByTestId("go-market"));
-  await user.click(await screen.findByTestId("fetch-market"));
-  const goConfigure = await screen.findByTestId("go-configure");
-  await waitFor(() => expect(goConfigure).toBeEnabled());
-  await user.click(goConfigure);
-  const save = await screen.findByTestId("save-config");
-  await waitFor(() => expect(save).toBeEnabled());
-  await user.click(save);
-  expect(await screen.findByRole("heading", { name: /Шаг 5\. Запуск расчёта/i })).toBeInTheDocument();
-  const run = await screen.findByTestId("run-calc");
-  await waitFor(() => expect(run).toBeEnabled());
-  await user.click(run);
+  expect(await screen.findByRole("heading", { name: /Настройка расчёта/i })).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole("button", { name: /Сохранить и перейти к запуску/i })).toBeEnabled());
+  await user.click(screen.getByRole("button", { name: /Сохранить и перейти к запуску/i }));
+  expect(await screen.findByRole("heading", { name: /Запуск расчёта/i })).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole("button", { name: /Запустить расчёт/i })).toBeEnabled());
+  await user.click(screen.getByRole("button", { name: /Запустить расчёт/i }));
 
-  // дашборд
-  expect(await screen.findByRole("heading", { name: /Шаг 6\. Панель риска/i })).toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: /Открыть стрессы/i }));
+  await user.click(await screen.findByRole("link", { name: /Стресс/i }));
 
-  expect(await screen.findByRole("heading", { name: /Шаг 7\. Стресс/i })).toBeInTheDocument();
-  await user.click(await screen.findByTestId("refresh-results"));
+  expect(await screen.findByRole("heading", { name: /Стресс-сценарии/i })).toBeInTheDocument();
 
-  expect(await screen.findByText(/Топ‑вкладчики/i)).toBeInTheDocument();
+  expect(await screen.findByText(/Драйверы stress/i)).toBeInTheDocument();
 });

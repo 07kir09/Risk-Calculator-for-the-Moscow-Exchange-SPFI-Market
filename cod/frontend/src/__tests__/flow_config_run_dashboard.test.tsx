@@ -2,34 +2,20 @@ import { screen } from "@testing-library/react";
 import { waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../App";
-import { renderWithProviders } from "./testUtils";
+import { renderWithProviders, seedReadyForConfigure } from "./testUtils";
 
-test("демо: импорт → проверка → рыночные данные → настройки → запуск → дашборд", async () => {
+test("демо: настройка → запуск → дашборд", async () => {
   const user = userEvent.setup();
-  renderWithProviders(<App />, { route: "/import" });
+  seedReadyForConfigure();
+  renderWithProviders(<App />, { route: "/configure" });
 
-  await user.click(screen.getByRole("button", { name: /Загрузить демо/i }));
-  expect(await screen.findByText(/Загружено позиций: 2/i)).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: /Настройка расчёта/i })).toBeInTheDocument();
 
-  await user.click(screen.getByRole("button", { name: /Продолжить: проверка данных/i }));
-  expect(await screen.findByRole("heading", { name: /Шаг 2\. Проверка данных/i })).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole("button", { name: /Сохранить и перейти к запуску/i })).toBeEnabled());
+  await user.click(screen.getByRole("button", { name: /Сохранить и перейти к запуску/i }));
+  expect(await screen.findByRole("heading", { name: /Запуск расчёта/i })).toBeInTheDocument();
 
-  await user.click(screen.getByTestId("go-market"));
-  expect(await screen.findByRole("heading", { name: /Шаг 3\. Связь с рыночными данными/i })).toBeInTheDocument();
-
-  await user.click(screen.getByTestId("fetch-market"));
-  const goConfigure = await screen.findByTestId("go-configure");
-  await waitFor(() => expect(goConfigure).toBeEnabled());
-  await user.click(goConfigure);
-  expect(await screen.findByRole("heading", { name: /Шаг 4\. Настройка расчёта/i })).toBeInTheDocument();
-
-  const save = screen.getByTestId("save-config");
-  await waitFor(() => expect(save).toBeEnabled());
-  await user.click(save);
-  expect(await screen.findByRole("heading", { name: /Шаг 5\. Запуск расчёта/i })).toBeInTheDocument();
-
-  const run = screen.getByTestId("run-calc");
-  await waitFor(() => expect(run).toBeEnabled());
-  await user.click(run);
-  expect(await screen.findByRole("heading", { name: /Шаг 6\. Панель риска/i })).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole("button", { name: /Запустить расчёт/i })).toBeEnabled());
+  await user.click(screen.getByRole("button", { name: /Запустить расчёт/i }));
+  expect(await screen.findByRole("link", { name: /^Экспорт$/i })).toBeInTheDocument();
 });

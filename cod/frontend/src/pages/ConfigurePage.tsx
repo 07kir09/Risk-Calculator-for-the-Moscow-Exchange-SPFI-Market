@@ -11,6 +11,7 @@ import {
   Tabs,
   Textarea,
 } from "@heroui/react";
+import { flushSync } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 import Checklist from "../components/Checklist";
@@ -382,23 +383,25 @@ export default function ConfigurePage() {
             <Button
               disabled={!readiness.ready}
               onClick={() => {
-                dataDispatch({ type: "RESET_RESULTS" });
-                dispatch({ type: "RESET_DOWNSTREAM", fromStep: WorkflowStep.Configure });
-                dispatch({
-                  type: "SET_CALC_CONFIG",
-                  selectedMetrics: selected,
-                  params: {
-                    alpha,
-                    horizonDays,
-                    parametricTailModel,
-                    historyDays,
-                    baseCurrency,
-                    fxRates: fxRatesResult.value,
-                    liquidityModel,
-                  },
-                  marginEnabled: selected.includes("margin_capital"),
+                flushSync(() => {
+                  dataDispatch({ type: "RESET_RESULTS" });
+                  dispatch({ type: "RESET_DOWNSTREAM", fromStep: WorkflowStep.Configure });
+                  dispatch({
+                    type: "SET_CALC_CONFIG",
+                    selectedMetrics: selected,
+                    params: {
+                      alpha,
+                      horizonDays,
+                      parametricTailModel,
+                      historyDays,
+                      baseCurrency,
+                      fxRates: fxRatesResult.value,
+                      liquidityModel,
+                    },
+                    marginEnabled: selected.includes("margin_capital"),
+                  });
+                  dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Configure });
                 });
-                dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Configure });
                 nav("/run");
               }}
             >

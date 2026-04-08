@@ -2,7 +2,11 @@ import client from "./client";
 import { PositionDTO } from "./types";
 import { metricsSchema, scenarioSchema } from "./contracts/metrics";
 import { marketDataSessionSummarySchema } from "./contracts/marketData";
+import { mockFetchMarketDataSession, mockUploadMarketDataBundleFile } from "./services/mock";
 import { z } from "zod";
+
+const viteEnv = ((import.meta as any).env ?? {}) as Record<string, any>;
+const demoMode = (viteEnv.VITE_DEMO_MODE ?? "1") === "1";
 
 export async function fetchMetrics(payload: {
   positions: PositionDTO[];
@@ -27,6 +31,9 @@ export async function fetchMetrics(payload: {
 }
 
 export async function uploadMarketDataBundleFile(file: File, sessionId?: string) {
+  if (demoMode) {
+    return mockUploadMarketDataBundleFile(file);
+  }
   const form = new FormData();
   form.append("file", file);
   if (sessionId) form.append("session_id", sessionId);
@@ -35,11 +42,17 @@ export async function uploadMarketDataBundleFile(file: File, sessionId?: string)
 }
 
 export async function fetchMarketDataSession(sessionId: string) {
+  if (demoMode) {
+    return mockFetchMarketDataSession();
+  }
   const { data } = await client.get(`/market-data/${sessionId}`);
   return marketDataSessionSummarySchema.parse(data);
 }
 
 export async function loadDefaultMarketDataBundle() {
+  if (demoMode) {
+    return mockFetchMarketDataSession();
+  }
   const { data } = await client.post("/market-data/load-default");
   return marketDataSessionSummarySchema.parse(data);
 }

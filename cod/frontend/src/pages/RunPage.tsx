@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Chip, Progress } from "@heroui/react";
+import { flushSync } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 import Card from "../ui/Card";
@@ -207,15 +208,18 @@ export default function RunPage() {
                       marginEnabled: wf.calcConfig.marginEnabled,
                       marketDataSessionId: dataState.marketDataSummary?.session_id,
                     });
-                    dataDispatch({ type: "SET_RESULTS", metrics });
-                    dispatch({
-                      type: "SET_CALC_RUN",
-                      calcRunId,
-                      status: "success",
-                      startedAt: wf.calcRun.startedAt ?? new Date().toISOString(),
-                      finishedAt: new Date().toISOString(),
+                    flushSync(() => {
+                      dataDispatch({ type: "SET_RESULTS", metrics });
+                      dispatch({
+                        type: "SET_CALC_RUN",
+                        calcRunId,
+                        status: "success",
+                        startedAt: wf.calcRun.startedAt ?? new Date().toISOString(),
+                        finishedAt: new Date().toISOString(),
+                      });
+                      dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.CalcRun });
+                      dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Results });
                     });
-                    dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.CalcRun });
                     nav("/dashboard");
                   } catch (error: any) {
                     dispatch({

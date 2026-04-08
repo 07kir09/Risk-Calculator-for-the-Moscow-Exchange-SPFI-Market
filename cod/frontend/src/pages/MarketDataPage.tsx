@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Chip, Progress, Tab, Tabs } from "@heroui/react";
+import { flushSync } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { fetchMarketDataSession, loadDefaultMarketDataBundle, uploadMarketDataBundleFile } from "../api/endpoints";
 import { MarketDataSessionSummary } from "../api/contracts/marketData";
@@ -213,7 +214,16 @@ export default function MarketDataPage() {
                   <Button variant="secondary" loading={localLoading} disabled={localLoading} onClick={loadLocalDatasets}>
                     Подтянуть папку Datasets
                   </Button>
-                  <Button variant="secondary" disabled={!isReady || !hasPortfolio} onClick={() => nav("/configure")}>
+                  <Button
+                    variant="secondary"
+                    disabled={!isReady || !hasPortfolio}
+                    onClick={() => {
+                      flushSync(() => {
+                        dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.MarketData });
+                      });
+                      nav("/configure");
+                    }}
+                  >
                     К настройке расчёта
                   </Button>
                 </div>

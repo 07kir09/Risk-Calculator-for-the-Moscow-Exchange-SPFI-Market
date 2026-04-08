@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { Accordion, AccordionItem, Checkbox, Chip, Divider } from "@heroui/react";
+import { flushSync } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 import Card from "../ui/Card";
@@ -234,7 +235,9 @@ export default function ValidatePage() {
               <Button
                 disabled={!canContinue}
                 onClick={() => {
-                  dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Validate });
+                  flushSync(() => {
+                    dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Validate });
+                  });
                   nav("/market");
                 }}
               >

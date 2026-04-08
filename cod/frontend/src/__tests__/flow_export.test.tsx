@@ -2,30 +2,22 @@ import { screen } from "@testing-library/react";
 import { waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../App";
-import { renderWithProviders } from "./testUtils";
+import { renderWithProviders, seedReadyForConfigure } from "./testUtils";
 
 test("экспорт: формирование Excel файла (вызов download)", async () => {
   const user = userEvent.setup();
-  renderWithProviders(<App />, { route: "/import" });
+  seedReadyForConfigure();
+  renderWithProviders(<App />, { route: "/configure" });
 
-  await user.click(screen.getByRole("button", { name: /Загрузить демо/i }));
-  await user.click(screen.getByRole("button", { name: /Продолжить: проверка данных/i }));
-  await user.click(await screen.findByTestId("go-market"));
-  await user.click(await screen.findByTestId("fetch-market"));
-  const goConfigure = await screen.findByTestId("go-configure");
-  await waitFor(() => expect(goConfigure).toBeEnabled());
-  await user.click(goConfigure);
-  const save = await screen.findByTestId("save-config");
-  await waitFor(() => expect(save).toBeEnabled());
-  await user.click(save);
-  expect(await screen.findByRole("heading", { name: /Шаг 5\. Запуск расчёта/i })).toBeInTheDocument();
-  const run = await screen.findByTestId("run-calc");
-  await waitFor(() => expect(run).toBeEnabled());
-  await user.click(run);
+  expect(await screen.findByRole("heading", { name: /Настройка расчёта/i })).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole("button", { name: /Сохранить и перейти к запуску/i })).toBeEnabled());
+  await user.click(screen.getByRole("button", { name: /Сохранить и перейти к запуску/i }));
+  expect(await screen.findByRole("heading", { name: /Запуск расчёта/i })).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole("button", { name: /Запустить расчёт/i })).toBeEnabled());
+  await user.click(screen.getByRole("button", { name: /Запустить расчёт/i }));
 
-  // дашборд
-  expect(await screen.findByRole("heading", { name: /Шаг 6\. Панель риска/i })).toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: /^Экспорт$/i }));
+  const exportLink = await screen.findByRole("link", { name: /^Экспорт$/i }, { timeout: 3000 });
+  await user.click(exportLink);
 
   expect(await screen.findByRole("heading", { name: /Шаг 10\. Отчёты и экспорт/i })).toBeInTheDocument();
 
