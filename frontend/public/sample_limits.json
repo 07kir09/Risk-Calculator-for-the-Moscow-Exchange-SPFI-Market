@@ -1,0 +1,11 @@
+{
+  "var_hist": 5000,
+  "es_hist": 7000,
+  "var_param": 5000,
+  "es_param": 7000,
+  "lc_var": 8000,
+  "stress": {
+    "shock_down": 9000,
+    "shock_up": 9000
+  }
+}

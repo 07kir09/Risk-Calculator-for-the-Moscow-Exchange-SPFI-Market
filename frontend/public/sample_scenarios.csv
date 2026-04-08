@@ -1,0 +1,6 @@
+scenario_id,underlying_shift,volatility_shift,rate_shift
+mild_down,-0.02,0.01,0.0
+base,0.0,0.0,0.0
+mild_up,0.02,-0.01,0.0
+shock_down,-0.1,0.05,-0.005
+shock_up,0.1,-0.05,0.005
