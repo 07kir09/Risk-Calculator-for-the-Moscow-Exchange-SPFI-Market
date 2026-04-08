@@ -45,6 +45,11 @@ function formatTick(value: string | number) {
   return value;
 }
 
+function formatCategoryTick(value: string | number) {
+  const label = String(value ?? "");
+  return label.length > 16 ? `${label.slice(0, 14)}…` : label;
+}
+
 function formatChartValue(value: number) {
   if (!Number.isFinite(value)) return "—";
   if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
@@ -269,8 +274,22 @@ export function AreaTrendChart({
             </linearGradient>
           </defs>
           <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
-          <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "rgba(244,241,234,0.46)", fontSize: 12 }} />
-          <YAxis tickFormatter={formatTick} tickLine={false} axisLine={false} tick={{ fill: "rgba(244,241,234,0.46)", fontSize: 12 }} width={42} />
+          <XAxis
+            dataKey="label"
+            tickLine={false}
+            axisLine={false}
+            minTickGap={20}
+            tickMargin={10}
+            tick={{ fill: "rgba(244,241,234,0.46)", fontSize: 11 }}
+          />
+          <YAxis
+            tickFormatter={formatTick}
+            tickLine={false}
+            axisLine={false}
+            tickMargin={10}
+            tick={{ fill: "rgba(244,241,234,0.46)", fontSize: 11 }}
+            width={56}
+          />
           <RechartsTooltip
             contentStyle={{ borderRadius: 18, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(10,10,12,0.94)" }}
             labelStyle={{ color: "rgba(244,241,234,0.58)" }}
@@ -314,8 +333,22 @@ export function LineTrendChart({
       <ResponsiveContainer width="100%" height={height}>
         <LineChart data={safe}>
           <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
-          <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "rgba(244,241,234,0.46)", fontSize: 12 }} />
-          <YAxis tickFormatter={formatTick} tickLine={false} axisLine={false} tick={{ fill: "rgba(244,241,234,0.46)", fontSize: 12 }} width={42} />
+          <XAxis
+            dataKey="label"
+            tickLine={false}
+            axisLine={false}
+            minTickGap={20}
+            tickMargin={10}
+            tick={{ fill: "rgba(244,241,234,0.46)", fontSize: 11 }}
+          />
+          <YAxis
+            tickFormatter={formatTick}
+            tickLine={false}
+            axisLine={false}
+            tickMargin={10}
+            tick={{ fill: "rgba(244,241,234,0.46)", fontSize: 11 }}
+            width={56}
+          />
           <RechartsTooltip
             contentStyle={{ borderRadius: 18, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(10,10,12,0.94)" }}
             labelStyle={{ color: "rgba(244,241,234,0.58)" }}
@@ -351,14 +384,23 @@ export function CompareBarsChart({
       <ResponsiveContainer width="100%" height={height}>
         <BarChart data={safe} layout="vertical" margin={{ top: 8, right: 16, left: 6, bottom: 8 }}>
           <CartesianGrid stroke="rgba(255,255,255,0.05)" horizontal={false} />
-          <XAxis type="number" tickLine={false} axisLine={false} tick={{ fill: "rgba(244,241,234,0.46)", fontSize: 12 }} />
+          <XAxis
+            type="number"
+            tickLine={false}
+            axisLine={false}
+            minTickGap={16}
+            tickMargin={10}
+            tick={{ fill: "rgba(244,241,234,0.46)", fontSize: 11 }}
+          />
           <YAxis
             type="category"
             dataKey="label"
+            tickFormatter={formatCategoryTick}
             tickLine={false}
             axisLine={false}
-            width={110}
-            tick={{ fill: "rgba(244,241,234,0.78)", fontSize: 12 }}
+            width={124}
+            tickMargin={10}
+            tick={{ fill: "rgba(244,241,234,0.78)", fontSize: 11 }}
           />
           <RechartsTooltip
             cursor={{ fill: "rgba(255,255,255,0.03)" }}

@@ -95,6 +95,7 @@ export default function Sidebar({
           key={item.to}
           type="button"
           className="navItem navItem--locked"
+          aria-label={item.label}
           onClick={() => {
             onCloseMobile();
             nav(target, { state: { reason } });
@@ -110,6 +111,7 @@ export default function Sidebar({
       <NavLink
         key={item.to}
         to={item.to}
+        aria-label={item.label}
         onClick={onCloseMobile}
         className={({ isActive }) => `navItem ${isActive ? "navItem--active" : ""}`}
       >
@@ -120,7 +122,10 @@ export default function Sidebar({
   };
 
   return (
-    <aside className={`appSidebar ${mobileOpen ? "appSidebar--mobileOpen" : ""}`} aria-label="Навигация">
+    <aside
+      className={`appSidebar ${collapsed ? "appSidebar--collapsed" : ""} ${mobileOpen ? "appSidebar--mobileOpen" : ""}`}
+      aria-label="Навигация"
+    >
       <div className={`appSidebarHeader ${collapsed ? "appSidebarHeader--collapsed" : ""}`}>
         <div className="brand" title="Risk Calculator">
           {!collapsed && (

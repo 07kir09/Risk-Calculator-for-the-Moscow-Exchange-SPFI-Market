@@ -42,16 +42,118 @@ type MetricKey =
   | "correlations"
   | "margin_capital";
 
-const metricCards: Array<{ key: MetricKey; title: string; hint: string }> = [
-  { key: "var_hist", title: "VaR (сценарный)", hint: "Потенциальный убыток по сценарному PnL." },
-  { key: "var_param", title: "VaR (параметрический)", hint: "VaR по предположению о распределении." },
-  { key: "es_hist", title: "ES (сценарный)", hint: "Средний убыток в хвосте сценарного распределения." },
-  { key: "es_param", title: "ES (параметрический)", hint: "ES по параметрическому распределению." },
-  { key: "lc_var", title: "LC VaR", hint: "VaR + надбавка за ликвидность." },
-  { key: "greeks", title: "Чувствительности", hint: "Delta, gamma, vega, theta, rho, DV01." },
-  { key: "stress", title: "Стресс-сценарии", hint: "Что будет при резком движении рынка." },
-  { key: "correlations", title: "Корреляции", hint: "Связи между факторами риска." },
-  { key: "margin_capital", title: "Маржа и капитал", hint: "Требования по обеспечению и капиталу." },
+type MetricCard = {
+  key: MetricKey;
+  title: string;
+  summary: string;
+  tags: string[];
+  tooltip: {
+    what: string;
+    purpose: string;
+    calculates: string;
+  };
+};
+
+const metricCards: MetricCard[] = [
+  {
+    key: "var_hist",
+    title: "VaR (сценарный)",
+    summary: "Базовый исторический VaR для оценки хвостового убытка по сценариям.",
+    tags: ["сценарный", "квантиль"],
+    tooltip: {
+      what: "Метрика показывает пороговый убыток, который портфель может превысить только в редких исторических или сценарных случаях.",
+      purpose: "Нужна для базовой оценки рыночного риска и для разговора с пользователем в формате «сколько можно потерять при обычном стрессовом дне».",
+      calculates: "Считает квантиль распределения PnL по историческим/сценарным наблюдениям на выбранном уровне доверия и горизонте.",
+    },
+  },
+  {
+    key: "var_param",
+    title: "VaR (параметрический)",
+    summary: "Быстрый VaR на базе волатильности, корреляций и tail-модели.",
+    tags: ["параметрический", "быстро"],
+    tooltip: {
+      what: "Это оценка VaR не по набору сценариев, а по предположению о форме распределения доходностей и взаимосвязях факторов риска.",
+      purpose: "Полезна, когда нужен быстрый и стабильный расчёт или сравнение с историческим VaR по той же конфигурации.",
+      calculates: "Считает порог убытка через параметры распределения, волатильности, корреляции и выбранную tail-модель.",
+    },
+  },
+  {
+    key: "es_hist",
+    title: "ES (сценарный)",
+    summary: "Показывает средний убыток внутри худшего хвоста сценарного распределения.",
+    tags: ["tail-risk", "сценарный"],
+    tooltip: {
+      what: "Expected Shortfall дополняет VaR: вместо одного порога он показывает, насколько плохими в среднем бывают уже самые плохие сценарии.",
+      purpose: "Нужна, когда VaR слишком «сухой» и хочется понять глубину хвостового риска, а не только точку отсечения.",
+      calculates: "Считает средний PnL в худшей части сценарного распределения, лежащей за выбранным уровнем доверия.",
+    },
+  },
+  {
+    key: "es_param",
+    title: "ES (параметрический)",
+    summary: "Параметрический Expected Shortfall для более гладкой оценки хвоста.",
+    tags: ["параметрический", "tail-risk"],
+    tooltip: {
+      what: "Это параметрический аналог ES: глубина хвоста оценивается не по дискретным сценариям, а по модели распределения.",
+      purpose: "Полезна для сравнения с историческим ES и для случаев, где нужна согласованная модельная оценка хвоста.",
+      calculates: "Считает средний ожидаемый убыток в хвосте распределения на основе параметров риска и tail-модели.",
+    },
+  },
+  {
+    key: "lc_var",
+    title: "LC VaR",
+    summary: "VaR с поправкой на ликвидность и сложность выхода из позиции.",
+    tags: ["ликвидность", "надбавка"],
+    tooltip: {
+      what: "LC VaR расширяет обычный VaR, добавляя риск того, что крупную или неликвидную позицию нельзя быстро закрыть без дополнительного убытка.",
+      purpose: "Нужна для реалистичной оценки риска портфеля, где важен не только рыночный шок, но и цена выхода из позиции.",
+      calculates: "Считает VaR и добавляет надбавку за ликвидность по выбранной модели ликвидности и размеру позиций.",
+    },
+  },
+  {
+    key: "greeks",
+    title: "Чувствительности",
+    summary: "Delta, gamma, vega, theta, rho и DV01 по портфелю и позициям.",
+    tags: ["экспозиции", "хедж"],
+    tooltip: {
+      what: "Это набор производных чувствительностей, которые показывают, как меняется стоимость портфеля при малом сдвиге факторов риска.",
+      purpose: "Нужны для хеджа, объяснения источников риска и быстрой диагностики, что именно двигает PnL.",
+      calculates: "Считает суммарные и позиционные чувствительности к цене, волатильности, времени, ставке и кривой доходности.",
+    },
+  },
+  {
+    key: "stress",
+    title: "Стресс-сценарии",
+    summary: "Итоговый PnL при заранее заданных сильных шоках рынка.",
+    tags: ["сценарии", "what-if"],
+    tooltip: {
+      what: "Метрика показывает, как портфель ведёт себя не в «обычном хвосте», а в заранее заданных резких движениях рынка.",
+      purpose: "Нужна для понятного пользовательского ответа на вопрос «что будет, если рынок резко сдвинется вот так».",
+      calculates: "Считает PnL и вклад позиций для каждого стресс-сценария из выбранного набора шоков.",
+    },
+  },
+  {
+    key: "correlations",
+    title: "Корреляции",
+    summary: "Матрица связей между ключевыми факторами риска в портфеле.",
+    tags: ["связи", "диверсификация"],
+    tooltip: {
+      what: "Корреляции показывают, какие факторы риска обычно двигаются вместе, а какие дают диверсификацию.",
+      purpose: "Нужны для объяснения агрегированного риска и для проверки, за счёт чего портфель реально диверсифицирован.",
+      calculates: "Считает матрицу корреляций между факторами риска или сериями изменений, используемыми в модели.",
+    },
+  },
+  {
+    key: "margin_capital",
+    title: "Маржа и капитал",
+    summary: "Требуемое обеспечение, вариационная маржа и капитал под риск.",
+    tags: ["обеспечение", "капитал"],
+    tooltip: {
+      what: "Это блок не про хвостовое распределение, а про ресурс, который нужен для обслуживания и покрытия риска портфеля.",
+      purpose: "Нужен, когда пользователь должен понимать не только риск убытка, но и операционную нагрузку на лимиты, залоги и капитал.",
+      calculates: "Считает initial margin, variation margin, капитал и связанные показатели обеспечения по текущему портфелю.",
+    },
+  },
 ];
 
 const recommendedSet: MetricKey[] = ["var_hist", "es_hist", "lc_var", "greeks", "stress"];
@@ -243,15 +345,42 @@ export default function ConfigurePage() {
                 <div className="cardTitle">Набор метрик</div>
                 <div className="cardSubtitle">Отметьте только то, что действительно нужно пользователю на выходе.</div>
 
-                <div className="metricGrid">
+                <div className="metricGrid metricGrid--compact">
                   {metricCards.map((metric) => (
-                    <label key={metric.key} className={`metricOption ${selected.includes(metric.key) ? "metricOption--selected" : ""}`}>
+                    <label key={metric.key} className={`metricOption metricOption--compact ${selected.includes(metric.key) ? "metricOption--selected" : ""}`}>
                       <Checkbox isSelected={selected.includes(metric.key)} onValueChange={() => toggle(metric.key)}>
-                        <span className="metricOptionTitle">
-                          {metric.title} <HelpTooltip text={metric.hint} />
+                        <span className="metricOptionTitleRow">
+                          <span className="metricOptionTitle">{metric.title}</span>
+                          <HelpTooltip
+                            text={
+                              <div className="metricTooltipContent">
+                                <div className="metricTooltipTitle">{metric.title}</div>
+                                <div className="metricTooltipSection">
+                                  <span>Что это</span>
+                                  <p>{metric.tooltip.what}</p>
+                                </div>
+                                <div className="metricTooltipSection">
+                                  <span>Зачем нужна</span>
+                                  <p>{metric.tooltip.purpose}</p>
+                                </div>
+                                <div className="metricTooltipSection">
+                                  <span>Что считает</span>
+                                  <p>{metric.tooltip.calculates}</p>
+                                </div>
+                              </div>
+                            }
+                          />
                         </span>
                       </Checkbox>
-                      <span className="metricOptionHint">{metric.hint}</span>
+                      <div className="metricOptionMeta">
+                        <span className="metricOptionKey">{metric.key}</span>
+                        {metric.tags.map((tag) => (
+                          <span key={tag} className="metricOptionPill">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                      <span className="metricOptionHint">{metric.summary}</span>
                     </label>
                   ))}
                 </div>

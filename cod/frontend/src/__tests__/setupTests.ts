@@ -6,7 +6,7 @@ jest.mock("framer-motion", () => {
   const React = require("react");
 
   const createMotionComponent = (tag = "div") =>
-    React.forwardRef(({ children, ...props }: any, ref) => React.createElement(tag, { ref, ...props }, children));
+    React.forwardRef(({ children, ...props }: any, ref: unknown) => React.createElement(tag, { ref, ...props }, children));
 
   const motion = new Proxy(
     {},
@@ -66,6 +66,22 @@ Object.defineProperty(globalThis, "IntersectionObserver", {
   writable: true,
   configurable: true,
   value: MockIntersectionObserver,
+});
+
+Object.defineProperty(window, "matchMedia", {
+  writable: true,
+  configurable: true,
+  value: ((query: string): MediaQueryList =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    }) as MediaQueryList),
 });
 
 beforeEach(() => {

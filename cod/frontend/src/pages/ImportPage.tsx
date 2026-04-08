@@ -37,7 +37,7 @@ import { useAppData } from "../state/appDataStore";
 import { isMarketDataBundleFile } from "../lib/marketDataFiles";
 import { demoPositions } from "../mock/demoData";
 import { parsePortfolioCsv } from "../validation/portfolioCsv";
-import { CompareBarsChart, GlassPanel, Reveal, Sparkline, StaggerGroup, StaggerItem } from "../components/rich/RichVisuals";
+import { DonutGauge, GlassPanel, Reveal, Sparkline, StaggerGroup, StaggerItem } from "../components/rich/RichVisuals";
 
 type ParseOutcome = ReturnType<typeof parsePortfolioCsv> & { encoding: string };
 
@@ -176,6 +176,19 @@ function positionStats(positions: PositionDTO[]) {
   return Array.from(byType.entries());
 }
 
+function instrumentTypeLabel(type: string) {
+  switch (type) {
+    case "option":
+      return "Опционы";
+    case "forward":
+      return "Форварды";
+    case "swap_ir":
+      return "Свопы";
+    default:
+      return type;
+  }
+}
+
 export default function ImportPage() {
   const nav = useNavigate();
   const { state: wf, dispatch } = useWorkflow();
@@ -289,10 +302,6 @@ export default function ImportPage() {
     [filteredPositions, previewPage]
   );
   const previewPages = Math.max(1, Math.ceil(filteredPositions.length / previewPageSize));
-  const statChartData = useMemo(
-    () => stats.map(([label, count]) => ({ label, value: count, tone: "positive" as const })),
-    [stats]
-  );
   const readinessSeries = useMemo(
     () => [
       { label: "Файл", value: positions.length > 0 ? 92 : 18 },
@@ -302,6 +311,31 @@ export default function ImportPage() {
     ],
     [criticalErrors, positions.length, readyRatio, warnings]
   );
+  const mixRows = useMemo(
+    () =>
+      stats
+        .map(([label, count]) => ({
+          key: label,
+          label: instrumentTypeLabel(label),
+          count,
+          share: positions.length ? (count / positions.length) * 100 : 0,
+        }))
+        .sort((a, b) => b.count - a.count),
+    [positions.length, stats]
+  );
+  const dominantMix = mixRows[0];
+  const uniqueUnderlyings = useMemo(
+    () => new Set(positions.map((position) => position.underlying_symbol).filter(Boolean)).size,
+    [positions]
+  );
+  const uniqueCurrencies = useMemo(
+    () => new Set(positions.map((position) => position.currency).filter(Boolean)).size,
+    [positions]
+  );
+  const diversityScore = useMemo(() => {
+    if (!positions.length) return 0;
+    return Math.min(100, Math.round((stats.length / 3) * 100));
+  }, [positions.length, stats.length]);
 
   useEffect(() => {
     if (previewPage > previewPages) setPreviewPage(1);
@@ -452,7 +486,58 @@ export default function ImportPage() {
                 subtitle="Мини-аналитика без перехода на отдельную страницу."
               >
                 {stats.length ? (
-                  <CompareBarsChart data={statChartData} height={200} />
+                  <div className="portfolioMiniAnalytics">
+                    <div className="portfolioMiniOverview">
+                      <DonutGauge
+                        value={diversityScore}
+                        label="mix"
+                        subtitle={`${stats.length} типа инструмента в текущем импорте`}
+                        color="#7da7ff"
+                      />
+                      <div className="portfolioMiniSummary">
+                        <div className="portfolioMiniEyebrow">Доминирующий слой</div>
+                        <div className="portfolioMiniLead">{dominantMix?.label ?? "—"}</div>
+                        <div className="portfolioMiniLeadMeta">
+                          {dominantMix
+                            ? `${dominantMix.label} занимают ${Math.round(dominantMix.share)}% текущего портфеля.`
+                            : "Загрузите позиции, чтобы увидеть структуру портфеля."}
+                        </div>
+                        <div className="portfolioMiniFacts">
+                          <div className="portfolioMiniFact">
+                            <span>Базовые активы</span>
+                            <strong>{uniqueUnderlyings}</strong>
+                          </div>
+                          <div className="portfolioMiniFact">
+                            <span>Валюты</span>
+                            <strong>{uniqueCurrencies}</strong>
+                          </div>
+                          <div className="portfolioMiniFact">
+                            <span>Крупнейшая доля</span>
+                            <strong>{dominantMix ? `${Math.round(dominantMix.share)}%` : "—"}</strong>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="portfolioMiniRows">
+                      {mixRows.map((row) => (
+                        <div key={row.key} className="portfolioMiniRow">
+                          <div className="portfolioMiniRowHead">
+                            <strong>{row.label}</strong>
+                            <span>
+                              {row.count} поз. · {Math.round(row.share)}%
+                            </span>
+                          </div>
+                          <div className="portfolioMiniBarTrack">
+                            <div
+                              className="portfolioMiniBarFill"
+                              style={{ width: `${Math.max(10, Math.round(row.share))}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 ) : (
                   <Skeleton className="h-[200px] rounded-[18px]" />
                 )}
@@ -589,7 +674,24 @@ export default function ImportPage() {
                     {stats.length === 0 ? (
                       <div className="textMuted">Структура появится после загрузки портфеля.</div>
                     ) : (
-                      <CompareBarsChart data={statChartData} height={220} />
+                      <div className="portfolioMiniRows">
+                        {mixRows.map((row) => (
+                          <div key={row.key} className="portfolioMiniRow">
+                            <div className="portfolioMiniRowHead">
+                              <strong>{row.label}</strong>
+                              <span>
+                                {row.count} поз. · {Math.round(row.share)}%
+                              </span>
+                            </div>
+                            <div className="portfolioMiniBarTrack">
+                              <div
+                                className="portfolioMiniBarFill"
+                                style={{ width: `${Math.max(10, Math.round(row.share))}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </Tab>

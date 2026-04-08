@@ -44,11 +44,36 @@ export default function AppShell({ children }: { children: ReactNode }) {
     }
   }, [location.pathname, location.state, navigate]);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+
+    const media = window.matchMedia("(max-width: 980px)");
+    const syncNavigationMode = () => {
+      if (media.matches) {
+        setCollapsed(false);
+        return;
+      }
+      setMobileOpen(false);
+    };
+
+    syncNavigationMode();
+
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", syncNavigationMode);
+      return () => media.removeEventListener("change", syncNavigationMode);
+    }
+
+    media.addListener(syncNavigationMode);
+    return () => media.removeListener(syncNavigationMode);
+  }, []);
+
   const handleToggleNavigation = () => {
-    if (typeof window !== "undefined" && window.matchMedia("(max-width: 980px)").matches) {
+    if (typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(max-width: 980px)").matches) {
+      setCollapsed(false);
       setMobileOpen((v) => !v);
       return;
     }
+    setMobileOpen(false);
     setCollapsed((v) => !v);
   };
 

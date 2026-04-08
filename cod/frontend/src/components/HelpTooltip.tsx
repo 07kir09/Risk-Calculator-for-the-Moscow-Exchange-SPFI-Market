@@ -68,7 +68,11 @@ export default function HelpTooltip({ text }: Props) {
         onMouseLeave={() => setOpen(false)}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
       >
         <span className="srOnly">Пояснение</span>
         <svg viewBox="0 0 24 24" aria-hidden="true" className="helpIconSvg">

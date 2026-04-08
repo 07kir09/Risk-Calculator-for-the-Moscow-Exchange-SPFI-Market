@@ -1319,6 +1319,18 @@ a:hover {
   padding: 20px 12px 10px;
 }
 
+.appSidebar--collapsed .appSidebarScroll {
+  padding: 18px 12px 18px;
+}
+
+.appSidebar--collapsed .navGroupLabel {
+  padding: 0;
+  margin: 0;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+
 .brand {
   align-items: flex-start;
 }
@@ -1403,6 +1415,16 @@ a:hover {
 
 .navItemLabel {
   letter-spacing: 0.02em;
+}
+
+.appSidebar--collapsed .navItem {
+  justify-content: center;
+  padding: 0;
+  min-height: 50px;
+}
+
+.appSidebar--collapsed .navItem:hover {
+  transform: none;
 }
 
 .sidebarFooter {
@@ -1532,6 +1554,8 @@ a:hover {
 
 .topbarMeta {
   gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .topbarCounter {
@@ -2810,6 +2834,11 @@ a:hover {
   margin-top: 18px;
 }
 
+.metricGrid--compact {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
 .importKpiCard,
 .metricOption {
   padding: 16px;
@@ -2960,18 +2989,118 @@ a:hover {
   gap: 10px;
 }
 
+.metricOption--compact {
+  padding: 14px 14px 13px;
+  border-radius: 18px;
+  gap: 9px;
+  min-height: 0;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.metricOption--compact:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+}
+
 .metricOption--selected {
   border-color: rgba(110, 255, 142, 0.32);
   background: rgba(110, 255, 142, 0.05);
 }
 
+.metricOptionTitleRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .metricOptionTitle {
   font-weight: 700;
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.metricOptionMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.metricOptionKey,
+.metricOptionPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(244, 241, 234, 0.6);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.metricOption--selected .metricOptionKey,
+.metricOption--selected .metricOptionPill {
+  border-color: rgba(110, 255, 142, 0.18);
+  background: rgba(110, 255, 142, 0.08);
+  color: rgba(244, 241, 234, 0.82);
 }
 
 .metricOptionHint {
   color: rgba(255, 255, 255, 0.64);
+  font-size: 13px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.metricOption--compact .helpIcon {
+  width: 18px;
+  height: 18px;
+  margin-left: 2px;
+  flex: 0 0 auto;
+}
+
+.metricOption--compact .helpIconSvg {
+  width: 13px;
+  height: 13px;
+}
+
+.metricTooltipContent {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.metricTooltipTitle {
   font-size: 14px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.metricTooltipSection {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metricTooltipSection span {
+  color: rgba(244, 241, 234, 0.5);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.metricTooltipSection p {
+  margin: 0;
+  color: rgba(244, 241, 234, 0.84);
+  line-height: 1.45;
 }
 
 .configureTextarea {
@@ -3080,6 +3209,10 @@ a:hover {
     grid-template-columns: 1fr;
   }
 
+  .metricGrid--compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .importUploadHeader,
   .importSummaryHeader,
   .importPreviewHeader,
@@ -3098,6 +3231,12 @@ a:hover {
   }
 
   .inputPairGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .metricGrid--compact {
     grid-template-columns: 1fr;
   }
 }
@@ -3290,14 +3429,17 @@ a:hover {
 
 .metricHeroValue {
   margin-top: 18px;
-  font-size: clamp(48px, 6vw, 86px);
-  line-height: 0.9;
-  letter-spacing: -0.08em;
+  font-size: clamp(40px, 4.8vw, 72px);
+  line-height: 0.86;
+  letter-spacing: -0.07em;
   font-weight: 900;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
 }
 
 .metricHeroChart {
   margin-top: 22px;
+  min-width: 0;
 }
 
 .metricHeroChip {
@@ -3410,7 +3552,7 @@ a:hover {
 }
 
 .donutGaugeValue {
-  font-size: 38px;
+  font-size: clamp(30px, 3vw, 38px);
   line-height: 1;
   font-weight: 900;
   letter-spacing: -0.06em;
@@ -3507,9 +3649,134 @@ a:hover {
 .heroInlineStat strong {
   display: block;
   margin-top: 10px;
-  font-size: 28px;
-  line-height: 1;
+  font-size: clamp(21px, 2vw, 28px);
+  line-height: 0.94;
   letter-spacing: -0.06em;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.portfolioMiniAnalytics {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.portfolioMiniOverview {
+  display: grid;
+  grid-template-columns: minmax(0, 0.84fr) minmax(0, 1.16fr);
+  gap: 18px;
+  align-items: center;
+}
+
+.portfolioMiniSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.portfolioMiniEyebrow {
+  color: rgba(244, 241, 234, 0.5);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.portfolioMiniLead {
+  font-size: clamp(28px, 3vw, 40px);
+  line-height: 0.92;
+  letter-spacing: -0.05em;
+  font-weight: 900;
+}
+
+.portfolioMiniLeadMeta {
+  color: rgba(244, 241, 234, 0.62);
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 36ch;
+}
+
+.portfolioMiniFacts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.portfolioMiniFact {
+  padding: 14px 14px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  min-width: 0;
+}
+
+.portfolioMiniFact span {
+  display: block;
+  color: rgba(244, 241, 234, 0.54);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.portfolioMiniFact strong {
+  display: block;
+  margin-top: 10px;
+  font-size: clamp(20px, 2vw, 26px);
+  line-height: 0.96;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+}
+
+.portfolioMiniRows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.portfolioMiniRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.portfolioMiniRowHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.portfolioMiniRowHead strong {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.portfolioMiniRowHead span {
+  color: rgba(244, 241, 234, 0.56);
+  font-size: 13px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.portfolioMiniBarTrack {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.portfolioMiniBarFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(125, 167, 255, 0.96), rgba(110, 255, 142, 0.92));
+  box-shadow: 0 0 20px rgba(125, 167, 255, 0.22);
+}
+
+.recharts-cartesian-axis-tick-value {
+  font-variant-numeric: tabular-nums;
 }
 
 .tableWrap,
@@ -3568,6 +3835,16 @@ a:hover {
   .heroInlineStats {
     grid-template-columns: 1fr;
   }
+
+  .portfolioMiniOverview,
+  .portfolioMiniFacts {
+    grid-template-columns: 1fr;
+  }
+
+  .portfolioMiniRowHead {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 @media (max-width: 760px) {
@@ -3582,5 +3859,14 @@ a:hover {
   .circularScore {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .topbarCounter,
+  .topbarStatusChip {
+    display: none;
+  }
+
+  .topbarBrandTitle {
+    font-size: 20px;
   }
 }
