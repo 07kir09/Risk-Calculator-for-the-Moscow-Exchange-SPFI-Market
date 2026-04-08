@@ -1,6 +1,11 @@
-import { ReactNode, useEffect, useMemo } from "react";
-import { createPortal } from "react-dom";
-import { useLockBodyScroll } from "../hooks/useLockBodyScroll";
+import { ReactNode } from "react";
+import {
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+} from "@heroui/react";
 import Button from "./Button";
 
 export default function ConfirmDialog({
@@ -22,40 +27,47 @@ export default function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  const portalRoot = useMemo(() => document.getElementById("overlay-root") ?? document.body, []);
-  useLockBodyScroll(open);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onCancel]);
-
-  if (!open) return null;
-
-  return createPortal(
-    <div className="modal-backdrop" onClick={onCancel} role="presentation">
-      <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <div className="modal-title">{title}</div>
-          <button className="btn btn-ghost" type="button" onClick={onCancel} aria-label="Закрыть">
-            Закрыть
-          </button>
-        </div>
-        <div className="modal-body">{description}</div>
-        <div className="modal-footer">
-          <Button variant="secondary" onClick={onCancel}>
+  return (
+    <Modal
+      isOpen={open}
+      onOpenChange={(next) => {
+        if (!next) onCancel();
+      }}
+      placement="center"
+      backdrop="blur"
+      motionProps={{
+        variants: {
+          enter: {
+            y: 0,
+            opacity: 1,
+            scale: 1,
+            transition: { type: "spring", stiffness: 220, damping: 22 },
+          },
+          exit: {
+            y: 12,
+            opacity: 0,
+            scale: 0.98,
+            transition: { duration: 0.18, ease: "easeIn" },
+          },
+        },
+      }}
+      classNames={{
+        base: "confirmModal",
+        backdrop: "confirmModalBackdrop",
+      }}
+    >
+      <ModalContent>
+        <ModalHeader>{title}</ModalHeader>
+        <ModalBody>{description}</ModalBody>
+        <ModalFooter>
+          <Button variant="ghost" onClick={onCancel}>
             {cancelText}
           </Button>
-          <Button variant={danger ? "danger" : "primary"} onClick={onConfirm}>
+          <Button variant={danger ? "danger" : "shadow"} onClick={onConfirm}>
             {confirmText}
           </Button>
-        </div>
-      </div>
-    </div>,
-    portalRoot
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
   );
 }

@@ -9,10 +9,10 @@ export default function UiDemoPage() {
         Страница для быстрой проверки: длинные тексты, таблицы, кнопки и сетка на разных ширинах.
       </p>
 
-      <div className="grid" style={{ marginTop: 12 }}>
+      <div className="grid pageSection--tight">
         <Card>
           <div className="cardTitle">Кнопки</div>
-          <div className="row wrap" style={{ marginTop: 12 }}>
+          <div className="inlineActions pageSection--tight">
             <Button>Primary</Button>
             <Button variant="secondary">Secondary</Button>
             <Button variant="ghost">Ghost</Button>
@@ -31,7 +31,7 @@ export default function UiDemoPage() {
 
       <Card>
         <div className="cardTitle">Таблица (overflow внутри)</div>
-        <div className="table-wrap" style={{ marginTop: 12 }}>
+        <div className="table-wrap pageSection--tight">
           <table className="table sticky">
             <thead>
               <tr>
@@ -57,4 +57,3 @@ export default function UiDemoPage() {
     </Card>
   );
 }
-

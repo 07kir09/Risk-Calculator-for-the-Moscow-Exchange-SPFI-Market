@@ -169,24 +169,24 @@ export default function HedgePage() {
       </div>
 
       {errorText && (
-        <div className="badge danger" style={{ marginTop: 12 }}>
+        <div className="badge danger pageSection--tight">
           {errorText}
         </div>
       )}
 
       <Card>
-        <div className="row wrap" style={{ justifyContent: "space-between" }}>
+        <div className="pageHeader">
           <div>
             <div className="cardTitle">Насколько хеджировать?</div>
             <div className="cardSubtitle">
               100% — попытка “обнулить” выбранную метрику (в рамках нашей модели). Начните с 25–50% и сравните эффект.
             </div>
           </div>
-          <div className="row" style={{ gap: 10 }}>
-            <label className="row" style={{ gap: 10 }}>
+          <div className="inlineActions">
+            <label className="row">
               <span className="textMuted">Доля:</span>
               <input
-                style={{ width: 120 }}
+                className="narrowInput"
                 type="number"
                 min={0}
                 max={100}
@@ -200,7 +200,7 @@ export default function HedgePage() {
         </div>
       </Card>
 
-      <div className="grid" style={{ marginTop: 12 }}>
+      <div className="grid pageSection--tight">
         {suggestions.length === 0 ? (
           <Card>
             <div className="cardTitle">Нет доступных подсказок</div>
@@ -209,16 +209,16 @@ export default function HedgePage() {
         ) : (
           suggestions.map((s) => (
             <Card key={s.kind}>
-              <div className="row wrap" style={{ justifyContent: "space-between" }}>
+              <div className="pageHeader">
                 <div className="cardTitle">{s.title}</div>
                 <div className="badge ok" title={String(s.current)}>
                   Сейчас: {formatNumber(s.current)}
                 </div>
               </div>
-              <div className="cardSubtitle" style={{ marginTop: 10 }}>
+              <div className="cardSubtitle statusMessage--compact">
                 {s.rationale}
               </div>
-              <div className="row wrap" style={{ marginTop: 12 }}>
+              <div className="inlineActions pageSection--tight">
                 <Button
                   loading={loading === s.kind}
                   disabled={loading !== null}
@@ -239,6 +239,7 @@ export default function HedgePage() {
                         liquidityModel,
                         selectedMetrics: ["greeks"],
                         marginEnabled: false,
+                        marketDataSessionId: dataState.marketDataSummary?.session_id,
                       });
                       const unitExposure = perUnit.greeks?.[s.metricKey as string] ?? Number.NaN;
                       if (!Number.isFinite(unitExposure) || unitExposure === 0) {

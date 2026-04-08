@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
+import Button from "./Button";
 
 export default function FileDropzone({
   accept,
@@ -17,6 +18,7 @@ export default function FileDropzone({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isActive, setActive] = useState(false);
+  const inputId = useId();
 
   const pick = () => {
     if (disabled) return;
@@ -54,12 +56,13 @@ export default function FileDropzone({
       }}
     >
       <input
+        id={inputId}
         data-testid={inputTestId}
         ref={inputRef}
         type="file"
         accept={accept}
         disabled={disabled}
-        style={{ display: "none" }}
+        className="visuallyHiddenInput"
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (!file) return;
@@ -69,7 +72,33 @@ export default function FileDropzone({
       />
       <div className="dropzoneTitle">{title}</div>
       <div className="dropzoneSubtitle">{subtitle}</div>
+      <div className="dropzoneActions">
+        <Button
+          type="button"
+          variant="shadow"
+          className="dropzoneCta"
+          disabled={disabled}
+          onClick={(e) => {
+            e.stopPropagation();
+            pick();
+          }}
+        >
+          Выбрать файл
+        </Button>
+        <label
+          htmlFor={inputId}
+          className={`dropzoneLink ${disabled ? "dropzoneLink--disabled" : ""}`}
+          onClick={(e) => {
+            if (disabled) {
+              e.preventDefault();
+              return;
+            }
+            e.stopPropagation();
+          }}
+        >
+          Открыть системный выбор
+        </label>
+      </div>
     </div>
   );
 }
-

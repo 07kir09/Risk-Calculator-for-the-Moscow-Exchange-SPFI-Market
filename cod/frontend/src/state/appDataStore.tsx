@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useReducer } from "react";
 import { ImportLogEntry, PositionDTO } from "../api/types";
 import { MetricsResponse, ScenarioDTO } from "../api/contracts/metrics";
+import { MarketDataSessionSummary } from "../api/contracts/marketData";
 
 export type DataSource = "demo" | "csv" | "api";
 
@@ -14,6 +15,7 @@ export interface AppDataState {
   validationLog: ImportLogEntry[];
   scenarios: ScenarioDTO[];
   limits: Record<string, any> | null;
+  marketDataSummary: MarketDataSessionSummary | null;
   results: {
     metrics: MetricsResponse | null;
     computedAt?: string;
@@ -25,6 +27,7 @@ export const initialAppDataState: AppDataState = {
   validationLog: [],
   scenarios: [],
   limits: null,
+  marketDataSummary: null,
   results: { metrics: null },
 };
 
@@ -33,6 +36,7 @@ type Action =
   | { type: "SET_VALIDATION_LOG"; log: ImportLogEntry[] }
   | { type: "SET_SCENARIOS"; scenarios: ScenarioDTO[] }
   | { type: "SET_LIMITS"; limits: Record<string, any> | null }
+  | { type: "SET_MARKET_DATA_SUMMARY"; summary: MarketDataSessionSummary | null }
   | { type: "SET_RESULTS"; metrics: MetricsResponse | null }
   | { type: "RESET_RESULTS" }
   | { type: "RESET_ALL" };
@@ -117,6 +121,8 @@ function reducer(state: AppDataState, action: Action): AppDataState {
       return { ...state, scenarios: action.scenarios };
     case "SET_LIMITS":
       return { ...state, limits: action.limits };
+    case "SET_MARKET_DATA_SUMMARY":
+      return { ...state, marketDataSummary: action.summary, results: { metrics: null } };
     case "SET_RESULTS":
       return { ...state, results: { metrics: action.metrics, computedAt: action.metrics ? new Date().toISOString() : undefined } };
     case "RESET_RESULTS":

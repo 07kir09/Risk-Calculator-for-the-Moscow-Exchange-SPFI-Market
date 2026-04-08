@@ -1,9 +1,8 @@
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
-import WorkflowStepper from "../components/WorkflowStepper";
-import NextStepBanner from "../components/NextStepBanner";
 import OnboardingModal from "../components/OnboardingModal";
 
 const titles: Record<string, string> = {
@@ -55,6 +54,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className={`app ${collapsed ? "app--collapsed" : ""}`}>
+      <div className="appAmbient">
+        <div className="appAmbientOrb appAmbientOrb--one" />
+        <div className="appAmbientOrb appAmbientOrb--two" />
+        <div className="appAmbientGrid" />
+      </div>
       <OnboardingModal />
       {mobileOpen && <div className="mobileBackdrop" onClick={() => setMobileOpen(false)} />}
       <Sidebar
@@ -69,22 +73,35 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <main className="appMain">
         <div className="appMainScroll">
           <div className="container">
-            {routeNotice && (
-              <div className="card">
-                <div className="row wrap" style={{ justifyContent: "space-between" }}>
-                  <div>
-                    <div className="badge warn">Навигация</div>
-                    <div style={{ marginTop: 8 }}>{routeNotice}</div>
-                  </div>
-                  <button className="btn btn-secondary" onClick={() => setRouteNotice(null)}>
-                    Понятно
-                  </button>
-                </div>
-              </div>
-            )}
-            <WorkflowStepper />
-            <NextStepBanner />
-            {children}
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={location.pathname}
+                initial={{ opacity: 0, x: 18, y: 18 }}
+                animate={{ opacity: 1, x: 0, y: 0 }}
+                exit={{ opacity: 0, x: -18, y: -8 }}
+                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                className="pageMotion"
+              >
+                {routeNotice && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -12, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -12, scale: 0.98 }}
+                    transition={{ type: "spring", stiffness: 220, damping: 22 }}
+                    className="routeNotice"
+                  >
+                    <div>
+                      <div className="routeNoticeLabel">Подсказка навигации</div>
+                      <div className="routeNoticeText">{routeNotice}</div>
+                    </div>
+                    <button className="topbarGhostButton" onClick={() => setRouteNotice(null)} aria-label="Закрыть сообщение">
+                      ×
+                    </button>
+                  </motion.div>
+                )}
+                {children}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
       </main>

@@ -1,13 +1,37 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  Chip,
+  Input,
+  Tab,
+  Table,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableHeader,
+  TableRow,
+  Tabs,
+  Textarea,
+} from "@heroui/react";
 import { useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 import ConfirmDialog from "../components/ConfirmDialog";
 import Card from "../ui/Card";
+import {
+  AreaTrendChart,
+  CompareBarsChart,
+  DonutGauge,
+  GlassPanel,
+  Reveal,
+  Sparkline,
+  StaggerGroup,
+  StaggerItem,
+} from "../components/rich/RichVisuals";
 import { useAppData } from "../state/appDataStore";
 import { useWorkflow } from "../workflow/workflowStore";
 import { WorkflowStep } from "../workflow/workflowTypes";
 import { formatNumber } from "../utils/format";
 import { runRiskCalculation } from "../api/services/risk";
+import { ContributorBars } from "../components/monolith/visuals";
 
 export default function StressPage() {
   const nav = useNavigate();
@@ -16,15 +40,15 @@ export default function StressPage() {
   const metrics = dataState.results.metrics;
   const stress = metrics?.stress || [];
   const topStressContributors = metrics?.top_contributors?.stress ?? [];
-  const [status, setStatus] = useState<string>("");
+  const [status, setStatus] = useState("");
   const [isRecalc, setIsRecalc] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   useEffect(() => {
     if (metrics) dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Stress });
-  }, [metrics, dispatch]);
+  }, [dispatch, metrics]);
 
-  const worst = useMemo(() => (stress.length ? Math.min(...stress.map((s) => s.pnl)) : undefined), [stress]);
+  const worst = useMemo(() => (stress.length ? Math.min(...stress.map((item) => item.pnl)) : undefined), [stress]);
 
   const [draftId, setDraftId] = useState("custom");
   const [draftS, setDraftS] = useState(0);
@@ -60,13 +84,14 @@ export default function StressPage() {
         liquidityModel,
         selectedMetrics,
         marginEnabled: wf.calcConfig.marginEnabled,
+        marketDataSessionId: dataState.marketDataSummary?.session_id,
       });
       dataDispatch({ type: "SET_RESULTS", metrics: updated });
       dispatch({ type: "SET_CALC_RUN", calcRunId, status: "success", startedAt, finishedAt: new Date().toISOString() });
-      setStatus("Готово: результаты обновлены.");
-    } catch (e: any) {
+      setStatus("Результаты стрессов обновлены.");
+    } catch (error: any) {
       dispatch({ type: "SET_CALC_RUN", calcRunId, status: "error", startedAt, finishedAt: new Date().toISOString() });
-      setStatus(e?.message ?? "Ошибка пересчёта");
+      setStatus(error?.message ?? "Ошибка пересчёта");
     } finally {
       setIsRecalc(false);
     }
@@ -78,17 +103,51 @@ export default function StressPage() {
     dataDispatch({
       type: "SET_SCENARIOS",
       scenarios: [
-        ...dataState.scenarios.filter((s) => s.scenario_id !== draftId.trim()),
-        { scenario_id: draftId.trim(), underlying_shift: draftS, volatility_shift: draftVol, rate_shift: draftR, probability, description: draftDesc },
+        ...dataState.scenarios.filter((scenario) => scenario.scenario_id !== draftId.trim()),
+        {
+          scenario_id: draftId.trim(),
+          underlying_shift: draftS,
+          volatility_shift: draftVol,
+          rate_shift: draftR,
+          probability,
+          description: draftDesc,
+        },
       ],
     });
-    setStatus("Сценарий добавлен. Нажмите «Обновить результаты», чтобы увидеть новый P&L.");
+    setStatus("Сценарий обновлён. Нажмите «Пересчитать», чтобы увидеть новый P&L.");
   };
 
   const removeScenario = (id: string) => {
-    dataDispatch({ type: "SET_SCENARIOS", scenarios: dataState.scenarios.filter((s) => s.scenario_id !== id) });
-    setStatus("Сценарий удалён. Нажмите «Обновить результаты», чтобы пересчитать P&L.");
+    dataDispatch({ type: "SET_SCENARIOS", scenarios: dataState.scenarios.filter((scenario) => scenario.scenario_id !== id) });
+    setStatus("Сценарий удалён. Чтобы обновить результаты, пересчитайте стресс-блок.");
   };
+
+  const contributorBars = useMemo(() => {
+    const max = Math.max(...topStressContributors.map((row) => Math.abs(row.pnl_contribution)), 1);
+    return topStressContributors.slice(0, 6).map((row, index) => ({
+      label: `${row.position_id}${row.scenario_id ? ` · ${row.scenario_id}` : ` · ${index + 1}`}`,
+      value: (Math.abs(row.pnl_contribution) / max) * 100,
+      tone: row.pnl_contribution < 0 ? "negative" as const : "positive" as const,
+    }));
+  }, [topStressContributors]);
+  const stressTrendData = useMemo(
+    () =>
+      (stress.length
+        ? stress
+        : [{ scenario_id: "base", pnl: 0, limit: 0, breached: false }]
+      ).map((scenario) => ({
+        label: scenario.scenario_id,
+        value: scenario.pnl,
+        secondary: scenario.limit ?? 0,
+      })),
+    [stress]
+  );
+  const breachShare = stress.length ? (stress.filter((item) => item.breached).length / stress.length) * 100 : 0;
+  const scenarioSpark = useMemo(
+    () => dataState.scenarios.slice(0, 8).map((scenario, index) => ({ label: `${index + 1}`, value: Math.abs(scenario.underlying_shift) + Math.abs(scenario.volatility_shift) + Math.abs(scenario.rate_shift) })),
+    [dataState.scenarios]
+  );
+
   return (
     <Card>
       <ConfirmDialog
@@ -96,10 +155,8 @@ export default function StressPage() {
         title="Удалить сценарий?"
         description={
           <div className="stack">
-            <div>
-              Сценарий <span className="code">{confirmDelete ?? ""}</span> будет удалён.
-            </div>
-            <div className="textMuted">Чтобы обновить результаты стрессов, нужно пересчитать.</div>
+            <div>Сценарий <span className="code">{confirmDelete ?? ""}</span> будет удалён из текущей сессии.</div>
+            <div className="textMuted">Чтобы обновить stress P&L, нужно пересчитать результаты.</div>
           </div>
         }
         confirmText="Удалить"
@@ -113,162 +170,148 @@ export default function StressPage() {
 
       <div className="pageHeader">
         <div className="pageHeaderText">
-          <h1 className="pageTitle">Шаг 7. Стресс‑сценарии</h1>
-          <p className="pageHint">Ответ: что будет при плохих сценариях. Здесь можно управлять сценариями и смотреть stress P&L.</p>
+          <h1 className="pageTitle">Стресс-сценарии</h1>
+          <p className="pageHint">Экран отвечает на два вопроса: какие сценарии заложены и какой убыток они дают.</p>
         </div>
         <div className="pageActions">
-          <Button variant="secondary" onClick={() => nav("/dashboard")}>Назад: панель</Button>
-          <Button data-testid="refresh-results" variant="secondary" loading={isRecalc} disabled={!metrics || isRecalc} onClick={recalcNow}>Обновить результаты</Button>
+          <Button variant="secondary" onClick={() => nav("/dashboard")}>Назад</Button>
+          <Button variant="secondary" loading={isRecalc} disabled={!metrics || isRecalc} onClick={recalcNow}>
+            Пересчитать
+          </Button>
         </div>
       </div>
 
       {!metrics ? (
         <Card>
-          <div className="badge warn">Нет результатов. Сначала запустите расчёт.</div>
-          <Button onClick={() => nav("/run")}>Перейти к запуску</Button>
+          <div className="textMuted">Нет результатов. Сначала выполните расчёт.</div>
+          <div className="runActionRow">
+            <Button onClick={() => nav("/run")}>К запуску</Button>
+          </div>
         </Card>
       ) : (
-        <div className="grid" style={{ marginTop: 12 }}>
-          <Card>
-            <div className="cardTitle">Результаты стрессов</div>
-            <div className="cardSubtitle">Худший stress P&L: {worst !== undefined ? formatNumber(worst) : "—"}</div>
-            <div className="table-wrap" style={{ marginTop: 12 }}>
-              <table className="table sticky">
-                <thead>
-                  <tr>
-                    <th>Сценарий</th>
-                    <th>P&L</th>
-                    <th>Лимит</th>
-                    <th>Статус</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stress.map((s) => (
-                    <tr key={s.scenario_id}>
-                      <td>{s.scenario_id}</td>
-                      <td>{formatNumber(s.pnl)}</td>
-                      <td>{s.limit ?? "—"}</td>
-                      <td>
-                        <span className={s.breached ? "badge danger" : "badge ok"}>{s.breached ? "Превышен" : "Ок"}</span>
-                      </td>
-                    </tr>
-                  ))}
-                  {stress.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="textMuted">Стрессы не считались (включите «Стресс‑сценарии» в настройках).</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <div className="row wrap" style={{ marginTop: 12 }}>
-              <Button variant="secondary" onClick={() => nav("/limits")}>Перейти к лимитам</Button>
-            </div>
-            {status && <div className="badge ok" style={{ marginTop: 12 }}>{status}</div>}
+        <div className="configureLayout">
+          <div className="configureMain">
+            <StaggerGroup className="visualSplitPanel">
+              <StaggerItem>
+                <GlassPanel
+                  title="Стрессовый профиль"
+                  subtitle="График показывает форму сценарного хвоста, а donut — долю breach-сценариев."
+                  badge={<Chip color={worst !== undefined && worst < 0 ? "danger" : "success"} variant="flat" radius="sm">{worst !== undefined ? formatNumber(worst, 2) : "—"}</Chip>}
+                >
+                  <div className="visualSplitPanel">
+                    <AreaTrendChart data={stressTrendData} color="#ff7777" accent="#7da7ff" showSecondary />
+                    <DonutGauge value={breachShare} label="breach share" subtitle="Процент стресс-сценариев, которые уже пересекают лимит." color="#ff7777" />
+                  </div>
+                </GlassPanel>
+              </StaggerItem>
+              <StaggerItem>
+                <GlassPanel title="Драйверы stress" subtitle="Кто именно вносит наибольший вклад в худший stress P&L.">
+                  <CompareBarsChart data={contributorBars} height={240} />
+                  <Sparkline data={scenarioSpark} color="#7da7ff" height={88} />
+                </GlassPanel>
+              </StaggerItem>
+            </StaggerGroup>
 
-            <Card style={{ marginTop: 12 }}>
-              <div className="cardTitle">Топ‑вкладчики в худший стресс</div>
-              <div className="cardSubtitle">Сортировка по |ΔPnL| для худшего сценария.</div>
-              <div className="table-wrap" style={{ marginTop: 12 }}>
-                <table className="table sticky">
-                  <thead>
-                    <tr>
-                      <th>Position</th>
-                      <th>Scenario</th>
-                      <th>ΔPnL</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {topStressContributors.map((row, idx) => (
-                      <tr key={`${row.position_id}-${idx}`}>
-                        <td>{row.position_id}</td>
-                        <td>{row.scenario_id ?? "—"}</td>
-                        <td>{formatNumber(row.pnl_contribution, 2)}</td>
-                      </tr>
-                    ))}
-                    {!topStressContributors.length && (
-                      <tr>
-                        <td colSpan={3} className="textMuted">Нет разложения по позициям для стресса.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+            <Reveal delay={0.06}>
+              <Card>
+                <Tabs
+                  aria-label="Работа со стрессами"
+                  radius="sm"
+                  color="primary"
+                  classNames={{
+                    tabList: "importTabsList",
+                    tab: "importTab",
+                    cursor: "importTabCursor",
+                    panel: "importTabPanel",
+                  }}
+                >
+                  <Tab key="results" title="Результаты">
+                    <div className="runSummaryHeader">
+                      <div>
+                        <div className="cardTitle">Результаты стрессов</div>
+                        <div className="cardSubtitle">Худший сценарий должен быть понятен без дополнительных кликов.</div>
+                      </div>
+                      <Chip color={worst !== undefined && worst < 0 ? "danger" : "success"} variant="flat" radius="sm">
+                        Худший stress P&L: {worst !== undefined ? formatNumber(worst, 2) : "—"}
+                      </Chip>
+                    </div>
+
+                    <Table
+                      removeWrapper
+                      aria-label="Stress P&L"
+                      classNames={{ table: "heroTable", th: "heroTableHeader", td: "heroTableCell", tr: "heroTableRow" }}
+                    >
+                      <TableHeader>
+                        <TableColumn>Сценарий</TableColumn>
+                        <TableColumn>P&L</TableColumn>
+                        <TableColumn>Лимит</TableColumn>
+                        <TableColumn>Статус</TableColumn>
+                      </TableHeader>
+                      <TableBody emptyContent="Стресс-сценарии не были рассчитаны.">
+                        {stress.map((scenario) => (
+                          <TableRow key={scenario.scenario_id}>
+                            <TableCell>{scenario.scenario_id}</TableCell>
+                            <TableCell>{formatNumber(scenario.pnl, 2)}</TableCell>
+                            <TableCell>{scenario.limit ?? "—"}</TableCell>
+                            <TableCell>
+                              <Chip color={scenario.breached ? "danger" : "success"} variant="flat" radius="sm">
+                                {scenario.breached ? "Превышен" : "Ок"}
+                              </Chip>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Tab>
+                  <Tab key="contributors" title="Вкладчики">
+                    <div className="cardTitle">Вкладчики в худший стресс</div>
+                    <div className="cardSubtitle">Помогает понять, какие позиции формируют основную просадку.</div>
+                    <ContributorBars rows={contributorBars} />
+                  </Tab>
+                </Tabs>
+
+                {status && (
+                  <Chip color="success" variant="flat" radius="sm" className="importIssueChip statusMessage">
+                    {status}
+                  </Chip>
+                )}
+              </Card>
+            </Reveal>
+          </div>
+
+          <aside className="importAside">
+            <Card>
+              <div className="cardTitle">Редактор сценария</div>
+              <div className="formGrid">
+                <Input label="ID сценария" value={draftId} onValueChange={setDraftId} />
+                <Input type="number" label="ΔS" value={String(draftS)} onValueChange={(value) => setDraftS(Number(value))} />
+                <Input type="number" label="ΔVol" value={String(draftVol)} onValueChange={(value) => setDraftVol(Number(value))} />
+                <Input type="number" label="Δr" value={String(draftR)} onValueChange={(value) => setDraftR(Number(value))} />
+                <Input type="number" label="Probability" value={draftProb === "" ? "" : String(draftProb)} onValueChange={(value) => setDraftProb(value === "" ? "" : Number(value))} />
+              </div>
+              <Textarea label="Описание" minRows={3} value={draftDesc} onValueChange={setDraftDesc} className="configureTextarea" />
+              <div className="runActionRow">
+                <Button variant="secondary" onClick={handleCreate}>Сохранить сценарий</Button>
               </div>
             </Card>
-          </Card>
 
-          <Card>
-            <div className="cardTitle">Каталог сценариев</div>
-            <div className="cardSubtitle">
-              Шок по цене/волатильности/ставке. `rate_shift` трактуется как абсолютный сдвиг ставки (в долях), `volatility` после шока ограничивается снизу.
-            </div>
-
-            <div className="stack" style={{ marginTop: 12 }}>
-              <label>
-                ID сценария
-                <input value={draftId} onChange={(e) => setDraftId(e.target.value)} />
-              </label>
-              <div className="grid">
-                <label>
-                  ΔS (underlying_shift)
-                  <input type="number" step="0.01" value={draftS} onChange={(e) => setDraftS(Number(e.target.value))} />
-                </label>
-                <label>
-                  ΔVol (volatility_shift)
-                  <input type="number" step="0.01" value={draftVol} onChange={(e) => setDraftVol(Number(e.target.value))} />
-                </label>
-                <label>
-                  Δr (rate_shift)
-                  <input type="number" step="0.001" value={draftR} onChange={(e) => setDraftR(Number(e.target.value))} />
-                </label>
-                <label>
-                  Probability (опц.)
-                  <input type="number" step="0.0001" min={0} value={draftProb} onChange={(e) => setDraftProb(e.target.value === "" ? "" : Number(e.target.value))} />
-                </label>
+            <Card>
+              <div className="cardTitle">Текущие сценарии</div>
+              <div className="scenarioPreviewList">
+                {dataState.scenarios.map((scenario) => (
+                  <div key={scenario.scenario_id} className="scenarioPreviewItem">
+                    <div>
+                      <strong>{scenario.scenario_id}</strong>
+                      <div className="textMuted">{scenario.description ?? "Без описания"}</div>
+                    </div>
+                    <div className="runActionRow scenarioActionWrap">
+                      <Button variant="ghost" onClick={() => setConfirmDelete(scenario.scenario_id)}>Удалить</Button>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <label>
-                Описание
-                <input value={draftDesc} onChange={(e) => setDraftDesc(e.target.value)} />
-              </label>
-              <div className="row wrap">
-                <Button variant="secondary" onClick={handleCreate}>Добавить/обновить сценарий</Button>
-              </div>
-            </div>
-
-            <div className="table-wrap" style={{ marginTop: 12 }}>
-              <table className="table sticky">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>ΔS</th>
-                    <th>ΔVol</th>
-                    <th>Δr</th>
-                    <th>Prob</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dataState.scenarios.map((s) => (
-                    <tr key={s.scenario_id}>
-                      <td title={s.description ?? ""}>{s.scenario_id}</td>
-                      <td>{s.underlying_shift}</td>
-                      <td>{s.volatility_shift}</td>
-                      <td>{s.rate_shift}</td>
-                      <td>{s.probability ?? "—"}</td>
-                      <td>
-                        <Button variant="secondary" onClick={() => setConfirmDelete(s.scenario_id)}>Удалить</Button>
-                      </td>
-                    </tr>
-                  ))}
-                  {dataState.scenarios.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="textMuted">Сценариев нет. Добавьте сверху или вернитесь в настройки.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+            </Card>
+          </aside>
         </div>
       )}
     </Card>

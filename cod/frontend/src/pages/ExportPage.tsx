@@ -1,13 +1,33 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Checkbox, Chip } from "@heroui/react";
 import * as XLSX from "xlsx";
 import Button from "../components/Button";
 import Card from "../ui/Card";
+import {
+  CompareBarsChart,
+  CircularScore,
+  GlassPanel,
+  Reveal,
+  Sparkline,
+  StaggerGroup,
+  StaggerItem,
+} from "../components/rich/RichVisuals";
 import { useAppData } from "../state/appDataStore";
 import { useWorkflow } from "../workflow/workflowStore";
 import { WorkflowStep } from "../workflow/workflowTypes";
 
 type SectionKey = "Summary" | "Metrics" | "Greeks" | "Stress" | "Limits" | "Params" | "ValidationLog";
+
+const sectionMeta: Record<SectionKey, { title: string; hint: string }> = {
+  Summary: { title: "Сводка расчёта", hint: "Идентификаторы запуска, время расчёта и объём портфеля." },
+  Metrics: { title: "Ключевые метрики", hint: "Base value, VaR, ES, LC VaR, капитал и маржа." },
+  Greeks: { title: "Чувствительности", hint: "Delta, Vega, DV01 и другие драйверы риска." },
+  Stress: { title: "Стресс-сценарии", hint: "P&L по каждому сценарию и факт превышения." },
+  Limits: { title: "Лимиты", hint: "Сравнение метрик с заданными порогами." },
+  Params: { title: "Параметры расчёта", hint: "Конфигурация методики и выбранные настройки." },
+  ValidationLog: { title: "Лог валидации", hint: "Ошибки и предупреждения, обнаруженные до расчёта." },
+};
 
 function downloadBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
@@ -27,6 +47,23 @@ export default function ExportPage() {
   const [sections, setSections] = useState<SectionKey[]>(["Summary", "Metrics", "Greeks", "Stress", "Limits", "Params", "ValidationLog"]);
 
   const canExport = Boolean(m);
+  const sectionBars = useMemo(
+    () =>
+      (["Summary", "Metrics", "Greeks", "Stress", "Limits", "Params", "ValidationLog"] as SectionKey[]).map((section) => ({
+        label: sectionMeta[section].title.split(" ")[0] ?? section,
+        value: sections.includes(section) ? 100 : 18,
+        tone: sections.includes(section) ? "positive" as const : "neutral" as const,
+      })),
+    [sections]
+  );
+  const exportReadiness = useMemo(
+    () => (canExport ? Math.max(32, Math.round((sections.length / 7) * 100)) : 0),
+    [canExport, sections.length]
+  );
+  const exportSpark = useMemo(
+    () => sectionBars.slice(0, 7).map((item, index) => ({ label: `${index + 1}`, value: item.value })),
+    [sectionBars]
+  );
 
   const toggle = (s: SectionKey) => {
     setSections((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
@@ -59,25 +96,56 @@ export default function ExportPage() {
 
       {!m ? (
         <Card>
-          <div className="badge warn">Нет результатов. Сначала запустите расчёт.</div>
-          <Button onClick={() => nav("/run")}>Перейти к запуску</Button>
+          <div className="pageEmptyState">
+            <div className="badge warn">Нет результатов. Сначала запустите расчёт.</div>
+            <div className="pageEmptyActions">
+              <Button onClick={() => nav("/run")}>Перейти к запуску</Button>
+            </div>
+          </div>
         </Card>
       ) : (
-        <div className="grid" style={{ marginTop: 12 }}>
-          <Card>
+        <div className="grid pageSection--tight">
+          <StaggerGroup className="visualSplitPanel">
+            <StaggerItem>
+              <GlassPanel
+                title="Профиль отчёта"
+                subtitle="Левый блок отвечает на вопрос “насколько полный отчёт получится”, правый — какие секции в него попадут."
+                badge={<Chip color="primary" variant="flat" radius="sm">{sections.length} секц.</Chip>}
+              >
+                <div className="visualSplitPanel">
+                  <CircularScore value={exportReadiness} label="Готовность экспорта" color="primary" hint="Заполняется по выбранным секциям" />
+                  <CompareBarsChart data={sectionBars} height={240} />
+                </div>
+              </GlassPanel>
+            </StaggerItem>
+            <StaggerItem>
+              <GlassPanel title="Ритм наполнения" subtitle="Sparkline помогает быстро понять, насколько отчёт будет компактным или плотным.">
+                <Sparkline data={exportSpark} color="#7da7ff" height={96} />
+              </GlassPanel>
+            </StaggerItem>
+          </StaggerGroup>
+
+          <Reveal delay={0.06}>
+            <Card>
             <div className="cardTitle">Конструктор отчёта</div>
             <div className="cardSubtitle">Можно убрать ненужные секции — файл будет проще.</div>
-            <div className="stack" style={{ marginTop: 12 }}>
+            <div className="stack pageSection--tight">
               {(["Summary", "Metrics", "Greeks", "Stress", "Limits", "Params", "ValidationLog"] as SectionKey[]).map((s) => (
-                <label key={s} className="row" style={{ justifyContent: "space-between" }}>
-                  <span className="row" style={{ gap: 10 }}>
-                    <input type="checkbox" checked={sections.includes(s)} onChange={() => toggle(s)} style={{ width: 18, height: 18 }} />
-                    <span style={{ fontWeight: 800 }}>{s}</span>
+                <div key={s} className="checkRow">
+                  <Checkbox
+                    isSelected={sections.includes(s)}
+                    onValueChange={() => toggle(s)}
+                    size="sm"
+                    radius="sm"
+                  />
+                  <span className="checkRowText">
+                    <span className="checkRowTitle">{sectionMeta[s].title}</span>
+                    <span className="checkRowHint">{sectionMeta[s].hint}</span>
                   </span>
-                </label>
+                </div>
               ))}
             </div>
-            <div className="row wrap" style={{ marginTop: 12 }}>
+            <div className="inlineActions pageSection--tight">
               <Button
                 disabled={!canExport}
                 onClick={() => {
@@ -153,21 +221,32 @@ export default function ExportPage() {
                 Скачать отчёт (JSON)
               </Button>
             </div>
-          </Card>
+            </Card>
+          </Reveal>
 
-          <Card>
+          <Reveal delay={0.1}>
+            <Card>
             <div className="cardTitle">Что будет внутри</div>
             <div className="cardSubtitle">Мини‑проверка, чтобы понимать, что экспорт действительно «не пустой».</div>
-            <div className="stack" style={{ marginTop: 12 }}>
-              <div>Сделок: <span className="code">{dataState.portfolio.positions.length}</span></div>
-              <div>Сценариев: <span className="code">{dataState.scenarios.length}</span></div>
-              <div>Ошибок валидации: <span className="code">{dataState.validationLog.filter((x) => x.severity === "ERROR").length}</span></div>
-              <div className="textMuted">Форматирование — только в UI. В файлах сохраняем значения без округлений.</div>
+            <div className="detailList pageSection--tight">
+              <div className="detailListRow">
+                <span>Сделок</span>
+                <strong>{dataState.portfolio.positions.length}</strong>
+              </div>
+              <div className="detailListRow">
+                <span>Сценариев</span>
+                <strong>{dataState.scenarios.length}</strong>
+              </div>
+              <div className="detailListRow">
+                <span>Ошибок валидации</span>
+                <strong>{dataState.validationLog.filter((x) => x.severity === "ERROR").length}</strong>
+              </div>
+              <div className="textMuted">Форматирование используется только в интерфейсе. В файл уходит исходная точность значений.</div>
             </div>
-          </Card>
+            </Card>
+          </Reveal>
         </div>
       )}
     </Card>
   );
 }
-

@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Checkbox } from "@heroui/react";
 import Button from "../components/Button";
 import ConfirmDialog from "../components/ConfirmDialog";
 import Card from "../ui/Card";
@@ -169,35 +170,35 @@ export default function PlanBPage() {
         </div>
       </div>
 
-      <div className="grid" style={{ marginTop: 12 }}>
+      <div className="grid pageSection--tight">
         {plans.map((p) => (
           <Card key={p.id}>
-            <div className="row wrap" style={{ justifyContent: "space-between" }}>
+            <div className="splitHeaderRow">
               <div className="cardTitle">{p.title}</div>
               <span className={`badge ${p.severity}`}>{p.severity === "danger" ? "Важно" : p.severity === "warn" ? "Внимание" : "Ок"}</span>
             </div>
-            <div className="cardSubtitle" style={{ marginTop: 10 }}>{p.summary}</div>
-            <div className="row wrap" style={{ marginTop: 12 }}>
+            <div className="cardSubtitle statusMessage--compact">{p.summary}</div>
+            <div className="inlineActions pageSection--tight">
               {p.actions.map((a) => (
                 <Button key={a.to} variant="secondary" onClick={() => nav(a.to)}>{a.label}</Button>
               ))}
             </div>
-            <div className="stack" style={{ marginTop: 12 }}>
+            <div className="stack pageSection--tight">
               {p.tasks.map((t) => {
                 const key = `${p.id}:${t.id}`;
                 const done = doneMap[key] ?? false;
                 return (
-                  <label key={key} className="row" style={{ gap: 10 }}>
-                    <input
-                      type="checkbox"
-                      checked={done}
-                      onChange={(e) => setDoneMap((prev) => ({ ...prev, [key]: e.target.checked }))}
-                      style={{ width: 18, height: 18 }}
+                  <div key={key} className="checkRow">
+                    <Checkbox
+                      isSelected={done}
+                      onValueChange={(checked) => setDoneMap((prev) => ({ ...prev, [key]: checked }))}
+                      size="sm"
+                      radius="sm"
                     />
-                    <span style={{ textDecoration: done ? "line-through" : "none", color: done ? "var(--muted)" : "var(--text)" }}>
+                    <span className={`checkRowText ${done ? "checkRowText--done" : ""}`}>
                       {t.text}
                     </span>
-                  </label>
+                  </div>
                 );
               })}
             </div>

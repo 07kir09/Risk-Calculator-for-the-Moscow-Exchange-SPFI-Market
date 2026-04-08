@@ -41,29 +41,32 @@ export default function MarginPage() {
 
       {!m ? (
         <Card>
-          <div className="badge warn">Нет результатов. Сначала запустите расчёт.</div>
-          <Button onClick={() => nav("/run")}>Перейти к запуску</Button>
+          <div className="pageEmptyState">
+            <div className="badge warn">Нет результатов. Сначала запустите расчёт.</div>
+            <div className="pageEmptyActions">
+              <Button onClick={() => nav("/run")}>Перейти к запуску</Button>
+            </div>
+          </div>
         </Card>
       ) : (
-        <div className="grid" style={{ marginTop: 12 }}>
+        <div className="compactGrid pageSection--tight">
           <Card>
             <div className="cardTitle">Initial Margin</div>
             <div className="cardSubtitle">Залог “на плохое движение” до закрытия позиции.</div>
-            <div style={{ fontSize: 26, fontWeight: 900, marginTop: 10 }}>{m.initial_margin ?? "—"}</div>
+            <div className="kpiValue kpiValue--sm kpiValue--mono">{m.initial_margin ?? "—"}</div>
           </Card>
           <Card>
             <div className="cardTitle">Variation Margin</div>
             <div className="cardSubtitle">Переоценка (MtM): прибыль/убыток деньгами.</div>
-            <div style={{ fontSize: 26, fontWeight: 900, marginTop: 10 }}>{m.variation_margin ?? "—"}</div>
+            <div className="kpiValue kpiValue--sm kpiValue--mono">{m.variation_margin ?? "—"}</div>
           </Card>
           <Card>
             <div className="cardTitle">Capital</div>
             <div className="cardSubtitle">Оценка капитала под риск (демо).</div>
-            <div style={{ fontSize: 26, fontWeight: 900, marginTop: 10 }}>{m.capital ?? "—"}</div>
+            <div className="kpiValue kpiValue--sm kpiValue--mono">{m.capital ?? "—"}</div>
           </Card>
         </div>
       )}
     </Card>
   );
 }
-

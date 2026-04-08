@@ -151,16 +151,16 @@ export default function WhatIfPage() {
       </div>
 
       {errorText && (
-        <div className="badge danger" style={{ marginTop: 12 }}>
+        <div className="badge danger pageSection--tight">
           {errorText}
         </div>
       )}
 
-      <div className="grid" style={{ marginTop: 12 }}>
+      <div className="grid pageSection--tight">
         <Card>
           <div className="cardTitle">1) Изменить существующую сделку</div>
           <div className="cardSubtitle">Выберите сделку и задайте новое количество/номинал.</div>
-          <div className="stack" style={{ marginTop: 12 }}>
+          <div className="stack pageSection--tight">
             <label>
               ID сделки
               <input
@@ -175,7 +175,7 @@ export default function WhatIfPage() {
                 ))}
               </datalist>
             </label>
-            <div className="grid">
+            <div className="inputPairGrid">
               <label>
                 Кол-во (quantity)
                 <input type="number" value={editQuantity} onChange={(e) => setEditQuantity(e.target.value === "" ? "" : Number(e.target.value))} />
@@ -185,7 +185,7 @@ export default function WhatIfPage() {
                 <input type="number" value={editNotional} onChange={(e) => setEditNotional(e.target.value === "" ? "" : Number(e.target.value))} />
               </label>
             </div>
-            <div className="row wrap">
+            <div className="inlineActions">
               <Button
                 variant="secondary"
                 disabled={
@@ -239,11 +239,11 @@ export default function WhatIfPage() {
           <div className="cardTitle">2) Добавленные сделки (хеджи)</div>
           <div className="cardSubtitle">Сюда попадают подсказки из раздела “Хедж”. Можно удалить.</div>
           {added.length === 0 ? (
-            <div className="textMuted" style={{ marginTop: 12 }}>
+            <div className="textMuted pageSection--tight">
               Пока ничего не добавлено. Откройте <Button variant="ghost" onClick={() => nav("/hedge")}>подсказки по хеджу</Button>.
             </div>
           ) : (
-            <div className="table-wrap" style={{ marginTop: 12 }}>
+            <div className="table-wrap pageSection--tight">
               <table className="table sticky">
                 <thead>
                   <tr>
@@ -265,7 +265,7 @@ export default function WhatIfPage() {
                       <td title={String(p.notional)}>{formatNumber(p.notional, 6)}</td>
                       <td>{p.underlying_symbol}</td>
                       <td title={String(p.strike)}>{formatNumber(p.strike, 6)}</td>
-                      <td style={{ textAlign: "right" }}>
+                      <td className="tableActionCell">
                         <Button
                           variant="ghost"
                           onClick={() => setAdded((prev) => prev.filter((x) => x.position_id !== p.position_id))}
@@ -283,12 +283,12 @@ export default function WhatIfPage() {
       </div>
 
       <Card>
-        <div className="row wrap" style={{ justifyContent: "space-between" }}>
+        <div className="pageHeader">
           <div>
             <div className="cardTitle">3) Рассчитать “после” и сравнить</div>
             <div className="cardSubtitle">Мы пересчитаем те же метрики, что и в основном расчёте.</div>
           </div>
-          <div className="row wrap">
+          <div className="inlineActions">
             <Button
               loading={isRunning}
               disabled={isRunning}
@@ -314,6 +314,7 @@ export default function WhatIfPage() {
                     liquidityModel,
                     selectedMetrics: wf.calcConfig.selectedMetrics,
                     marginEnabled: wf.calcConfig.marginEnabled,
+                    marketDataSessionId: dataState.marketDataSummary?.session_id,
                   });
                   setAfterMetrics(metrics);
                 } catch (e: any) {
@@ -328,7 +329,7 @@ export default function WhatIfPage() {
           </div>
         </div>
 
-        <div className="table-wrap" style={{ marginTop: 12 }}>
+        <div className="table-wrap pageSection--tight">
           <table className="table sticky">
             <thead>
               <tr>
@@ -358,7 +359,7 @@ export default function WhatIfPage() {
           </table>
         </div>
 
-        <div className="textMuted" style={{ marginTop: 10 }}>
+        <div className="textMuted statusMessage--compact">
           Точное значение всегда доступно по наведению (tooltip) или через экспорт JSON.
         </div>
       </Card>

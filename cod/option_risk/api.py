@@ -5,13 +5,23 @@ import math
 import logging
 import uuid
 from dataclasses import asdict, is_dataclass
+from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi import HTTPException, Request
+from fastapi import File, Form, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from .data.bootstrap import build_bootstrapped_market_data
+from .data.market_data_sessions import (
+    classify_market_data_filename,
+    create_market_data_session,
+    create_session_from_default_datasets,
+    load_market_data_bundle_for_session,
+    store_market_data_file,
+    summarize_market_data_session,
+)
 from .data.models import MarketScenario, OptionPosition, Portfolio
 from .risk.pipeline import CalculationConfig, run_calculation
 
@@ -32,6 +42,7 @@ class PortfolioRequest(BaseModel):
     calc_stress: bool = True
     calc_margin_capital: bool = True
     calc_correlations: bool = True
+    market_data_session_id: str | None = None
 
 
 app = FastAPI(title="Option Risk API", version="0.1.0")
@@ -129,8 +140,64 @@ def compute_metrics(req: PortfolioRequest):
             liquidity_model=req.liquidity_model,
             mode=req.mode,
         )
-        result = run_calculation(portfolio, req.scenarios, req.limits, cfg)
+        market_context = None
+        extra_validation_log = []
+        if req.market_data_session_id:
+            bundle, bundle_summary = load_market_data_bundle_for_session(req.market_data_session_id)
+            bootstrapped_market_data = build_bootstrapped_market_data(bundle, base_currency=req.base_currency)
+            market_context = bootstrapped_market_data.market_context
+            extra_validation_log = bundle_summary.validation_log + bootstrapped_market_data.validation_log
+
+        result = run_calculation(portfolio, req.scenarios, req.limits, cfg, market=market_context)
+        if extra_validation_log:
+            result.validation_log = [*extra_validation_log, *result.validation_log]
         return _json_safe(result.__dict__)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/market-data/session")
+def create_market_data_upload_session():
+    session_id = create_market_data_session()
+    return {"session_id": session_id}
+
+
+@app.get("/market-data/{session_id}")
+def get_market_data_session(session_id: str):
+    return _json_safe(asdict(summarize_market_data_session(session_id)))
+
+
+@app.post("/market-data/upload")
+async def upload_market_data_file(
+    file: UploadFile = File(...),
+    session_id: str | None = Form(default=None),
+):
+    filename = Path(file.filename or "").name
+    if not filename:
+        raise HTTPException(status_code=400, detail="Не удалось определить имя файла.")
+    if classify_market_data_filename(filename) is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Файл {filename} не распознан как market data bundle. "
+                "Поддерживаются curveDiscount, curveForward, fixing, calibrationInstrument*, RC_*."
+            ),
+        )
+
+    payload = await file.read()
+    if not payload:
+        raise HTTPException(status_code=400, detail=f"Файл {filename} пустой.")
+
+    active_session_id = session_id or create_market_data_session()
+    summary = store_market_data_file(active_session_id, filename, payload)
+    return _json_safe(asdict(summary))
+
+
+@app.post("/market-data/load-default")
+def load_default_market_datasets():
+    try:
+        summary = create_session_from_default_datasets()
+        return _json_safe(asdict(summary))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

@@ -1,42 +1,59 @@
+import Card from "../ui/Card";
+
 export default function HelpPage() {
   return (
-    <div className="card">
+    <Card>
       <h1 className="pageTitle">Справка</h1>
       <p className="pageHint">
-        Здесь коротко и “по‑человечески” объясняем, что делать на сайте и что означают основные термины.
+        Здесь коротко и по-человечески объясняется, что делать на сайте и как читать основные результаты.
       </p>
 
-      <div className="grid" style={{ marginTop: 12 }}>
-        <div className="card">
-          <div className="cardTitle">Как пользоваться (самый простой сценарий)</div>
-          <ol style={{ margin: "10px 0 0", paddingLeft: 18 }} className="stack">
-            <li>Откройте <span className="code">Шаг 1. Импорт сделок</span> и загрузите CSV (или демо‑данные).</li>
-            <li>На <span className="code">Шаг 2. Проверка данных</span> исправьте ошибки (критические — обязательно).</li>
-            <li>На <span className="code">Шаг 3</span> нажмите “Подтянуть рыночные данные”.</li>
-            <li>На <span className="code">Шаг 4</span> выберите метрики и нажмите “Сохранить”.</li>
-            <li>На <span className="code">Шаг 5</span> нажмите “Запустить расчёт”, затем смотрите результаты на панели.</li>
+      <div className="grid pageSection--tight">
+        <Card>
+          <div className="cardTitle">Как пользоваться</div>
+          <ol className="orderedList pageSection--tight">
+            <li>Откройте шаг импорта и загрузите файл портфеля или демо-данные.</li>
+            <li>На шаге проверки данных устраните критические ошибки и просмотрите предупреждения.</li>
+            <li>Подтяните рыночные данные и убедитесь, что расчёт готов к запуску.</li>
+            <li>Выберите нужные метрики и параметры расчёта.</li>
+            <li>Запустите расчёт и смотрите результат на панели риска.</li>
           </ol>
-        </div>
+        </Card>
 
-        <div className="card">
-          <div className="cardTitle">Что считать (простое объяснение)</div>
-          <div className="stack" style={{ marginTop: 10 }}>
-            <div><span className="badge ok">VaR</span> — “какой убыток возможен в плохой день” при выбранном доверии.</div>
-            <div><span className="badge ok">ES</span> — “средний убыток в самых плохих случаях” (хуже, чем VaR).</div>
-            <div><span className="badge ok">Greeks</span> — “что именно двигает цену” (цена/вола/ставка).</div>
-            <div><span className="badge ok">Stress</span> — “что будет, если рынок резко двинется”.</div>
-            <div><span className="badge ok">Лимиты</span> — сравнение “факт” vs “разрешено”.</div>
+        <Card>
+          <div className="cardTitle">Как читать метрики</div>
+          <div className="detailList pageSection--tight">
+            <div className="detailListRow">
+              <span>VaR</span>
+              <strong>Возможный убыток в плохой день</strong>
+            </div>
+            <div className="detailListRow">
+              <span>ES</span>
+              <strong>Средний убыток в самых плохих случаях</strong>
+            </div>
+            <div className="detailListRow">
+              <span>Greeks</span>
+              <strong>Что именно двигает цену портфеля</strong>
+            </div>
+            <div className="detailListRow">
+              <span>Stress</span>
+              <strong>Что будет при резком движении рынка</strong>
+            </div>
+            <div className="detailListRow">
+              <span>Лимиты</span>
+              <strong>Сравнение факта с допустимым уровнем</strong>
+            </div>
           </div>
-        </div>
+        </Card>
       </div>
 
-      <div className="card" style={{ marginTop: 12 }}>
+      <Card className="pageSection--tight">
         <div className="cardTitle">Точность чисел</div>
-        <div className="cardSubtitle">Мы не округляем вычисления. Форматирование — только для удобства отображения.</div>
-        <div className="textMuted" style={{ marginTop: 10 }}>
-          Наведите курсор на число, чтобы увидеть точное значение (если поддерживается в текущем виджете), или используйте экспорт (шаг 10).
+        <div className="cardSubtitle">Интерфейс округляет значения только для чтения. Выгрузка сохраняет исходную точность.</div>
+        <div className="textMuted statusMessage--compact">
+          Если нужно проверить точные значения, используйте экспорт в Excel или JSON на шаге отчёта.
         </div>
-      </div>
-    </div>
+      </Card>
+    </Card>
   );
 }

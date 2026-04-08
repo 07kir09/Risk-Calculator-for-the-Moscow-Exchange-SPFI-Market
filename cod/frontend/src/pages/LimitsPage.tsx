@@ -1,7 +1,16 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
+import { Chip, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/react";
 import { useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 import Card from "../ui/Card";
+import {
+  CompareBarsChart,
+  DonutGauge,
+  GlassPanel,
+  Reveal,
+  StaggerGroup,
+  StaggerItem,
+} from "../components/rich/RichVisuals";
 import { useAppData } from "../state/appDataStore";
 import { useWorkflow } from "../workflow/workflowStore";
 import { WorkflowStep } from "../workflow/workflowTypes";
@@ -11,71 +20,131 @@ export default function LimitsPage() {
   const nav = useNavigate();
   const { state: dataState } = useAppData();
   const { dispatch } = useWorkflow();
-  const m = dataState.results.metrics;
-  const limits = m?.limits || [];
+  const metrics = dataState.results.metrics;
+  const limits = metrics?.limits || [];
 
   useEffect(() => {
-    if (m) dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Limits });
-  }, [m, dispatch]);
+    if (metrics) dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Limits });
+  }, [dispatch, metrics]);
+
+  const breachedCount = useMemo(() => limits.filter(([, , , breached]) => breached).length, [limits]);
+  const limitBars = useMemo(
+    () =>
+      limits.map(([metric, value, limit, breached]) => {
+        const utilization = limit ? Math.abs((value / limit) * 100) : 0;
+        return {
+          label: String(metric),
+          value: utilization,
+          tone: breached ? "negative" as const : utilization > 80 ? "neutral" as const : "positive" as const,
+        };
+      }),
+    [limits]
+  );
+  const overallUtilization = useMemo(
+    () => (limitBars.length ? Math.max(...limitBars.map((item) => item.value), 0) : 0),
+    [limitBars]
+  );
 
   return (
     <Card>
       <div className="pageHeader">
         <div className="pageHeaderText">
-          <h1 className="pageTitle">Шаг 8. Лимиты</h1>
-          <p className="pageHint">Сравниваем «факт» с установленными лимитами и показываем превышения.</p>
+          <h1 className="pageTitle">Лимиты</h1>
+          <p className="pageHint">Здесь сравнивается факт с лимитом. Главное — быстро понять, что превышено и насколько это критично.</p>
         </div>
         <div className="pageActions">
-          <Button variant="secondary" onClick={() => nav("/dashboard")}>Назад: панель</Button>
-          <Button variant="secondary" onClick={() => nav("/stress")}>Открыть стрессы</Button>
-          <Button variant="secondary" onClick={() => nav("/hedge")}>Хедж‑подсказки</Button>
+          <Button variant="secondary" onClick={() => nav("/dashboard")}>
+            Назад
+          </Button>
+          <Chip color={breachedCount > 0 ? "danger" : "success"} variant="flat" radius="sm">
+            {breachedCount > 0 ? `Превышений: ${breachedCount}` : "Все лимиты в норме"}
+          </Chip>
         </div>
       </div>
 
-      {!m ? (
+      {!metrics ? (
         <Card>
-          <div className="badge warn">Нет результатов. Сначала запустите расчёт.</div>
-          <Button onClick={() => nav("/run")}>Перейти к запуску</Button>
+          <div className="textMuted">Результатов ещё нет. Сначала запустите расчёт.</div>
+          <div className="runActionRow">
+            <Button onClick={() => nav("/run")}>К запуску</Button>
+          </div>
         </Card>
       ) : (
-        <Card>
-          <div className="row wrap" style={{ justifyContent: "space-between" }}>
-            <div>
-              <div className="cardTitle">Таблица лимитов</div>
-              <div className="cardSubtitle">Клик по строке (в будущих версиях) откроет вклад сделок.</div>
-            </div>
-            <Button variant="secondary" onClick={() => nav("/export")}>Экспорт</Button>
+        <div className="runLayout">
+          <div className="runMain">
+            <StaggerGroup className="visualSplitPanel">
+              <StaggerItem>
+                <GlassPanel
+                  title="Общая загрузка лимитов"
+                  subtitle="Radial gauge нужен для одного ответа: насколько близко мы к жёсткой границе."
+                  badge={<Chip color={breachedCount > 0 ? "danger" : overallUtilization > 80 ? "warning" : "success"} variant="flat" radius="sm">{Math.round(overallUtilization)}%</Chip>}
+                >
+                  <DonutGauge
+                    value={overallUtilization}
+                    label="limit load"
+                    subtitle={breachedCount > 0 ? "Есть прямые breach-события." : "Пока всё находится в рабочей зоне."}
+                    color={breachedCount > 0 ? "#ff7777" : overallUtilization > 80 ? "#ffb86a" : "#6eff8e"}
+                  />
+                </GlassPanel>
+              </StaggerItem>
+              <StaggerItem>
+                <GlassPanel title="Сравнение по метрикам" subtitle="Бар-чарт быстрее таблицы показывает, какая метрика ближе к красной зоне.">
+                  <CompareBarsChart data={limitBars} height={260} />
+                </GlassPanel>
+              </StaggerItem>
+            </StaggerGroup>
+
+            <Reveal delay={0.08}>
+              <Card>
+              <div className="cardTitle">Факт против лимита</div>
+              <div className="cardSubtitle">Статус виден сразу, а таблица остаётся компактной и читаемой.</div>
+
+              <Table
+                removeWrapper
+                aria-label="Таблица лимитов"
+                classNames={{ table: "heroTable", th: "heroTableHeader", td: "heroTableCell", tr: "heroTableRow" }}
+              >
+                <TableHeader>
+                  <TableColumn>Метрика</TableColumn>
+                  <TableColumn>Факт</TableColumn>
+                  <TableColumn>Лимит</TableColumn>
+                  <TableColumn>Использование</TableColumn>
+                  <TableColumn>Статус</TableColumn>
+                </TableHeader>
+                <TableBody emptyContent="Лимиты не были переданы в расчёт.">
+                  {limits.map(([metric, value, limit, breached]) => {
+                    const utilization = limit ? Math.abs((value / limit) * 100) : 0;
+                    return (
+                      <TableRow key={metric}>
+                        <TableCell>{metric}</TableCell>
+                        <TableCell>{formatNumber(value, 2)}</TableCell>
+                        <TableCell>{formatNumber(limit, 2)}</TableCell>
+                        <TableCell>{formatNumber(utilization, 1)}%</TableCell>
+                        <TableCell>
+                          <Chip color={breached ? "danger" : utilization > 80 ? "warning" : "success"} variant="flat" radius="sm">
+                            {breached ? "Превышен" : utilization > 80 ? "Близко к лимиту" : "Ок"}
+                          </Chip>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+              </Card>
+            </Reveal>
           </div>
-          <div className="table-wrap" style={{ marginTop: 12 }}>
-            <table className="table sticky">
-              <thead>
-                <tr>
-                  <th>Метрика</th>
-                  <th>Факт</th>
-                  <th>Лимит</th>
-                  <th>Статус</th>
-                </tr>
-              </thead>
-              <tbody>
-                {limits.map(([metric, value, limit, breached]) => (
-                  <tr key={metric}>
-                    <td>{metric}</td>
-                    <td title={String(value)}>{formatNumber(value)}</td>
-                    <td>{formatNumber(limit)}</td>
-                    <td>
-                      <span className={breached ? "badge danger" : "badge ok"}>{breached ? "Превышен" : "Ок"}</span>
-                    </td>
-                  </tr>
-                ))}
-                {limits.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="textMuted">Лимитов нет (или не переданы при расчёте).</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+
+          <aside className="importAside">
+            <Card>
+              <div className="cardTitle">Что делать дальше</div>
+              <div className="cardSubtitle">Если есть превышения, переходите к стрессам или what-if, чтобы понять источник проблемы.</div>
+              <div className="runActionRow">
+                <Button variant="secondary" onClick={() => nav("/stress")}>К стрессам</Button>
+                <Button variant="secondary" onClick={() => nav("/actions")}>К what-if</Button>
+              </div>
+            </Card>
+          </aside>
+        </div>
       )}
     </Card>
   );

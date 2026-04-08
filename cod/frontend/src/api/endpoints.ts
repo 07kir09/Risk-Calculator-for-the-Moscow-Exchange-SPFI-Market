@@ -1,6 +1,7 @@
 import client from "./client";
 import { PositionDTO } from "./types";
 import { metricsSchema, scenarioSchema } from "./contracts/metrics";
+import { marketDataSessionSummarySchema } from "./contracts/marketData";
 import { z } from "zod";
 
 export async function fetchMetrics(payload: {
@@ -19,9 +20,28 @@ export async function fetchMetrics(payload: {
   calc_stress?: boolean;
   calc_margin_capital?: boolean;
   calc_correlations?: boolean;
+  market_data_session_id?: string;
 }) {
   const { data } = await client.post("/metrics", payload);
   return metricsSchema.parse(data);
+}
+
+export async function uploadMarketDataBundleFile(file: File, sessionId?: string) {
+  const form = new FormData();
+  form.append("file", file);
+  if (sessionId) form.append("session_id", sessionId);
+  const { data } = await client.post("/market-data/upload", form);
+  return marketDataSessionSummarySchema.parse(data);
+}
+
+export async function fetchMarketDataSession(sessionId: string) {
+  const { data } = await client.get(`/market-data/${sessionId}`);
+  return marketDataSessionSummarySchema.parse(data);
+}
+
+export async function loadDefaultMarketDataBundle() {
+  const { data } = await client.post("/market-data/load-default");
+  return marketDataSessionSummarySchema.parse(data);
 }
 
 export async function fetchLimits() {

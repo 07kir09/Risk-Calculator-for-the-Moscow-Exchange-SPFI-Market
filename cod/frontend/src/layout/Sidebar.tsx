@@ -1,46 +1,47 @@
-import { NavLink, useNavigate } from "react-router-dom";
 import { useMemo } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
+import { ScrollShadow, Tooltip } from "@heroui/react";
+import Button from "../components/Button";
+import { useAppData } from "../state/appDataStore";
 import { isStepAvailable, useWorkflow } from "../workflow/workflowStore";
-import { WorkflowStep } from "../workflow/workflowTypes";
 import { orderedSteps } from "../workflow/order";
 import { stepTitle } from "../workflow/labels";
 import { stepToRoute } from "../workflow/routes";
+import { WorkflowStep } from "../workflow/workflowTypes";
 
-type NavItem = { to: string; label: string; step?: WorkflowStep; right?: string };
+type NavItem = { to: string; label: string; step?: WorkflowStep };
 
 const workflowItems: NavItem[] = [
-  { to: "/import", label: "1. Импорт сделок", step: WorkflowStep.Import },
-  { to: "/validate", label: "2. Проверка данных", step: WorkflowStep.Validate },
-  { to: "/market", label: "3. Рыночные данные", step: WorkflowStep.MarketData },
-  { to: "/configure", label: "4. Настройки расчёта", step: WorkflowStep.Configure },
-  { to: "/run", label: "5. Запуск расчёта", step: WorkflowStep.CalcRun },
-  { to: "/dashboard", label: "6. Результаты", step: WorkflowStep.Results },
-  { to: "/stress", label: "7. Стресс‑сценарии", step: WorkflowStep.Stress },
-  { to: "/limits", label: "8. Лимиты", step: WorkflowStep.Limits },
-  { to: "/margin", label: "9. Маржа и капитал", step: WorkflowStep.Margin },
-  { to: "/export", label: "10. Отчёты и экспорт", step: WorkflowStep.Export },
-  { to: "/actions", label: "11. Песочница (What‑if/хедж)", step: WorkflowStep.PostActions },
+  { to: "/import", label: "Импорт", step: WorkflowStep.Import },
+  { to: "/validate", label: "Проверка данных", step: WorkflowStep.Validate },
+  { to: "/market", label: "Рыночные данные", step: WorkflowStep.MarketData },
+  { to: "/configure", label: "Настройка расчёта", step: WorkflowStep.Configure },
+  { to: "/run", label: "Запуск", step: WorkflowStep.CalcRun },
+  { to: "/dashboard", label: "Панель риска", step: WorkflowStep.Results },
+  { to: "/stress", label: "Стресс-сценарии", step: WorkflowStep.Stress },
+  { to: "/limits", label: "Лимиты", step: WorkflowStep.Limits },
+  { to: "/margin", label: "Маржа и капитал", step: WorkflowStep.Margin },
+  { to: "/export", label: "Экспорт", step: WorkflowStep.Export },
+  { to: "/actions", label: "What-if и хедж", step: WorkflowStep.PostActions },
 ];
 
-const dataItems: NavItem[] = [{ to: "/portfolio", label: "Портфель (просмотр)" }];
-
-const helpItems: NavItem[] = [{ to: "/help", label: "Справка" }];
-
-function LockIcon() {
-  return (
-    <svg className="navItemIcon" viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5Zm-3 8V7a3 3 0 0 1 6 0v3H9Z"
-      />
-    </svg>
-  );
-}
+const utilityItems: NavItem[] = [
+  { to: "/portfolio", label: "Просмотр портфеля" },
+  { to: "/help", label: "Справка" },
+];
 
 function DotIcon() {
   return (
     <svg className="navItemIcon" viewBox="0 0 24 24" aria-hidden="true">
-      <path fill="currentColor" d="M12 7a5 5 0 1 0 0 10a5 5 0 0 0 0-10Z" />
+      <circle cx="12" cy="12" r="5" fill="currentColor" />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg className="navItemIcon" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="currentColor" d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5Zm-3 8V7a3 3 0 0 1 6 0v3H9Z" />
     </svg>
   );
 }
@@ -54,10 +55,8 @@ export default function Sidebar({
   mobileOpen: boolean;
   onCloseMobile: () => void;
 }) {
-  const items = useMemo(() => workflowItems, []);
-  const data = useMemo(() => dataItems, []);
-  const help = useMemo(() => helpItems, []);
-  const { state } = useWorkflow();
+  const { state, dispatch } = useWorkflow();
+  const { state: dataState, dispatch: dataDispatch } = useAppData();
   const nav = useNavigate();
 
   const firstIncomplete = useMemo(() => {
@@ -68,89 +67,102 @@ export default function Sidebar({
     return WorkflowStep.Results;
   }, [state.calcConfig.marginEnabled, state.completedSteps]);
 
+  const status = useMemo(() => {
+    if (state.validation.criticalErrors > 0) return "Есть ошибки";
+    if (state.calcRun.status === "success") return "Результаты готовы";
+    if (dataState.portfolio.positions.length > 0) return "Сессия собрана";
+    return "Новый расчёт";
+  }, [dataState.portfolio.positions.length, state.calcRun.status, state.validation.criticalErrors]);
+
+  const handleStartNewCalculation = () => {
+    dataDispatch({ type: "RESET_ALL" });
+    dispatch({ type: "RESET_ALL" });
+    onCloseMobile();
+    nav("/import", { replace: true });
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const renderItem = (item: NavItem) => {
+    const available = item.step ? isStepAvailable(state, item.step) : true;
+
+    if (!available) {
+      const target = stepToRoute[firstIncomplete] ?? "/import";
+      const reason = `Чтобы открыть «${item.label}», сначала завершите: ${stepTitle[firstIncomplete]}`;
+      return (
+        <button
+          key={item.to}
+          type="button"
+          className="navItem navItem--locked"
+          onClick={() => {
+            onCloseMobile();
+            nav(target, { state: { reason } });
+          }}
+        >
+          <LockIcon />
+          {!collapsed && <span className="navItemLabel">{item.label}</span>}
+        </button>
+      );
+    }
+
+    return (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        onClick={onCloseMobile}
+        className={({ isActive }) => `navItem ${isActive ? "navItem--active" : ""}`}
+      >
+        <DotIcon />
+        {!collapsed && <span className="navItemLabel">{item.label}</span>}
+      </NavLink>
+    );
+  };
+
   return (
     <aside className={`appSidebar ${mobileOpen ? "appSidebar--mobileOpen" : ""}`} aria-label="Навигация">
       <div className={`appSidebarHeader ${collapsed ? "appSidebarHeader--collapsed" : ""}`}>
-        <div className="brand" title="Риск‑калькулятор СПФИ (MOEX)">
-          <div className="brandMark">R</div>
+        <div className="brand" title="Risk Calculator">
           {!collapsed && (
             <div className="brandText">
-              <div className="brandTitle">Риск‑калькулятор</div>
-              <div className="brandSubtitle">СПФИ (MOEX)</div>
+              <div className="brandTitle">Панель расчёта риска</div>
+              <div className="brandSubtitle">{status}</div>
             </div>
           )}
         </div>
       </div>
 
-      <div className="appSidebarScroll">
-        <div className="navGroupLabel">Данные</div>
-        {data.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            onClick={() => onCloseMobile()}
-            className={({ isActive }) => `navItem ${isActive ? "navItem--active" : ""}`}
-            title={item.label}
-          >
-            <DotIcon />
-            {!collapsed && <span className="navItemLabel">{item.label}</span>}
-          </NavLink>
-        ))}
+      <ScrollShadow className="appSidebarScroll" hideScrollBar>
+        <div className="navGroupLabel">Процесс</div>
+        {workflowItems.map((item) =>
+          collapsed ? (
+            <Tooltip key={item.to} content={item.label} placement="right" delay={200}>
+              <div>{renderItem(item)}</div>
+            </Tooltip>
+          ) : (
+            renderItem(item)
+          )
+        )}
 
-        <div className="navGroupLabel">Рабочий процесс</div>
-        {items.map((item) => {
-          const available = item.step ? isStepAvailable(state, item.step) : true;
-          const title = available ? item.label : "Сначала завершите предыдущие шаги";
+        <div className="navGroupLabel">Дополнительно</div>
+        {utilityItems.map((item) =>
+          collapsed ? (
+            <Tooltip key={item.to} content={item.label} placement="right" delay={200}>
+              <div>{renderItem(item)}</div>
+            </Tooltip>
+          ) : (
+            renderItem(item)
+          )
+        )}
+      </ScrollShadow>
 
-          if (!available) {
-            const target = stepToRoute[firstIncomplete] ?? "/import";
-            const reason = `Чтобы открыть «${item.label}», сначала завершите: ${stepTitle[firstIncomplete]}`;
-            return (
-              <button
-                key={item.to}
-                className="navItem navItem--locked"
-                title={title}
-                type="button"
-                onClick={() => {
-                  onCloseMobile();
-                  nav(target, { state: { reason } });
-                }}
-              >
-                <LockIcon />
-                {!collapsed && <span className="navItemLabel">{item.label}</span>}
-                {!collapsed && <span className="navItemRight">Недоступно</span>}
-              </button>
-            );
-          }
-
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              onClick={() => onCloseMobile()}
-              className={({ isActive }) => `navItem ${isActive ? "navItem--active" : ""}`}
-              title={title}
-            >
-              <DotIcon />
-              {!collapsed && <span className="navItemLabel">{item.label}</span>}
-            </NavLink>
-          );
-        })}
-
-        <div className="navGroupLabel">Справка</div>
-        {help.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            onClick={() => onCloseMobile()}
-            className={({ isActive }) => `navItem ${isActive ? "navItem--active" : ""}`}
-            title={item.label}
-          >
-            <DotIcon />
-            {!collapsed && <span className="navItemLabel">{item.label}</span>}
-          </NavLink>
-        ))}
-      </div>
+      {!collapsed && (
+        <div className="sidebarFooter">
+          <Button variant="secondary" className="sidebarAction" onClick={handleStartNewCalculation}>
+            К новому расчёту
+          </Button>
+        </div>
+      )}
     </aside>
   );
 }

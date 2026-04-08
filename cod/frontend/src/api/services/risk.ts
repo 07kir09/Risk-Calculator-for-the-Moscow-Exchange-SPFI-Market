@@ -15,10 +15,11 @@ export async function runRiskCalculation(params: {
   liquidityModel: string;
   selectedMetrics: string[];
   marginEnabled: boolean;
+  marketDataSessionId?: string;
 }): Promise<MetricsResponse> {
   const viteEnv = ((import.meta as any).env ?? {}) as Record<string, any>;
   const demoMode = (viteEnv.VITE_DEMO_MODE ?? "1") === "1";
-  if (demoMode) {
+  if (demoMode && !params.marketDataSessionId) {
     const tailModel = params.parametricTailModel ?? "cornish_fisher";
     const metrics = await mockFetchMetrics();
     return {
@@ -54,5 +55,6 @@ export async function runRiskCalculation(params: {
     calc_stress: needsStress,
     calc_margin_capital: needsMargin,
     calc_correlations: needsCorrelations,
+    market_data_session_id: params.marketDataSessionId,
   });
 }

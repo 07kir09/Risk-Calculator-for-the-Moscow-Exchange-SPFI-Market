@@ -54,6 +54,25 @@ def _read_excel(path: Path) -> pd.DataFrame:
     return _normalize_columns(pd.read_excel(path))
 
 
+def _add_duplicate_message(
+    messages: List[ValidationMessage],
+    *,
+    strict: bool,
+    file_name: str,
+    message: str,
+    field: str | None = None,
+) -> None:
+    _add_message(messages, "ERROR" if strict else "WARNING", f"{file_name}: {message}", field=field)
+
+
+def _find_single_market_file(base_dir: Path, stem: str) -> Path | None:
+    for suffix in (".xlsx", ".xls"):
+        candidate = base_dir / f"{stem}{suffix}"
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def _parse_dates(
     series: pd.Series,
     *,
@@ -111,7 +130,7 @@ def _numeric_ratio(series: pd.Series) -> float:
     return float(parsed.notna().sum()) / float(len(series))
 
 
-def _load_discount_curves(path: Path, messages: List[ValidationMessage]) -> pd.DataFrame:
+def _load_discount_curves(path: Path, messages: List[ValidationMessage], *, strict: bool = True) -> pd.DataFrame:
     df = _read_excel(path)
     required = ["Дата", "Кривая", "Тип", "Дисконт фактор", "Тенор", "Ставка"]
     if not _require_columns(df, required, messages=messages, file_name=path.name):
@@ -149,17 +168,21 @@ def _load_discount_curves(path: Path, messages: List[ValidationMessage]) -> pd.D
             "source_file": path.name,
         }
     )
-    dup_count = int(out.duplicated(subset=["as_of_date", "curve_name", "curve_type", "tenor_label"]).sum())
+    duplicate_mask = out.duplicated(subset=["as_of_date", "curve_name", "curve_type", "tenor_label"], keep="last")
+    dup_count = int(duplicate_mask.sum())
     if dup_count:
-        _add_message(
+        _add_duplicate_message(
             messages,
-            "ERROR",
-            f"{path.name}: найдено {dup_count} дубликатов в discount curve по ключу дата/кривая/тип/tenor.",
+            strict=strict,
+            file_name=path.name,
+            message=f"найдено {dup_count} дубликатов в discount curve по ключу дата/кривая/тип/tenor.",
         )
+        if not strict:
+            out = out.loc[~duplicate_mask].copy()
     return out.sort_values(["as_of_date", "curve_name", "tenor_years", "tenor_label"]).reset_index(drop=True)
 
 
-def _load_forward_curves(path: Path, messages: List[ValidationMessage]) -> pd.DataFrame:
+def _load_forward_curves(path: Path, messages: List[ValidationMessage], *, strict: bool = True) -> pd.DataFrame:
     df = _read_excel(path)
     required = ["Дата", "Кривая", "Тип", "Срок", "Тенор", "Ставка"]
     if not _require_columns(df, required, messages=messages, file_name=path.name):
@@ -176,17 +199,21 @@ def _load_forward_curves(path: Path, messages: List[ValidationMessage]) -> pd.Da
             "source_file": path.name,
         }
     )
-    dup_count = int(out.duplicated(subset=["as_of_date", "curve_name", "curve_type", "tenor_label"]).sum())
+    duplicate_mask = out.duplicated(subset=["as_of_date", "curve_name", "curve_type", "tenor_label"], keep="last")
+    dup_count = int(duplicate_mask.sum())
     if dup_count:
-        _add_message(
+        _add_duplicate_message(
             messages,
-            "ERROR",
-            f"{path.name}: найдено {dup_count} дубликатов в forward curve по ключу дата/кривая/тип/tenor.",
+            strict=strict,
+            file_name=path.name,
+            message=f"найдено {dup_count} дубликатов в forward curve по ключу дата/кривая/тип/tenor.",
         )
+        if not strict:
+            out = out.loc[~duplicate_mask].copy()
     return out.sort_values(["as_of_date", "curve_name", "tenor_years", "tenor_label"]).reset_index(drop=True)
 
 
-def _load_fixings(path: Path, messages: List[ValidationMessage]) -> pd.DataFrame:
+def _load_fixings(path: Path, messages: List[ValidationMessage], *, strict: bool = True) -> pd.DataFrame:
     df = _read_excel(path)
     required = ["Индекс", "Фиксинг", "Дата"]
     if not _require_columns(df, required, messages=messages, file_name=path.name):
@@ -200,18 +227,22 @@ def _load_fixings(path: Path, messages: List[ValidationMessage]) -> pd.DataFrame
             "source_file": path.name,
         }
     )
-    dup_count = int(out.duplicated(subset=["index_name", "as_of_date"]).sum())
+    duplicate_mask = out.duplicated(subset=["index_name", "as_of_date"], keep="last")
+    dup_count = int(duplicate_mask.sum())
     if dup_count:
-        _add_message(
+        _add_duplicate_message(
             messages,
-            "ERROR",
-            f"{path.name}: найдено {dup_count} дубликатов фиксингов по ключу индекс/дата.",
+            strict=strict,
+            file_name=path.name,
+            message=f"найдено {dup_count} дубликатов фиксингов по ключу индекс/дата.",
         )
+        if not strict:
+            out = out.loc[~duplicate_mask].copy()
     return out.sort_values(["index_name", "as_of_date"]).reset_index(drop=True)
 
 
 def _load_calibration_files(base_dir: Path, messages: List[ValidationMessage]) -> pd.DataFrame:
-    files = sorted(base_dir.glob("calibrationInstrument*.xlsx"))
+    files = sorted([*base_dir.glob("calibrationInstrument*.xlsx"), *base_dir.glob("calibrationInstrument*.xls")])
     frames: list[pd.DataFrame] = []
     if not files:
         _add_message(messages, "WARNING", f"{base_dir.name}: не найдено ни одного calibrationInstrument*.xlsx.")
@@ -244,8 +275,8 @@ def _currency_from_filename(path: Path) -> str | None:
     return match.group(1) if match else None
 
 
-def _load_fx_history_files(base_dir: Path, messages: List[ValidationMessage]) -> pd.DataFrame:
-    files = sorted(base_dir.glob("RC_*.xlsx"))
+def _load_fx_history_files(base_dir: Path, messages: List[ValidationMessage], *, strict: bool = True) -> pd.DataFrame:
+    files = sorted([*base_dir.glob("RC_*.xlsx"), *base_dir.glob("RC_*.xls")])
     frames: list[pd.DataFrame] = []
     fingerprints: dict[str, str] = {}
     if not files:
@@ -258,20 +289,24 @@ def _load_fx_history_files(base_dir: Path, messages: List[ValidationMessage]) ->
         if not _require_columns(df, required, messages=messages, file_name=path.name):
             continue
 
-        currency_code = _currency_from_filename(path) or "UNK"
+        currency_code_from_filename = _currency_from_filename(path) or "UNK"
+        currency_code = currency_code_from_filename
         labels = sorted({str(value).strip() for value in df["cdx"].dropna().unique() if str(value).strip()})
         if len(labels) == 1:
             inferred = _FX_LABEL_TO_CODE.get(labels[0].upper())
-            if inferred and inferred != currency_code:
+            if inferred and inferred != currency_code_from_filename:
                 _add_message(
                     messages,
-                    "ERROR",
+                    "ERROR" if strict else "WARNING",
                     (
-                        f"{path.name}: код валюты в имени файла ({currency_code}) "
+                        f"{path.name}: код валюты в имени файла ({currency_code_from_filename}) "
                         f"не совпадает с содержимым файла ({labels[0]} -> {inferred})."
+                        + (" Для tolerant-режима используется код из содержимого файла." if not strict else "")
                     ),
                     field="cdx",
                 )
+                if not strict:
+                    currency_code = inferred
 
         out = pd.DataFrame(
             {
@@ -284,23 +319,29 @@ def _load_fx_history_files(base_dir: Path, messages: List[ValidationMessage]) ->
             }
         ).sort_values(["obs_date"]).reset_index(drop=True)
 
-        dup_count = int(out.duplicated(subset=["obs_date"]).sum())
+        duplicate_mask = out.duplicated(subset=["obs_date"], keep="last")
+        dup_count = int(duplicate_mask.sum())
         if dup_count:
-            _add_message(
+            _add_duplicate_message(
                 messages,
-                "ERROR",
-                f"{path.name}: найдено {dup_count} дубликатов FX history по дате.",
+                strict=strict,
+                file_name=path.name,
+                message=f"найдено {dup_count} дубликатов FX history по дате.",
                 field="data",
             )
+            if not strict:
+                out = out.loc[~duplicate_mask].copy()
 
         payload = out[["nominal", "obs_date", "rate"]].to_csv(index=False)
         fingerprint = hashlib.md5(payload.encode("utf-8")).hexdigest()
         if fingerprint in fingerprints and fingerprints[fingerprint] != path.name:
             _add_message(
                 messages,
-                "ERROR",
+                "ERROR" if strict else "WARNING",
                 f"{path.name}: FX history полностью совпадает с {fingerprints[fingerprint]}.",
             )
+            if not strict:
+                continue
         else:
             fingerprints[fingerprint] = path.name
 
@@ -311,7 +352,7 @@ def _load_fx_history_files(base_dir: Path, messages: List[ValidationMessage]) ->
     return pd.concat(frames, ignore_index=True).sort_values(["currency_code", "obs_date"]).reset_index(drop=True)
 
 
-def load_market_data_bundle_from_directory(base_dir: Path) -> MarketDataBundle:
+def load_market_data_bundle_from_directory(base_dir: Path, *, strict: bool = True) -> MarketDataBundle:
     base_dir = Path(base_dir)
     if not base_dir.exists():
         raise ValueError(f"Каталог с market data не найден: {base_dir}")
@@ -320,18 +361,23 @@ def load_market_data_bundle_from_directory(base_dir: Path) -> MarketDataBundle:
 
     messages: List[ValidationMessage] = []
 
-    discount_path = base_dir / "curveDiscount.xlsx"
-    forward_path = base_dir / "curveForward.xlsx"
-    fixing_path = base_dir / "fixing.xlsx"
-    for required_path in (discount_path, forward_path, fixing_path):
-        if not required_path.exists():
-            _add_message(messages, "ERROR", f"{base_dir.name}: отсутствует обязательный файл {required_path.name}.")
+    discount_path = _find_single_market_file(base_dir, "curveDiscount")
+    forward_path = _find_single_market_file(base_dir, "curveForward")
+    fixing_path = _find_single_market_file(base_dir, "fixing")
+    required_files = {
+        "curveDiscount.xlsx": discount_path,
+        "curveForward.xlsx": forward_path,
+        "fixing.xlsx": fixing_path,
+    }
+    for display_name, required_path in required_files.items():
+        if required_path is None:
+            _add_message(messages, "ERROR", f"{base_dir.name}: отсутствует обязательный файл {display_name}.")
 
-    discount_curves = _load_discount_curves(discount_path, messages) if discount_path.exists() else pd.DataFrame()
-    forward_curves = _load_forward_curves(forward_path, messages) if forward_path.exists() else pd.DataFrame()
-    fixings = _load_fixings(fixing_path, messages) if fixing_path.exists() else pd.DataFrame()
+    discount_curves = _load_discount_curves(discount_path, messages, strict=strict) if discount_path is not None else pd.DataFrame()
+    forward_curves = _load_forward_curves(forward_path, messages, strict=strict) if forward_path is not None else pd.DataFrame()
+    fixings = _load_fixings(fixing_path, messages, strict=strict) if fixing_path is not None else pd.DataFrame()
     calibration_instruments = _load_calibration_files(base_dir, messages)
-    fx_history = _load_fx_history_files(base_dir, messages)
+    fx_history = _load_fx_history_files(base_dir, messages, strict=strict)
 
     return MarketDataBundle(
         fx_history=fx_history,

@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { demoPositions } from "../mock/demoData";
 import { useAppData } from "../state/appDataStore";
-import { useLockBodyScroll } from "../hooks/useLockBodyScroll";
 import { useWorkflow } from "../workflow/workflowStore";
 import { WorkflowStep } from "../workflow/workflowTypes";
 import Button from "./Button";
@@ -14,56 +13,60 @@ export default function OnboardingModal() {
   const nav = useNavigate();
   const { dispatch: dataDispatch } = useAppData();
   const { dispatch } = useWorkflow();
-  const [open, setOpen] = useState(() => localStorage.getItem(STORAGE_KEY) !== "1");
+  const [open, setOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(STORAGE_KEY) !== "1";
+  });
   const portalRoot = useMemo(() => document.getElementById("overlay-root") ?? document.body, []);
-  useLockBodyScroll(open);
+
+  const closeHint = () => {
+    setOpen(false);
+  };
 
   useEffect(() => {
     if (!open) localStorage.setItem(STORAGE_KEY, "1");
   }, [open]);
 
   useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    if (open) {
+      const timer = window.setTimeout(() => {
+        setOpen(false);
+      }, 15000);
+      return () => window.clearTimeout(timer);
+    }
   }, [open]);
 
   if (!open) return null;
 
   return createPortal(
-    <div className="modal-backdrop" onClick={() => setOpen(false)} role="presentation">
-      <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <div className="modal-title">Как работать с калькулятором</div>
-          <button className="btn btn-ghost" type="button" onClick={() => setOpen(false)} aria-label="Закрыть">
-            Закрыть
-          </button>
+    <aside className="onboardingHint" role="dialog" aria-live="polite" aria-label="Подсказка по работе с калькулятором">
+      <div className="onboardingHintHeader">
+        <div className="onboardingHintTitle">Быстрый старт</div>
+        <Button variant="ghost" type="button" onClick={closeHint} aria-label="Скрыть подсказку">
+          Закрыть
+        </Button>
+      </div>
+      <div className="onboardingHintBody">
+        <div className="textMuted">
+          Можешь сразу загружать свой CSV/XLSX. Подсказка больше не блокирует экран.
         </div>
-        <div className="modal-body">
-          <div className="stack">
-            <div className="textMuted">
-              Сайт ведёт по шагам. Пока шаг не завершён — следующий будет заблокирован (это нормально).
-            </div>
-            <ol style={{ margin: 0, paddingLeft: 18 }} className="stack">
-              <li>
-                <strong>Импорт сделок</strong> — загрузите CSV или демо‑портфель.
-              </li>
-              <li>
-                <strong>Проверка данных</strong> — исправьте ошибки формата (критические — обязательно).
-              </li>
-              <li>
-                <strong>Запуск расчёта</strong> — выберите метрики и получите отчёты (Панель / Стрессы / Лимиты).
-              </li>
-            </ol>
-            <div className="textMuted">
-              Если вы сомневаетесь, что загрузить — начните с демо‑портфеля, а потом замените файл на свой.
-            </div>
-          </div>
-        </div>
-        <div className="modal-footer" style={{ justifyContent: "space-between" }}>
+        <ol className="orderedList">
+          <li>Импортируй файл или возьми демо-портфель.</li>
+          <li>Проверь ошибки и предупреждения.</li>
+          <li>Запусти расчёт и открой панель риска.</li>
+        </ol>
+      </div>
+      <div className="onboardingHintFooter">
+        <Button
+          variant="flat"
+          onClick={() => {
+            closeHint();
+            nav("/import");
+          }}
+        >
+          Начать с файла
+        </Button>
+        <div className="inlineActions">
           <Button
             variant="secondary"
             onClick={() => {
@@ -73,24 +76,18 @@ export default function OnboardingModal() {
               dispatch({ type: "SET_SNAPSHOT", snapshotId: crypto.randomUUID() });
               dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Import });
               dispatch({ type: "SET_VALIDATION", criticalErrors: 0, warnings: 0, acknowledged: false });
-              setOpen(false);
+              closeHint();
               nav("/validate");
             }}
           >
             Загрузить демо
           </Button>
-          <Button
-            onClick={() => {
-              setOpen(false);
-              nav("/import");
-            }}
-          >
-            Начать
+          <Button onClick={closeHint}>
+            Понятно
           </Button>
         </div>
       </div>
-    </div>,
+    </aside>,
     portalRoot
   );
 }
-

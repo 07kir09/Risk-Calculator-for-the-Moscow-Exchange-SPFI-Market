@@ -1,9 +1,30 @@
-import { useEffect, useMemo, useState } from "react";
+import { Key, useEffect, useMemo, useState } from "react";
+import {
+  Accordion,
+  AccordionItem,
+  Checkbox,
+  Chip,
+  Input,
+  Select,
+  SelectItem,
+  Tab,
+  Tabs,
+  Textarea,
+} from "@heroui/react";
 import { useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 import Checklist from "../components/Checklist";
 import HelpTooltip from "../components/HelpTooltip";
 import Card from "../ui/Card";
+import {
+  CompareBarsChart,
+  DonutGauge,
+  GlassPanel,
+  Reveal,
+  Sparkline,
+  StaggerGroup,
+  StaggerItem,
+} from "../components/rich/RichVisuals";
 import { useAppData } from "../state/appDataStore";
 import { demoScenarios } from "../mock/demoData";
 import { useWorkflow } from "../workflow/workflowStore";
@@ -21,15 +42,15 @@ type MetricKey =
   | "margin_capital";
 
 const metricCards: Array<{ key: MetricKey; title: string; hint: string }> = [
-  { key: "var_hist", title: "VaR (simulated/demo)", hint: "Потенциальный убыток по сценарному PnL (в демо это не исторический ряд рынка)." },
-  { key: "var_param", title: "VaR (параметрический)", hint: "VaR по предположению о распределении (нормальное — демо)." },
-  { key: "es_hist", title: "ES (simulated/demo)", hint: "Средний убыток в худшем хвосте сценарного распределения." },
-  { key: "es_param", title: "ES (параметрический)", hint: "ES по параметрическому распределению (демо)." },
-  { key: "lc_var", title: "LC VaR", hint: "VaR + надбавка за ликвидность (если задана в сделках)." },
-  { key: "greeks", title: "Чувствительности (Greeks + DV01)", hint: "Показывает, что сильнее всего влияет на стоимость портфеля." },
-  { key: "stress", title: "Стресс‑сценарии", hint: "Что будет при резком движении рынка (шоки по цене/воле/ставке)." },
-  { key: "correlations", title: "Корреляции (демо)", hint: "Связи между факторами. Нужны для сценариев/VaR (если включено)." },
-  { key: "margin_capital", title: "Маржа/капитал (демо)", hint: "Оценка требований по обеспечению и капитала для риска." },
+  { key: "var_hist", title: "VaR (сценарный)", hint: "Потенциальный убыток по сценарному PnL." },
+  { key: "var_param", title: "VaR (параметрический)", hint: "VaR по предположению о распределении." },
+  { key: "es_hist", title: "ES (сценарный)", hint: "Средний убыток в хвосте сценарного распределения." },
+  { key: "es_param", title: "ES (параметрический)", hint: "ES по параметрическому распределению." },
+  { key: "lc_var", title: "LC VaR", hint: "VaR + надбавка за ликвидность." },
+  { key: "greeks", title: "Чувствительности", hint: "Delta, gamma, vega, theta, rho, DV01." },
+  { key: "stress", title: "Стресс-сценарии", hint: "Что будет при резком движении рынка." },
+  { key: "correlations", title: "Корреляции", hint: "Связи между факторами риска." },
+  { key: "margin_capital", title: "Маржа и капитал", hint: "Требования по обеспечению и капиталу." },
 ];
 
 const recommendedSet: MetricKey[] = ["var_hist", "es_hist", "lc_var", "greeks", "stress"];
@@ -62,7 +83,7 @@ export default function ConfigurePage() {
   }, [dataState.scenarios.length, dataDispatch]);
 
   const toggle = (key: MetricKey) => {
-    setSelected((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+    setSelected((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
   };
 
   const fxRatesResult = useMemo(() => {
@@ -74,12 +95,12 @@ export default function ConfigurePage() {
         return { value: undefined, error: "FX rates должен быть JSON-объектом вида {\"USD\": 90.5}" };
       }
       const out: Record<string, number> = {};
-      for (const [k, v] of Object.entries(parsed)) {
-        const n = Number(v);
-        if (!Number.isFinite(n) || n <= 0) {
-          return { value: undefined, error: `Неверный FX для ${k}: ожидается положительное число` };
+      for (const [key, value] of Object.entries(parsed)) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric) || numeric <= 0) {
+          return { value: undefined, error: `Неверный FX для ${key}: ожидается положительное число` };
         }
-        out[String(k).toUpperCase()] = n;
+        out[String(key).toUpperCase()] = numeric;
       }
       return { value: out, error: "" };
     } catch {
@@ -108,24 +129,62 @@ export default function ConfigurePage() {
       ready: hasPortfolio && noCritical && marketOk && hasMetrics && alphaOk && tailModelOk && baseCurrencyOk && fxOk,
     };
   }, [
-    dataState.portfolio.positions.length,
-    wf.validation.criticalErrors,
-    wf.marketData.status,
-    wf.marketData.missingFactors,
-    selected.length,
     alpha,
-    parametricTailModel,
     baseCurrency,
+    dataState.portfolio.positions.length,
     fxRatesResult.error,
+    parametricTailModel,
+    selected.length,
+    wf.marketData.missingFactors,
+    wf.marketData.status,
+    wf.validation.criticalErrors,
   ]);
+
+  const selectedScenarioPreview = dataState.scenarios.slice(0, 5);
+  const selectedMetricBars = useMemo(
+    () =>
+      metricCards.map((metric) => ({
+        label: metric.key,
+        value: selected.includes(metric.key) ? 100 : 18,
+        tone: selected.includes(metric.key) ? "positive" as const : "neutral" as const,
+      })),
+    [selected]
+  );
+  const readinessScore = useMemo(
+    () => [
+      readiness.hasPortfolio,
+      readiness.noCritical,
+      readiness.marketOk,
+      readiness.hasMetrics,
+      readiness.alphaOk && readiness.tailModelOk && readiness.baseCurrencyOk && readiness.fxOk,
+    ].filter(Boolean).length * 20,
+    [
+      readiness.alphaOk,
+      readiness.baseCurrencyOk,
+      readiness.fxOk,
+      readiness.hasMetrics,
+      readiness.hasPortfolio,
+      readiness.marketOk,
+      readiness.noCritical,
+      readiness.tailModelOk,
+    ]
+  );
+  const selectedTrendData = useMemo(
+    () =>
+      selectedMetricBars.slice(0, 6).map((item, index) => ({
+        label: `${index + 1}`,
+        value: item.value,
+      })),
+    [selectedMetricBars]
+  );
 
   return (
     <Card>
       <div className="pageHeader">
         <div className="pageHeaderText">
-          <h1 className="pageTitle">Шаг 4. Настройка расчёта</h1>
+          <h1 className="pageTitle">Настройка расчёта</h1>
           <p className="pageHint">
-            Выберите, что считать — чтобы не гонять лишнее. Если вы не понимаете термин, наведите на <HelpTooltip text="Короткое объяснение термина. Формулы — в справке." />.
+            Один экран для выбора метрик, параметров и набора сценариев. Здесь важно только то, что влияет на расчёт.
           </p>
         </div>
         <div className="pageActions">
@@ -133,147 +192,222 @@ export default function ConfigurePage() {
             Рекомендуемый набор
           </Button>
           <Button variant="secondary" onClick={() => nav("/market")}>
-            Назад: рыночные данные
+            Назад
           </Button>
         </div>
       </div>
 
-      <div className="grid" style={{ marginTop: 12 }}>
-        <Card>
-          <div className="cardTitle">Метрики</div>
-          <div className="cardSubtitle">Отметьте галочками, что именно нужно посчитать.</div>
-          <div className="stack" style={{ marginTop: 12 }}>
-            {metricCards.map((m) => (
-              <label key={m.key} className="row" style={{ justifyContent: "space-between" }}>
-                <span className="row" style={{ gap: 10 }}>
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(m.key)}
-                    onChange={() => toggle(m.key)}
-                    style={{ width: 18, height: 18 }}
-                  />
-                  <span style={{ fontWeight: 800 }}>
-                    {m.title} <HelpTooltip text={m.hint} />
-                  </span>
-                </span>
-              </label>
-            ))}
-          </div>
-        </Card>
+      <div className="configureLayout">
+        <div className="configureMain">
+          <StaggerGroup className="visualSplitPanel">
+            <StaggerItem>
+              <GlassPanel
+                title="Контур расчёта"
+                subtitle="Сразу видно, сколько обязательных условий уже выполнено и какие блоки реально попадут в расчёт."
+                badge={<Chip color={readiness.ready ? "success" : "warning"} variant="flat" radius="sm">{readiness.ready ? "ready" : "draft"}</Chip>}
+              >
+                <div className="visualSplitPanel">
+                  <DonutGauge value={readinessScore} label="readiness" subtitle="Готовность конфигурации к запуску." />
+                  <CompareBarsChart data={selectedMetricBars.slice(0, 6)} height={240} />
+                </div>
+              </GlassPanel>
+            </StaggerItem>
+            <StaggerItem>
+              <GlassPanel title="Ритм выбора" subtitle="Sparkline показывает, насколько насыщен набор активированных метрик и сценариев.">
+                <Sparkline data={selectedTrendData} color={readiness.ready ? "#6eff8e" : "#7da7ff"} height={110} />
+                <div className="visualChipRow">
+                  {selected.slice(0, 8).map((metric) => (
+                    <Chip key={metric} color="primary" variant="flat" radius="sm">
+                      {metric}
+                    </Chip>
+                  ))}
+                </div>
+              </GlassPanel>
+            </StaggerItem>
+          </StaggerGroup>
 
-        <Card>
-          <div className="cardTitle">Параметры VaR/ES</div>
-          <div className="cardSubtitle">Даже если вы не считаете VaR — можно оставить по умолчанию.</div>
-          <div className="stack" style={{ marginTop: 12 }}>
-            <label>
-              Уровень доверия (alpha) <HelpTooltip text="Например, 0.99 означает: «99% случаев должны быть лучше, чем VaR»." />
-              <input type="number" step={0.001} min={0.8} max={0.999} value={alpha} onChange={(e) => setAlpha(Number(e.target.value))} />
-            </label>
-            <label>
-              Горизонт (дней) <HelpTooltip text="Сколько дней «держим позицию» в расчёте риска. Для демо — параметр отчёта." />
-              <input type="number" min={1} value={horizonDays} onChange={(e) => setHorizonDays(Number(e.target.value))} />
-            </label>
-            <label>
-              Tail-модель для параметрического VaR/ES
-              <select value={parametricTailModel} onChange={(e) => setParametricTailModel(e.target.value)}>
-                <option value="cornish_fisher">Cornish-Fisher (усиленный хвост)</option>
-                <option value="normal">Normal</option>
-              </select>
-            </label>
-            <label>
-              Окно истории (дней) <HelpTooltip text="Сколько дней истории используем для исторического VaR/ES (демо)." />
-              <input type="number" min={30} value={historyDays} onChange={(e) => setHistoryDays(Number(e.target.value))} />
-            </label>
-            <label>
-              Базовая валюта отчёта
-              <input
-                type="text"
-                value={baseCurrency}
-                maxLength={3}
-                onChange={(e) => setBaseCurrency(e.target.value.toUpperCase())}
-              />
-            </label>
-            <label>
-              FX коэффициенты (JSON, опционально){" "}
-              <HelpTooltip text='Пример: {"USD": 90.5, "EUR": 98.2}. Курс = сколько единиц базовой валюты за 1 единицу валюты позиции.' />
-              <textarea rows={4} value={fxRatesText} onChange={(e) => setFxRatesText(e.target.value)} />
-            </label>
-            {fxRatesResult.error && <div className="badge danger">{fxRatesResult.error}</div>}
-            <label>
-              LC VaR модель ликвидности
-              <select value={liquidityModel} onChange={(e) => setLiquidityModel(e.target.value)}>
-                <option value="fraction_of_position_value">Haircut как доля от стоимости позиции</option>
-                <option value="half_spread_fraction">Haircut как half-spread доля</option>
-                <option value="absolute_per_contract">Haircut как абсолют на контракт</option>
-              </select>
-            </label>
-          </div>
-        </Card>
-
-        <Card>
-          <div className="cardTitle">Стресс‑сценарии (будут использованы при расчёте)</div>
-          <div className="cardSubtitle">Потом их можно запускать и сравнивать на шаге «Стрессы».</div>
-          <div className="stack" style={{ marginTop: 12 }}>
-            {(dataState.scenarios || []).slice(0, 6).map((s) => (
-              <div key={s.scenario_id} className="row wrap" style={{ justifyContent: "space-between" }}>
-                <span style={{ fontWeight: 800 }}>{s.scenario_id}</span>
-                <span className="textMuted">ΔS {s.underlying_shift}, ΔVol {s.volatility_shift}, Δr {s.rate_shift}</span>
-              </div>
-            ))}
-            <div className="textMuted">Редактор сценариев будет доступен после расчёта (шаг «Стрессы»).</div>
-          </div>
-        </Card>
-      </div>
-
-      <Card>
-        <div className="row wrap" style={{ justifyContent: "space-between" }}>
-          <div>
-            <div className="cardTitle">Чек‑лист готовности</div>
-            <div className="cardSubtitle">Если что‑то не готово — подсветим.</div>
-          </div>
-          <Button
-            data-testid="save-config"
-            disabled={!readiness.ready}
-            onClick={() => {
-              dataDispatch({ type: "RESET_RESULTS" });
-              dispatch({ type: "RESET_DOWNSTREAM", fromStep: WorkflowStep.Configure });
-              dispatch({
-                type: "SET_CALC_CONFIG",
-                selectedMetrics: selected,
-                params: {
-                  alpha,
-                  horizonDays,
-                  parametricTailModel,
-                  historyDays,
-                  baseCurrency,
-                  fxRates: fxRatesResult.value,
-                  liquidityModel,
-                },
-                marginEnabled: selected.includes("margin_capital"),
-              });
-              dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Configure });
-              nav("/run");
+          <Tabs
+            aria-label="Настройка расчёта"
+            radius="sm"
+            color="primary"
+            classNames={{
+              tabList: "importTabsList",
+              tab: "importTab",
+              cursor: "importTabCursor",
+              panel: "importTabPanel",
             }}
           >
-            Сохранить и перейти к запуску
-          </Button>
+            <Tab key="metrics" title="Что считать">
+              <Card>
+                <div className="cardTitle">Набор метрик</div>
+                <div className="cardSubtitle">Отметьте только то, что действительно нужно пользователю на выходе.</div>
+
+                <div className="metricGrid">
+                  {metricCards.map((metric) => (
+                    <label key={metric.key} className={`metricOption ${selected.includes(metric.key) ? "metricOption--selected" : ""}`}>
+                      <Checkbox isSelected={selected.includes(metric.key)} onValueChange={() => toggle(metric.key)}>
+                        <span className="metricOptionTitle">
+                          {metric.title} <HelpTooltip text={metric.hint} />
+                        </span>
+                      </Checkbox>
+                      <span className="metricOptionHint">{metric.hint}</span>
+                    </label>
+                  ))}
+                </div>
+              </Card>
+            </Tab>
+
+            <Tab key="params" title="Параметры">
+              <Card>
+                <div className="cardTitle">Параметры VaR/ES и агрегации</div>
+                <div className="cardSubtitle">Только параметры, которые меняют методику расчёта.</div>
+
+                <div className="formGrid">
+                  <Input type="number" label="Уровень доверия (alpha)" step="0.001" value={String(alpha)} onValueChange={(value) => setAlpha(Number(value))} />
+                  <Input type="number" label="Горизонт, дней" min={1} value={String(horizonDays)} onValueChange={(value) => setHorizonDays(Number(value))} />
+                  <Input type="number" label="Окно истории, дней" min={30} value={String(historyDays)} onValueChange={(value) => setHistoryDays(Number(value))} />
+                  <Input label="Базовая валюта" maxLength={3} value={baseCurrency} onValueChange={(value) => setBaseCurrency(value.toUpperCase())} />
+
+                  <Select
+                    label="Tail-модель"
+                    selectedKeys={[parametricTailModel]}
+                    onSelectionChange={(keys) => {
+                      const [key] = Array.from(keys as Set<Key>);
+                      if (key) setParametricTailModel(String(key));
+                    }}
+                  >
+                    <SelectItem key="cornish_fisher">Cornish-Fisher</SelectItem>
+                    <SelectItem key="normal">Normal</SelectItem>
+                  </Select>
+
+                  <Select
+                    label="Модель ликвидности"
+                    selectedKeys={[liquidityModel]}
+                    onSelectionChange={(keys) => {
+                      const [key] = Array.from(keys as Set<Key>);
+                      if (key) setLiquidityModel(String(key));
+                    }}
+                  >
+                    <SelectItem key="fraction_of_position_value">Haircut как доля от стоимости позиции</SelectItem>
+                    <SelectItem key="half_spread_fraction">Haircut как half-spread доля</SelectItem>
+                    <SelectItem key="absolute_per_contract">Haircut как абсолют на контракт</SelectItem>
+                  </Select>
+                </div>
+
+                <Accordion variant="splitted" className="configureAccordion">
+                  <AccordionItem
+                    key="fx"
+                    aria-label="Продвинутые FX-настройки"
+                    title="FX rates и продвинутые настройки"
+                    subtitle="Откройте только если расчёт мультивалютный или нужен ручной override."
+                    classNames={{ base: "validateAccordionItem", trigger: "validateAccordionTrigger", content: "validateAccordionContent" }}
+                  >
+                    <Textarea
+                      label="FX rates (JSON, опционально)"
+                      minRows={5}
+                      value={fxRatesText}
+                      onValueChange={setFxRatesText}
+                      className="configureTextarea"
+                    />
+                    {fxRatesResult.error && (
+                      <Chip color="danger" variant="flat" radius="sm" className="importIssueChip">
+                        {fxRatesResult.error}
+                      </Chip>
+                    )}
+                  </AccordionItem>
+                </Accordion>
+              </Card>
+            </Tab>
+
+            <Tab key="scenarios" title="Сценарии">
+              <Card>
+                <div className="cardTitle">Набор сценариев для расчёта</div>
+                <div className="cardSubtitle">Полный редактор будет на шаге стресс-сценариев, но уже здесь видно, что пойдёт в расчёт.</div>
+
+                <div className="scenarioPreviewList">
+                  {selectedScenarioPreview.map((scenario) => (
+                    <div key={scenario.scenario_id} className="scenarioPreviewItem">
+                      <div>
+                        <strong>{scenario.scenario_id}</strong>
+                        <div className="textMuted">{scenario.description ?? "Без описания"}</div>
+                      </div>
+                      <div className="scenarioPreviewValues">
+                        <span>ΔS {scenario.underlying_shift}</span>
+                        <span>ΔVol {scenario.volatility_shift}</span>
+                        <span>Δr {scenario.rate_shift}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </Tab>
+          </Tabs>
         </div>
 
-        <div style={{ marginTop: 12 }}>
-          <Checklist
-            items={[
-              { label: "Сделки загружены", done: readiness.hasPortfolio },
-              { label: `Критических ошибок нет (${wf.validation.criticalErrors})`, done: readiness.noCritical },
-              { label: "Рыночные данные привязаны", done: readiness.marketOk },
-              { label: `Метрики выбраны (${selected.length})`, done: readiness.hasMetrics },
-              { label: "Параметры корректны", done: readiness.alphaOk, hint: readiness.alphaOk ? undefined : "Проверьте alpha" },
-              { label: "Tail-модель корректна", done: readiness.tailModelOk, hint: readiness.tailModelOk ? undefined : "Выберите normal или cornish_fisher" },
-              { label: "Базовая валюта корректна", done: readiness.baseCurrencyOk, hint: readiness.baseCurrencyOk ? undefined : "Ожидается код ISO 4217" },
-              { label: "FX JSON корректен", done: readiness.fxOk, hint: readiness.fxOk ? undefined : fxRatesResult.error || "Проверьте JSON" },
-            ]}
-          />
-        </div>
-      </Card>
+        <aside className="importAside">
+          <Reveal delay={0.08}>
+            <Card>
+            <div className="cardTitle">Готовность к запуску</div>
+            <div className="cardSubtitle">Если что-то не выполнено, расчёт не стартует.</div>
+            <Checklist
+              items={[
+                { label: "Портфель загружен", done: readiness.hasPortfolio },
+                { label: "Критических ошибок нет", done: readiness.noCritical },
+                { label: "Рыночные данные готовы", done: readiness.marketOk },
+                { label: `Метрики выбраны (${selected.length})`, done: readiness.hasMetrics },
+                { label: "Параметры корректны", done: readiness.alphaOk && readiness.tailModelOk && readiness.baseCurrencyOk && readiness.fxOk },
+              ]}
+            />
+            </Card>
+          </Reveal>
+
+          <Reveal delay={0.1}>
+            <Card>
+            <div className="cardTitle">Итоговый набор</div>
+            <div className="cardSubtitle">Что реально будет посчитано.</div>
+            <div className="configureSelectedChips">
+              {selected.map((metric) => (
+                <Chip key={metric} color="primary" variant="flat" radius="sm">
+                  {metric}
+                </Chip>
+              ))}
+            </div>
+            </Card>
+          </Reveal>
+
+          <Reveal delay={0.12}>
+            <Card>
+            <div className="cardTitle">Следующий шаг</div>
+            <div className="cardSubtitle">На экране запуска будет только финальная проверка и сам расчёт.</div>
+            <Button
+              disabled={!readiness.ready}
+              onClick={() => {
+                dataDispatch({ type: "RESET_RESULTS" });
+                dispatch({ type: "RESET_DOWNSTREAM", fromStep: WorkflowStep.Configure });
+                dispatch({
+                  type: "SET_CALC_CONFIG",
+                  selectedMetrics: selected,
+                  params: {
+                    alpha,
+                    horizonDays,
+                    parametricTailModel,
+                    historyDays,
+                    baseCurrency,
+                    fxRates: fxRatesResult.value,
+                    liquidityModel,
+                  },
+                  marginEnabled: selected.includes("margin_capital"),
+                });
+                dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Configure });
+                nav("/run");
+              }}
+            >
+              Сохранить и перейти к запуску
+            </Button>
+            </Card>
+          </Reveal>
+        </aside>
+      </div>
     </Card>
   );
 }

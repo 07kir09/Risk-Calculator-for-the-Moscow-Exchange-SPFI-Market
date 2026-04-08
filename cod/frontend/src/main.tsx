@@ -2,17 +2,15 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
+import { HeroUIProvider } from "@heroui/react";
 import App from "./App";
 import { WorkflowProvider } from "./workflow/workflowStore";
 import { AppDataProvider } from "./state/appDataStore";
+import "./tw.css";
 import "./styles.css";
 
-const storedTheme = localStorage.getItem("theme");
-if (storedTheme === "light" || storedTheme === "dark") {
-  document.documentElement.dataset.theme = storedTheme;
-} else if (window.matchMedia?.("(prefers-color-scheme: dark)")?.matches) {
-  document.documentElement.dataset.theme = "dark";
-}
+document.documentElement.classList.add("dark");
+document.documentElement.dataset.theme = "dark";
 
 const client = new QueryClient({
   defaultOptions: {
@@ -33,9 +31,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={client}>
       <WorkflowProvider>
         <AppDataProvider>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
+          <HeroUIProvider>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </HeroUIProvider>
         </AppDataProvider>
       </WorkflowProvider>
     </QueryClientProvider>
