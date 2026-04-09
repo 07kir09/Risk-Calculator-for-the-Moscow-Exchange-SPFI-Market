@@ -10,7 +10,6 @@ const order: WorkflowStep[] = [
   WorkflowStep.Validate,
   WorkflowStep.MarketData,
   WorkflowStep.Configure,
-  WorkflowStep.CalcRun,
   WorkflowStep.Results,
 ];
 

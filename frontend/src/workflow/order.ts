@@ -5,7 +5,6 @@ export const orderedSteps: WorkflowStep[] = [
   WorkflowStep.Validate,
   WorkflowStep.MarketData,
   WorkflowStep.Configure,
-  WorkflowStep.CalcRun,
   WorkflowStep.Results,
   WorkflowStep.Stress,
   WorkflowStep.Limits,
@@ -13,4 +12,3 @@ export const orderedSteps: WorkflowStep[] = [
   WorkflowStep.Export,
   WorkflowStep.PostActions,
 ];
-

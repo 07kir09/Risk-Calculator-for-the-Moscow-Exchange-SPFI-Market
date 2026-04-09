@@ -1303,7 +1303,7 @@ textarea:focus {
   --chip-border: rgba(255, 255, 255, 0.08);
   --shadow-sm: none;
   --shadow-md: none;
-  --topbar-h: 92px;
+  --topbar-h: 80px;
   --sidebar-w: 286px;
   --sidebar-w-collapsed: 94px;
 }
@@ -1517,11 +1517,35 @@ a:hover {
 }
 
 .appTopbar {
-  padding: 0 34px;
-  border-bottom: 1px solid var(--border);
-  background: rgba(18, 18, 18, 0.94);
-  backdrop-filter: blur(12px);
-  gap: 24px;
+  padding: 0 20px;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  backdrop-filter: none;
+  gap: 12px;
+}
+
+.appTopbar.appTopbar--centered {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.topbarMenuSlot {
+  display: flex;
+  align-items: center;
+  justify-self: start;
+  min-width: 0;
+}
+
+.topbarCenter {
+  justify-self: center;
+  min-width: 0;
+}
+
+.topbarRightSpacer {
+  width: 40px;
+  height: 40px;
+  justify-self: end;
 }
 
 .topbarLeft {
@@ -1548,16 +1572,330 @@ a:hover {
   height: 18px;
 }
 
+.topbarMenuButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 112px;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.topbarMenuButton--icon {
+  min-width: 40px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  gap: 0;
+  border-radius: 12px;
+  opacity: 0.78;
+}
+
+.topbarMenuButton span {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.topbarMenuButton:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
+}
+
+.topbarMenuButton--icon:hover {
+  opacity: 1;
+  transform: none;
+}
+
+.topbarMenuButton svg {
+  width: 18px;
+  height: 18px;
+}
+
+.navigationDrawerBackdrop {
+  background: rgba(4, 6, 10, 0.58) !important;
+  backdrop-filter: blur(10px);
+}
+
+.navigationDrawerContent {
+  width: min(360px, calc(100vw - 24px)) !important;
+}
+
+.navigationDrawerContent [data-slot="base"] {
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top right, rgba(125, 167, 255, 0.12), transparent 42%),
+    linear-gradient(180deg, rgba(18, 18, 20, 0.98), rgba(10, 10, 12, 0.98));
+}
+
+.navigationDrawerHeader {
+  padding-right: 44px;
+}
+
+.navigationDrawerHeader h2 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.03em;
+}
+
+.navigationDrawerStatus {
+  margin-top: 6px;
+  color: rgba(244, 241, 234, 0.58);
+  font-size: 13px;
+}
+
+.navigationDrawerBody {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.navigationDrawerSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.navigationDrawerSectionTitle {
+  color: rgba(244, 241, 234, 0.42);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.navigationDrawerNav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.navigationDrawerItem {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 0 11px;
+  align-items: center;
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 200ms ease, border-color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
+}
+
+.navigationDrawerItem:hover {
+  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(125, 167, 255, 0.18);
+  transform: translateX(3px);
+}
+
+.navigationDrawerItem--active {
+  background: rgba(125, 167, 255, 0.08);
+  border-color: rgba(125, 167, 255, 0.28);
+  box-shadow: inset 3px 0 0 rgba(125, 167, 255, 0.9);
+}
+
+.navigationDrawerItem--completed {
+  opacity: 0.72;
+}
+
+.navigationDrawerItem--locked {
+  color: rgba(244, 241, 234, 0.68);
+}
+
+/* icon column */
+.navigationDrawerItemIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: rgba(125, 167, 255, 0.9);
+  flex-shrink: 0;
+}
+
+.navigationDrawerItem--locked .navigationDrawerItemIcon {
+  color: rgba(255, 184, 106, 0.88);
+}
+
+.navigationDrawerItem--completed .navigationDrawerItemIcon {
+  color: rgba(110, 255, 142, 0.72);
+}
+
+.navigationDrawerItem--active .navigationDrawerItemIcon {
+  color: rgba(125, 167, 255, 1);
+}
+
+/* content column */
+.navigationDrawerItemContent {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.navigationDrawerItemLabel {
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.navigationDrawerItemHint {
+  margin-top: 2px;
+  color: rgba(244, 241, 234, 0.44);
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* step badge column */
+.navigationDrawerItemBadge {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(244, 241, 234, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: 10px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  transition: background 200ms ease, color 200ms ease, border-color 200ms ease;
+}
+
+.navigationDrawerItemBadge--done {
+  background: rgba(110, 255, 142, 0.12);
+  color: rgba(110, 255, 142, 0.9);
+  border-color: rgba(110, 255, 142, 0.28);
+}
+
+.navigationDrawerItemBadge--active {
+  background: rgba(125, 167, 255, 0.16);
+  color: rgba(125, 167, 255, 0.96);
+  border-color: rgba(125, 167, 255, 0.36);
+}
+
+.navigationDrawerItemBadge--locked {
+  background: rgba(255, 184, 106, 0.08);
+  color: rgba(255, 184, 106, 0.7);
+  border-color: rgba(255, 184, 106, 0.2);
+}
+
+/* progress bar in header */
+.navigationDrawerProgress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.navigationDrawerProgressBar {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.navigationDrawerProgressFill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(125, 167, 255, 0.7), rgba(110, 255, 142, 0.8));
+  transition: width 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.navigationDrawerProgressLabel {
+  font-size: 11px;
+  color: rgba(244, 241, 234, 0.4);
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.navigationDrawerClose {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.navigationDrawerClose:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.appSidebarMobileClose {
+  display: none;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+}
+
 .topbarBrand {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
+.topbarBrand--centered {
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+}
+
 .topbarBrandTitle {
   font-size: 24px;
   font-weight: 900;
   letter-spacing: -0.04em;
+}
+
+.topbarBrandSubtitle {
+  color: rgba(244, 241, 234, 0.58);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.topbarCenterTrigger {
+  min-height: 52px !important;
+  padding: 8px 16px !important;
+  border-radius: 14px !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  color: var(--text) !important;
+  transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.topbarCenterTrigger:hover {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  transform: translateY(-1px);
 }
 
 .topbarBrandMeta {
@@ -1711,6 +2049,48 @@ a:hover {
   gap: 18px;
 }
 
+.pageMotion--enter {
+  animation: pageEnter 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.pageMotion > * {
+  animation: pageBlockEnter 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pageMotion > *:nth-child(2) {
+  animation-delay: 40ms;
+}
+
+.pageMotion > *:nth-child(3) {
+  animation-delay: 70ms;
+}
+
+.pageMotion > *:nth-child(4) {
+  animation-delay: 100ms;
+}
+
+@keyframes pageEnter {
+  from {
+    opacity: 0.992;
+    transform: translate3d(0, 2px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes pageBlockEnter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 .pageSection {
   margin-top: 18px;
 }
@@ -1743,9 +2123,42 @@ a:hover {
   background: rgba(255, 255, 255, 0.02);
 }
 
-.checkRow input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+.appCheckbox {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.appCheckbox--disabled {
+  opacity: 0.72;
+}
+
+.appCheckboxContent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.appCheckboxLabel {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.appCheckboxDescription {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.checkRow .appCheckbox {
+  flex: 1 1 auto;
+}
+
+.checkRow .appCheckbox > label,
+.checkRow .appCheckbox [data-slot="base"] {
   margin-top: 2px;
   flex: 0 0 auto;
 }
@@ -1964,10 +2377,15 @@ a:hover {
   padding: 22px;
 }
 
-.dropzone:hover,
+.dropzone:hover:not(.dropzone--suspend-hover),
 .dropzone--active {
   border-color: rgba(110, 255, 142, 0.52);
   background: rgba(110, 255, 142, 0.06);
+}
+
+.dropzone--suspend-hover:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .dropzoneTitle {
@@ -2001,6 +2419,23 @@ a:hover {
 
 .dropzoneCta {
   min-width: 164px;
+}
+
+.dropzoneCta.appButton {
+  background: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14) !important;
+}
+
+.dropzoneCta.appButton:hover {
+  background: rgba(255, 255, 255, 0.14) !important;
+  border-color: rgba(255, 255, 255, 0.26) !important;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.22) !important;
+}
+
+.dropzoneExtraAction {
+  display: inline-flex;
+  align-items: center;
 }
 
 .dropzoneLink {
@@ -2712,20 +3147,50 @@ a:hover {
     position: fixed;
     inset: 0 auto 0 0;
     top: 0;
-    width: min(84vw, var(--sidebar-w));
+    width: min(360px, calc(100vw - 24px));
     transform: translateX(-100%);
     transition: transform 220ms ease-out;
     z-index: 120;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    background:
+      radial-gradient(circle at top right, rgba(125, 167, 255, 0.12), transparent 42%),
+      linear-gradient(180deg, rgba(18, 18, 20, 0.98), rgba(10, 10, 12, 0.98));
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.42);
   }
 
   .appSidebar.appSidebar--mobileOpen {
     transform: translateX(0);
   }
 
+  .appSidebarHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 24px 22px 12px;
+  }
+
+  .appSidebarScroll {
+    padding: 18px 18px 20px;
+  }
+
+  .sidebarFooter {
+    padding: 18px 18px 24px;
+  }
+
+  .appSidebarMobileClose {
+    display: inline-flex;
+  }
+
+  .topbarMenuButton:not(.topbarMenuButton--icon) {
+    min-width: 104px;
+  }
+
   .mobileBackdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.52);
+    background: rgba(4, 6, 10, 0.58);
+    backdrop-filter: blur(10px);
     z-index: 115;
   }
 
@@ -2738,6 +3203,7 @@ a:hover {
     width: 100%;
   }
 }
+
 
 @media (max-width: 760px) {
   .appTopbar {
@@ -2774,14 +3240,23 @@ a:hover {
     align-items: flex-start;
   }
 
-  .topbarCounter,
-  .topbarStatusChip {
-    display: none;
+  .topbarBrandTitle {
+    font-size: 20px;
   }
 
-  .topbarBrandMeta {
-    display: none;
+  .topbarBrandSubtitle {
+    font-size: 11px;
+    letter-spacing: 0.06em;
   }
+}
+
+.app--drawerOnly {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.app--drawerOnly .appTopbar,
+.app--drawerOnly .appMain {
+  grid-column: 1 !important;
 }
 
 /* ===== Usability layer ===== */
@@ -2914,20 +3389,60 @@ a:hover {
   background: rgba(255, 255, 255, 0.03) !important;
 }
 
+.importTabs {
+  width: 100%;
+}
+
+.importTabs [data-slot="tabs-list-container"] {
+  width: max-content;
+  max-width: 100%;
+}
+
+.importTabs [data-slot="tabs-list"] {
+  background: transparent !important;
+  border-radius: 12px !important;
+  padding: 2px !important;
+  border: 0 !important;
+}
+
+.importTabsPanel {
+  padding-top: 18px !important;
+  animation: sectionSoftEnter 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Backward-compatible tabs styles for shared AppTabs component */
 .importTabsList {
-  background: rgba(255, 255, 255, 0.04) !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.03) !important;
   border-radius: 14px !important;
   padding: 4px !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .importTab {
-  border-radius: 12px !important;
+  min-height: 40px;
+  border-radius: 10px !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(244, 241, 234, 0.76);
+  font-size: 14px;
   font-weight: 700 !important;
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease !important;
 }
 
-.importTabCursor {
-  border-radius: 12px !important;
-  background: rgba(110, 255, 142, 0.16) !important;
+.importTab:hover {
+  color: rgba(244, 241, 234, 0.94);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.importTab--active {
+  color: rgba(236, 242, 252, 0.98) !important;
+  background: rgba(125, 167, 255, 0.18) !important;
+  border-color: rgba(125, 167, 255, 0.34) !important;
 }
 
 .importTabPanel {
@@ -3008,6 +3523,28 @@ a:hover {
   background: rgba(0, 0, 0, 0.56) !important;
 }
 
+.detailDrawerClose {
+  margin-left: auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(244, 241, 234, 0.78);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.detailDrawerClose:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(125, 167, 255, 0.35);
+  color: rgba(244, 241, 234, 0.96);
+  transform: translateY(-1px);
+}
+
 .detailDrawerBody {
   display: flex;
   flex-direction: column;
@@ -3054,8 +3591,10 @@ a:hover {
 }
 
 .metricInlineCheckbox {
+  display: inline-flex;
   align-items: center;
   gap: 7px;
+  min-width: 0;
 }
 
 .metricInlineCheckboxBox {
@@ -3117,6 +3656,7 @@ a:hover {
 }
 
 .metricCheckbox {
+  display: inline-flex;
   align-items: flex-start;
   gap: 7px;
 }
@@ -3503,6 +4043,10 @@ a:hover {
   backdrop-filter: blur(24px);
 }
 
+.appTopbar.appTopbar--centered {
+  backdrop-filter: none !important;
+}
+
 .topbarBreadcrumbs {
   margin-top: 2px;
 }
@@ -3614,26 +4158,59 @@ a:hover {
 
 .glassPanelHeader {
   position: relative;
+}
+
+.glassPanelHeaderInner {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
 }
 
+.glassPanelTitleWrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.glassPanelDivider {
+  margin-top: 14px !important;
+  margin-bottom: 0 !important;
+  opacity: 0.14;
+}
+
+.dashboardDivider {
+  margin: 20px 0 4px !important;
+  opacity: 0.1;
+}
+
+.glassPanelBody {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 16px;
+}
+
 .glassPanelTitle,
 .richChartTitle {
-  font-size: 20px;
-  line-height: 1.05;
-  letter-spacing: -0.04em;
+  font-size: 18px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
   font-weight: 800;
 }
 
 .glassPanelSubtitle,
 .richChartSubtitle {
-  margin-top: 6px;
-  color: rgba(244,241,234,0.62);
-  font-size: 13px;
-  line-height: 1.45;
+  margin-top: 5px;
+  color: rgba(244,241,234,0.56);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.metricTooltip {
+  max-width: 260px;
+  font-size: 12px;
+  line-height: 1.55;
+  padding: 10px 14px;
 }
 
 .glassPanel > *,
@@ -3673,42 +4250,36 @@ a:hover {
 .donutGauge {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-}
-
-.donutGaugeChart {
-  position: relative;
-  width: 100%;
-  min-height: 172px;
-}
-
-.donutGaugeCenter {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
+  gap: 10px;
+  padding: 12px 0 8px;
+}
+
+.donutGaugeSvg {
+  width: 96px !important;
+  height: 96px !important;
 }
 
 .donutGaugeValue {
-  font-size: clamp(26px, 2.5vw, 33px);
-  line-height: 0.96;
-  font-weight: 900;
-  letter-spacing: -0.05em;
+  font-size: 22px !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.04em !important;
 }
 
-.donutGaugeCenter span,
-.donutGaugeSubtitle {
-  color: rgba(244,241,234,0.56);
-  text-align: center;
-}
-
-.donutGaugeCenter span {
+.donutGaugeLabel {
   font-size: 11px;
-  letter-spacing: 0.12em;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+  color: rgba(244, 241, 234, 0.5);
+}
+
+.donutGaugeSubtitle {
+  color: rgba(244, 241, 234, 0.5);
+  font-size: 12px;
+  text-align: center;
+  line-height: 1.5;
+  max-width: 220px;
 }
 
 .circularScore {
@@ -4015,5 +4586,2059 @@ a:hover {
 
   .topbarBrandTitle {
     font-size: 20px;
+  }
+}
+
+/* ================================================================
+   IMPORT PAGE — redesign
+   ================================================================ */
+
+.importHeroRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 22px;
+  margin-bottom: 22px;
+}
+
+.importPagePlain {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.importHeroNextLink {
+  border: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  min-height: 58px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 180ms ease, transform 180ms ease, opacity 180ms ease;
+}
+
+.importHeroNextLinkText,
+.importHeroNextLinkArrow {
+  margin: 0;
+  line-height: 1;
+}
+
+.importHeroNextLink:hover {
+  background: rgba(255, 255, 255, 0.04);
+  transform: translateX(1px);
+}
+
+.importHeroNextLink:focus,
+.importHeroNextLink:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.importHeroActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.dashboardPage {
+  gap: 20px;
+}
+
+.dashboardPage--revamp {
+  padding-bottom: 18px;
+}
+
+.dashboardHeroActions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.dashboardSummaryStrip {
+  margin-top: -4px;
+  margin-bottom: 2px;
+}
+
+.dashboardQuickStats {
+  margin-left: auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  min-width: min(560px, 100%);
+}
+
+.dashboardQuickStat {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dashboardQuickStat span {
+  display: block;
+  color: rgba(244, 241, 234, 0.54);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dashboardQuickStat strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.dashboardEmptyChecklist {
+  margin-top: 14px;
+}
+
+.dashboardEmptyActions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.dashboardPulseRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dashboardPulseCard {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02)),
+    rgba(10, 10, 12, 0.5);
+}
+
+.dashboardPulseCard span {
+  display: block;
+  color: rgba(244, 241, 234, 0.54);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dashboardPulseCard strong {
+  display: block;
+  margin-top: 9px;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.dashboardFlowGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  gap: 16px;
+}
+
+.dashboardGaugeRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.importHeroMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+@media (max-width: 1100px) {
+  .dashboardQuickStats {
+    margin-left: 0;
+    min-width: 0;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboardPulseRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboardFlowGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .dashboardGaugeRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+.importFileTag {
+  font-size: 12px;
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  color: rgba(244, 241, 234, 0.42);
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.importColumnsModal {
+  max-width: 420px !important;
+}
+
+.importColumnsModalText {
+  margin: 0;
+  color: rgba(244, 241, 234, 0.76);
+}
+
+.importColumnsList {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.importColumnsList li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.importColumnsList li:last-child {
+  border-bottom: 0;
+}
+
+.importColumnsListName {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  color: rgba(235, 241, 255, 0.92);
+  font-size: 13px;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  font-weight: 700;
+}
+
+.importColumnsListHint {
+  color: rgba(244, 241, 234, 0.54);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* Upload zone */
+.importZone {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+  margin-bottom: 18px;
+  transition: none;
+}
+
+.importZone--loaded {
+  border-color: transparent;
+  background: transparent;
+}
+
+.importUploadSplit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.importDropPane {
+  display: flex;
+  align-items: stretch;
+}
+
+.importDropPane .dropzone {
+  min-height: 210px;
+  height: 100%;
+  width: 100%;
+  border-radius: 14px;
+}
+
+.importDropPane .dropzoneLink {
+  display: none;
+}
+
+.importDropPane .dropzoneActions {
+  margin-top: 12px;
+}
+
+.importNoteButton {
+  min-width: 124px;
+  min-height: 38px;
+  align-self: center;
+  border-color: rgba(125, 167, 255, 0.34) !important;
+  background: rgba(125, 167, 255, 0.12) !important;
+  color: rgba(222, 236, 255, 0.96) !important;
+  font-weight: 700 !important;
+}
+
+.importNoteButton:hover {
+  border-color: rgba(125, 167, 255, 0.52) !important;
+  background: rgba(125, 167, 255, 0.2) !important;
+}
+
+.importDemoTile {
+  border: 1px solid rgba(125, 167, 255, 0.24);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at top right, rgba(125, 167, 255, 0.16), transparent 52%),
+    rgba(255, 255, 255, 0.02);
+  color: var(--text);
+  padding: 16px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: pointer;
+  height: 100%;
+  min-height: 210px;
+  transition: border-color 180ms ease, transform 180ms ease, background 180ms ease;
+}
+
+.importDemoTile:hover {
+  border-color: rgba(125, 167, 255, 0.44);
+  background:
+    radial-gradient(circle at top right, rgba(125, 167, 255, 0.2), transparent 58%),
+    rgba(255, 255, 255, 0.04);
+  transform: translateY(-1px);
+}
+
+.importDemoTileTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.importDemoEyebrow {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(244, 241, 234, 0.56);
+}
+
+.importDemoAction {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(125, 167, 255, 0.9);
+}
+
+.importDemoTitle {
+  font-size: 24px;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-weight: 800;
+}
+
+.importDemoText {
+  color: rgba(244, 241, 234, 0.72);
+  font-size: 13px;
+  line-height: 1.55;
+  max-width: 34ch;
+}
+
+.importDemoChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.importDemoChips span {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(244, 241, 234, 0.82);
+  font-size: 11px;
+}
+
+.importZoneLinks {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 20px 14px;
+}
+
+.importTemplateLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(125, 167, 255, 0.82);
+  text-decoration: none;
+  padding: 6px 14px;
+  border-radius: 10px;
+  background: rgba(125, 167, 255, 0.06);
+  border: 1px solid rgba(125, 167, 255, 0.14);
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.importTemplateLink:hover {
+  background: rgba(125, 167, 255, 0.12);
+  border-color: rgba(125, 167, 255, 0.26);
+  color: rgba(125, 167, 255, 1);
+}
+
+.importZoneLinks--compact {
+  justify-content: flex-start;
+  padding: 10px 0 0;
+}
+
+.importZoneNotice {
+  padding: 0 20px 14px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Stats strip */
+/* Body grid */
+.importBody {
+  display: block;
+  align-items: start;
+}
+
+.importBodyMain {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.importSwitch {
+  margin-bottom: 14px;
+}
+
+.importSwitchButton {
+  min-height: 42px;
+  padding-inline: 16px !important;
+  border-radius: 10px !important;
+  font-weight: 700;
+  color: rgba(244, 241, 234, 0.76) !important;
+  background: transparent !important;
+  border: 0 !important;
+  transition: background 180ms ease, color 180ms ease !important;
+}
+
+.importSwitchButton:hover {
+  color: rgba(244, 241, 234, 0.94) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.importSwitchButton[data-selected="true"] {
+  color: rgba(236, 242, 252, 0.98) !important;
+  background: rgba(125, 167, 255, 0.08) !important;
+}
+
+.importSwitchButton [data-slot="tabs-indicator"] {
+  background: rgba(125, 167, 255, 0.58) !important;
+  height: 3px !important;
+  border-radius: 999px !important;
+}
+
+.importSwitchButton[data-selected="true"] [data-slot="tabs-indicator"] {
+  opacity: 1 !important;
+}
+
+.importSwitchButton:not([data-selected="true"]) [data-slot="tabs-indicator"] {
+  opacity: 0 !important;
+}
+
+/* Table toolbar */
+.importTableToolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.importNextStepLink {
+  border: 0;
+  background: transparent;
+  color: rgba(226, 236, 252, 0.88);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.importNextStepLink:hover {
+  color: rgba(236, 245, 255, 1);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.importNextStepLink:focus,
+.importNextStepLink:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.importTableToolbar .importSearchField {
+  flex: 1;
+  min-width: min(420px, 100%);
+}
+
+.importTableToolbar--elevated {
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.importTableToolbarMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 210px;
+}
+
+.importTableToolbarMeta strong {
+  font-size: 14px;
+  letter-spacing: 0.01em;
+}
+
+.importTableToolbarMeta span {
+  font-size: 12px;
+  color: rgba(244, 241, 234, 0.52);
+}
+
+.importToolbarActions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.importPositionsTable {
+  min-width: 960px;
+}
+
+.importPreviewScroll {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+  border-radius: 16px;
+  animation: sectionSoftEnter 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.importTableScrollContainer {
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+}
+
+.importPreviewScroll [data-slot="table-content"] {
+  width: 100%;
+  min-width: 960px;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.importPreviewScroll [data-slot="table-header"] {
+  display: block;
+  width: 100%;
+  z-index: 3;
+}
+
+.importPreviewScroll [data-slot="table-header"] tr {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.importPreviewScroll [data-slot="table-body"] {
+  display: block;
+  width: 100%;
+  max-height: 280px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+}
+
+.importPreviewScroll [data-slot="table-body"] tr {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.importPreviewScroll [data-slot="table-header"] [data-slot="table-column"] {
+  background: rgba(17, 20, 28, 0.96);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.importLoadingShell {
+  display: grid;
+  gap: 10px;
+  animation: sectionSoftEnter 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.importRowAction {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.importRowAction:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(125, 167, 255, 0.32);
+}
+
+/* Empty hint */
+.importEmptyHint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 64px 24px;
+  border-radius: 18px;
+  border: 1px dashed rgba(255, 255, 255, 0.07);
+  text-align: center;
+  animation: sectionSoftEnter 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.importEmptyIcon {
+  width: 44px;
+  height: 44px;
+  color: rgba(125, 167, 255, 0.3);
+  margin-bottom: 4px;
+}
+
+.importEmptyTitle {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: rgba(244, 241, 234, 0.7);
+}
+
+.importEmptyMeta {
+  font-size: 13px;
+  color: rgba(244, 241, 234, 0.42);
+  max-width: 32ch;
+  line-height: 1.55;
+}
+
+/* Aside: gauge row */
+.importGaugeRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* Mix (instrument type) bars */
+.importMixRows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.importMixRow {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.importMixRowHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.importMixRowHead strong {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.importMixRowHead span {
+  font-size: 12px;
+  color: rgba(244, 241, 234, 0.5);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.importMixBarTrack {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.importMixBarFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(125, 167, 255, 0.9), rgba(110, 255, 142, 0.85));
+  transition: width 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.importShareCell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 160px;
+}
+
+.importShareCell span {
+  min-width: 42px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: rgba(244, 241, 234, 0.86);
+}
+
+.importPortfolioKpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.importPortfolioKpi {
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.025);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.importPortfolioKpi span {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(244, 241, 234, 0.45);
+}
+
+.importPortfolioKpi strong {
+  font-size: 19px;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Columns reference */
+.importColsList { display: none; }
+
+/* Issues list */
+.importIssuesList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.importIssueRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.importIssueMsg {
+  font-size: 13px;
+  color: rgba(244, 241, 234, 0.72);
+  line-height: 1.5;
+  padding-top: 2px;
+}
+
+/* Responsive */
+@media (max-width: 960px) {
+  .importHeroActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .importHeroRow {
+    gap: 10px;
+  }
+
+  .importHeroNextLink {
+    min-height: 48px;
+    padding: 6px 8px;
+  }
+
+  .importUploadSplit {
+    grid-template-columns: 1fr;
+  }
+
+  .importDropPane .dropzone,
+  .importDemoTile {
+    min-height: 196px;
+  }
+
+  .importToolbarActions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+
+  .importPortfolioKpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ================================================================
+   VALIDATE PAGE — import-style redesign
+   ================================================================ */
+
+/* Hero right: big arrow link + small buttons below */
+.validateHeroRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.importHeroNextLink:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
+  pointer-events: auto;
+  transform: none !important;
+}
+
+.validateHeroNavLink {
+  min-height: 48px;
+  padding: 6px 10px;
+}
+
+.validateHeroNavLink .importHeroNextLinkText,
+.validateHeroNavLink .importHeroNextLinkArrow {
+  font-size: clamp(24px, 2.4vw, 36px);
+  letter-spacing: -0.05em;
+}
+
+.validateHeroBackLink {
+  margin-top: 2px;
+}
+
+/* Status pane (left half of importUploadSplit) */
+.validateStatusPane {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.015);
+  min-height: 210px;
+  padding: 24px;
+  animation: sectionSoftEnter 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Clean state */
+.validateCleanState {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.validateCleanText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.validateCleanTitle {
+  font-size: 17px;
+  font-weight: 600;
+  color: rgba(244, 241, 234, 0.92);
+  line-height: 1.3;
+}
+
+.validateCleanSub {
+  font-size: 13px;
+  color: rgba(244, 241, 234, 0.48);
+}
+
+/* Issues state */
+.validateIssueState {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+}
+
+.validateInvalidImportPane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  max-width: 520px;
+}
+
+.validateInvalidImportTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: rgba(244, 241, 234, 0.92);
+  line-height: 1.3;
+}
+
+.validateInvalidImportSub {
+  font-size: 13px;
+  color: rgba(244, 241, 234, 0.56);
+  line-height: 1.5;
+}
+
+.validateIssueChart {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Empty state */
+.validateEmptyPane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.validateEmptyIcon {
+  width: 36px;
+  height: 36px;
+  color: rgba(244, 241, 234, 0.2);
+}
+
+.validateEmptyTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(244, 241, 234, 0.5);
+}
+
+.validateEmptySub {
+  font-size: 12px;
+  color: rgba(244, 241, 234, 0.3);
+}
+
+/* Tips tile (right half of importUploadSplit) — like importDemoTile but static */
+.validateTipTile {
+  border: 1px solid rgba(110, 255, 142, 0.18);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at top right, rgba(110, 255, 142, 0.1), transparent 52%),
+    rgba(255, 255, 255, 0.02);
+  padding: 20px;
+  min-height: 210px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: sectionSoftEnter 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes sectionSoftEnter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.validateTipTileTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.validateTipEyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(110, 255, 142, 0.7);
+}
+
+.validateTipList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.validateTipItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: rgba(244, 241, 234, 0.7);
+  line-height: 1.4;
+}
+
+.validateTipDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(110, 255, 142, 0.5);
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+
+.validateTipFooter {
+  font-size: 12px;
+  color: rgba(244, 241, 234, 0.35);
+  line-height: 1.4;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Acknowledge block inside zone */
+.validateAckZone {
+  padding: 14px 20px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Issues section */
+.validateIssuesSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.validateBottomActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+/* Help page in import-style shell */
+.helpGrid {
+  margin-bottom: 0;
+}
+
+.helpTile {
+  border: 1px solid rgba(125, 167, 255, 0.2);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at top right, rgba(125, 167, 255, 0.12), transparent 56%),
+    rgba(255, 255, 255, 0.02);
+  padding: 18px;
+  min-height: 210px;
+}
+
+.helpTile--wide {
+  min-height: 0;
+}
+
+@media (max-width: 768px) {
+  .validateHeroRight {
+    align-items: flex-start;
+  }
+
+  .validateBottomActions {
+    justify-content: flex-start;
+  }
+
+  .validateIssueState {
+    flex-direction: column;
+  }
+}
+
+/* ================================================================
+   MARKET DATA PAGE
+   ================================================================ */
+
+.marketUploadSplit {
+  grid-template-columns: minmax(0, 1fr) 220px minmax(0, 1fr);
+  align-items: stretch;
+}
+
+/* Left pane: dropzone + datasets button */
+.marketDropPane {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 210px;
+}
+
+.marketDropPane .dropzone {
+  border-radius: 14px;
+  min-height: 210px;
+  height: 100%;
+}
+
+.marketDropActions {
+  display: flex;
+  justify-content: center;
+}
+
+.marketApiStubCol {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.015);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  min-height: 210px;
+}
+
+.marketApiStubButton {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(244, 241, 234, 0.52);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: not-allowed;
+}
+
+.marketApiStubHint {
+  font-size: 12px;
+  color: rgba(244, 241, 234, 0.42);
+}
+
+/* Right tile: bundle status */
+.marketBundleTile {
+  border: 1px solid rgba(125, 167, 255, 0.22);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at top right, rgba(125, 167, 255, 0.13), transparent 54%),
+    rgba(255, 255, 255, 0.02);
+  padding: 20px;
+  min-height: 210px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.marketBundleTileTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.marketBundleEyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(125, 167, 255, 0.75);
+}
+
+.marketBundleCheck {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(110, 255, 142, 0.18);
+  border: 1px solid rgba(110, 255, 142, 0.42);
+  color: rgba(110, 255, 142, 0.95);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.marketBundleState {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.marketBundleState--compact {
+  padding-top: 4px;
+}
+
+.marketBundleStateTitle {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: rgba(244, 241, 234, 0.92);
+}
+
+.marketBundleStateText {
+  font-size: 13px;
+  color: rgba(244, 241, 234, 0.62);
+  line-height: 1.45;
+}
+
+.marketBundleNeedList {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.marketBundleNeedList li {
+  color: rgba(244, 241, 234, 0.8);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.marketBundleRequirementList {
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.marketBundleRequirementItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px 12px;
+}
+
+.marketBundleRequirementItem.is-loaded {
+  border-color: rgba(110, 255, 142, 0.34);
+  background: rgba(110, 255, 142, 0.08);
+}
+
+.marketBundleRequirementItem.is-missing {
+  border-color: rgba(255, 120, 120, 0.34);
+  background: rgba(255, 120, 120, 0.08);
+}
+
+.marketBundleRequirementMark {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.marketBundleRequirementItem.is-loaded .marketBundleRequirementMark {
+  color: rgba(110, 255, 142, 0.95);
+  background: rgba(18, 41, 21, 0.6);
+}
+
+.marketBundleRequirementItem.is-missing .marketBundleRequirementMark {
+  color: rgba(255, 167, 167, 0.95);
+  background: rgba(45, 20, 20, 0.6);
+}
+
+.marketBundleRequirementBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.marketBundleRequirementBody strong {
+  font-size: 13px;
+  color: rgba(244, 241, 234, 0.95);
+}
+
+.marketBundleRequirementBody span {
+  font-size: 12px;
+  color: rgba(244, 241, 234, 0.58);
+  line-height: 1.4;
+}
+
+.marketBundleState--ready .marketBundleStateTitle {
+  color: rgba(110, 255, 142, 0.92);
+}
+
+.marketBundleMeta {
+  margin-top: auto;
+  font-size: 12px;
+  color: rgba(244, 241, 234, 0.5);
+  line-height: 1.4;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Tabs card */
+.marketTabsCard {
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.015);
+  overflow: hidden;
+}
+
+.marketBoardGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.marketBoardCard {
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.marketBoardTitle {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: rgba(244, 241, 234, 0.94);
+}
+
+.marketBoardSub {
+  font-size: 12px;
+  color: rgba(244, 241, 234, 0.52);
+}
+
+.marketFileList,
+.marketIssueList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.marketFileRow {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.marketFileRowMain {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.marketFileRowMain strong {
+  font-size: 13px;
+  color: rgba(244, 241, 234, 0.94);
+  overflow-wrap: anywhere;
+}
+
+.marketFileRowMain span {
+  font-size: 12px;
+  color: rgba(244, 241, 234, 0.5);
+}
+
+.marketFileBadge {
+  height: 22px;
+  min-width: 38px;
+  border-radius: 999px;
+  border: 1px solid rgba(110, 255, 142, 0.34);
+  background: rgba(110, 255, 142, 0.1);
+  color: rgba(110, 255, 142, 0.95);
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+}
+
+.marketIssueRow {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.marketIssueRow strong {
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.marketIssueRow span {
+  font-size: 12px;
+  color: rgba(244, 241, 234, 0.7);
+  line-height: 1.45;
+}
+
+.marketIssueRow.is-error {
+  border-color: rgba(255, 120, 120, 0.34);
+  background: rgba(255, 120, 120, 0.08);
+}
+
+.marketIssueRow.is-error strong {
+  color: rgba(255, 167, 167, 0.95);
+}
+
+.marketIssueRow.is-warn {
+  border-color: rgba(255, 182, 89, 0.34);
+  background: rgba(255, 182, 89, 0.08);
+}
+
+.marketIssueRow.is-warn strong {
+  color: rgba(255, 215, 140, 0.95);
+}
+
+.marketIssueRow.is-info strong {
+  color: rgba(198, 213, 255, 0.95);
+}
+
+.marketIssueRow.is-ok {
+  border-color: rgba(110, 255, 142, 0.34);
+  background: rgba(110, 255, 142, 0.08);
+}
+
+.marketIssueRow.is-ok strong {
+  color: rgba(110, 255, 142, 0.95);
+}
+
+@media (max-width: 768px) {
+  .marketUploadSplit {
+    grid-template-columns: 1fr;
+  }
+
+  .marketBoardGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .marketApiStubCol,
+  .marketBundleTile {
+    min-height: auto;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   ConfigurePage
+═══════════════════════════════════════════ */
+
+.configureTopSplit {
+  align-items: stretch;
+}
+
+.configureTopSplit > * {
+  min-height: 210px;
+}
+
+/* Left pane: readiness summary */
+.configureSummaryPane {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 22px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top right, rgba(125, 167, 255, 0.11), transparent 58%),
+    rgba(255, 255, 255, 0.02);
+}
+
+.configureSummaryTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.configureSummaryEyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(125, 167, 255, 0.74);
+}
+
+.configureSummaryScore {
+  font-size: 30px;
+  font-weight: 800;
+  color: rgba(230, 238, 250, 0.72);
+  line-height: 1;
+  transition: color 0.3s ease;
+}
+
+.configureSummaryScore--ok {
+  color: rgba(110, 255, 142, 0.9);
+}
+
+/* Right tile: selected metrics */
+.configureSetTile {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 22px;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at top right, rgba(125, 167, 255, 0.13), transparent 56%),
+    rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(125, 167, 255, 0.24);
+  min-height: 210px;
+}
+
+.configureSetTileTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.configureSetEyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(125, 167, 255, 0.74);
+}
+
+.configureSetChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+
+.configureSetChip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(125, 167, 255, 0.12);
+  border: 1px solid rgba(125, 167, 255, 0.28);
+  color: rgba(223, 236, 255, 0.92);
+}
+
+.configureSetEmpty {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.36);
+  font-style: italic;
+}
+
+.configureSetActions {
+  display: flex;
+  gap: 8px;
+}
+
+.configureSetFooter {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.42);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 10px;
+  margin-top: auto;
+}
+
+.configureMetricsCard {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.configureTopGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.configureMetricsCard--compact {
+  min-height: 320px;
+  max-height: none;
+  height: 100%;
+}
+
+.configureMetricsCard--compact .cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  height: 100%;
+}
+
+.configureMetricGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  height: 100%;
+}
+
+.configureMetricHeaderRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.configureMetricHeaderCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.configureMetricHeaderHint {
+  display: block;
+  margin-top: 0;
+}
+
+.configureMetricGroup [data-slot="label"] {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: rgba(244, 241, 234, 0.94);
+}
+
+.configureMetricGroup [data-slot="description"] {
+  font-size: 13px;
+  color: rgba(244, 241, 234, 0.58);
+}
+
+.configureMetricList {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.configureMetricList--compact {
+  grid-template-columns: 1fr;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: 450px;
+  min-height: 0;
+  flex: 1 1 auto;
+  padding-right: 4px;
+}
+
+.configureMetricOption {
+  position: relative;
+  width: 100%;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 14px 14px 14px 12px;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.configureMetricOption:hover {
+  transform: translateY(-1px);
+  border-color: rgba(125, 167, 255, 0.34);
+  background: rgba(125, 167, 255, 0.08);
+}
+
+.configureMetricOption--selected {
+  border-color: rgba(110, 255, 142, 0.36);
+  background: rgba(110, 255, 142, 0.1);
+}
+
+.configureMetricControl {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 20px;
+  height: 20px;
+}
+
+.configureMetricContent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding-right: 28px;
+}
+
+.configureMetricGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid rgba(125, 167, 255, 0.38);
+  background: rgba(125, 167, 255, 0.14);
+  color: rgba(218, 233, 255, 0.96);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.configureMetricCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.configureMetricCopy [data-slot="label"] {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: rgba(244, 241, 234, 0.96);
+}
+
+.configureMetricCopy [data-slot="description"] {
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(244, 241, 234, 0.62);
+}
+
+.configureParamsCard .cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.configureSliderGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.configureParamSlider {
+  width: 100%;
+  border-radius: 12px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.015);
+  padding: 10px 10px 12px;
+}
+
+.configureParamLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.configureParamSlider [data-slot="label"] {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: rgba(236, 242, 252, 0.92);
+}
+
+.configureParamInfoTrigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(125, 167, 255, 0.35);
+  background: rgba(125, 167, 255, 0.1);
+  color: rgba(216, 230, 255, 0.95);
+  cursor: help;
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.configureParamInfoTrigger:hover {
+  border-color: rgba(125, 167, 255, 0.52);
+  background: rgba(125, 167, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.configureParamInfoGlyph {
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.configureParamTooltip {
+  max-width: 320px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(12, 15, 22, 0.98);
+  color: rgba(236, 242, 252, 0.9);
+  padding: 0;
+}
+
+.configureParamTooltipArrow {
+  fill: rgba(12, 15, 22, 0.98);
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 1;
+}
+
+.configureParamTooltipInner {
+  padding: 10px 12px;
+}
+
+.configureParamTooltipTitle {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(211, 228, 255, 0.96);
+}
+
+.configureParamTooltipText {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(236, 242, 252, 0.88);
+}
+
+.configureParamTooltipText strong {
+  color: rgba(228, 239, 255, 0.96);
+}
+
+.configureParamSelectLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.configureParamSliderOutput {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(198, 219, 255, 0.9);
+}
+
+.configureParamSliderTrack {
+  margin-top: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.configureParamSliderFill {
+  background: rgba(125, 167, 255, 0.95) !important;
+  background-image: none !important;
+  border-radius: inherit;
+}
+
+.configureParamSliderThumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 2px solid rgba(222, 236, 255, 0.92);
+  background: rgba(17, 22, 33, 0.98);
+}
+
+.configureParamsFormGrid {
+  margin-top: 2px;
+}
+
+.configureParamField--full {
+  grid-column: 1 / -1;
+}
+
+.configureWorkspaceGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.configureSectionCard {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.configureSectionCard--scenarios {
+  grid-column: 1 / -1;
+}
+
+.configureSectionCard .cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.configureSectionCard .metricInlineList {
+  margin-top: 10px;
+}
+
+.configureSectionCard .metricInlineOption {
+  border-radius: 12px;
+  padding: 8px 11px;
+}
+
+.configureSectionCard .metricInlineOption--selected {
+  border-color: rgba(110, 255, 142, 0.3);
+  background: rgba(110, 255, 142, 0.11);
+}
+
+.configureSectionCard .formGrid {
+  margin-top: 10px;
+}
+
+.configureSectionCard .cardSubtitle {
+  max-width: 90ch;
+}
+
+.configureScenarioAccordion {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.configureScenarioItem {
+  border-radius: 14px;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  margin-bottom: 8px;
+}
+
+.configureScenarioTrigger {
+  padding: 12px 14px !important;
+  background: transparent !important;
+}
+
+.configureScenarioTrigger:hover {
+  background: transparent !important;
+}
+
+.configureScenarioHead {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.configureScenarioHead strong {
+  font-size: 14px;
+  color: rgba(244, 241, 234, 0.96);
+}
+
+.configureScenarioHead span {
+  font-size: 12px;
+  color: rgba(244, 241, 234, 0.58);
+  overflow-wrap: anywhere;
+}
+
+.configureScenarioPanel {
+  padding: 0 14px 12px !important;
+}
+
+.configureScenarioBody {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.configureScenarioMetric {
+  border-radius: 10px;
+  border: 0;
+  background: transparent;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.configureScenarioMetric span {
+  font-size: 11px;
+  color: rgba(244, 241, 234, 0.5);
+}
+
+.configureScenarioMetric strong {
+  font-size: 13px;
+  color: rgba(228, 238, 255, 0.94);
+}
+
+.configureAccordion {
+  margin-top: 6px;
+}
+
+.configureTextarea {
+  font-family: monospace;
+  font-size: 12px;
+}
+
+@media (max-width: 1080px) {
+  .configureTopGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .configureSliderGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .configureWorkspaceGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .configureTopSplit {
+    grid-template-columns: 1fr !important;
+  }
+
+  .configureSummaryPane,
+  .configureSetTile {
+    min-height: auto;
+  }
+
+  .configureSectionCard .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .configureMetricHeaderRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .configureMetricList {
+    grid-template-columns: 1fr;
+  }
+
+  .configureMetricList--compact {
+    max-height: none;
+  }
+
+  .configureParamField--full {
+    grid-column: auto;
+  }
+
+  .configureSliderGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .configureScenarioBody {
+    grid-template-columns: 1fr;
   }
 }

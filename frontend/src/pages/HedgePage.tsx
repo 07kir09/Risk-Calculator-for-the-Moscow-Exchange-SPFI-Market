@@ -148,7 +148,7 @@ export default function HedgePage() {
       <Card>
         <h1 className="pageTitle">Подсказки по хеджу</h1>
         <p className="pageHint">Пока нет результатов. Сначала запустите расчёт, чтобы мы увидели ваши риски.</p>
-        <Button onClick={() => nav("/run")}>Перейти к запуску</Button>
+        <Button onClick={() => nav("/dashboard")}>Перейти к результатам</Button>
       </Card>
     );
   }

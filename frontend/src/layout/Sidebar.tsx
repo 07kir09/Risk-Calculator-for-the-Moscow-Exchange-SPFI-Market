@@ -6,29 +6,9 @@ import { useAppData } from "../state/appDataStore";
 import { isStepAvailable, useWorkflow } from "../workflow/workflowStore";
 import { orderedSteps } from "../workflow/order";
 import { stepTitle } from "../workflow/labels";
-import { stepToRoute } from "../workflow/routes";
 import { WorkflowStep } from "../workflow/workflowTypes";
-
-type NavItem = { to: string; label: string; step?: WorkflowStep };
-
-const workflowItems: NavItem[] = [
-  { to: "/import", label: "Импорт", step: WorkflowStep.Import },
-  { to: "/validate", label: "Проверка данных", step: WorkflowStep.Validate },
-  { to: "/market", label: "Рыночные данные", step: WorkflowStep.MarketData },
-  { to: "/configure", label: "Настройка расчёта", step: WorkflowStep.Configure },
-  { to: "/run", label: "Запуск", step: WorkflowStep.CalcRun },
-  { to: "/dashboard", label: "Панель риска", step: WorkflowStep.Results },
-  { to: "/stress", label: "Стресс-сценарии", step: WorkflowStep.Stress },
-  { to: "/limits", label: "Лимиты", step: WorkflowStep.Limits },
-  { to: "/margin", label: "Маржа и капитал", step: WorkflowStep.Margin },
-  { to: "/export", label: "Экспорт", step: WorkflowStep.Export },
-  { to: "/actions", label: "What-if и хедж", step: WorkflowStep.PostActions },
-];
-
-const utilityItems: NavItem[] = [
-  { to: "/portfolio", label: "Просмотр портфеля" },
-  { to: "/help", label: "Справка" },
-];
+import { NavItem, utilityItems, workflowItems } from "./navigationModel";
+import { showBlockedNavigationToast } from "../lib/blockedNavigationToast";
 
 function DotIcon() {
   return (
@@ -88,7 +68,6 @@ export default function Sidebar({
     const available = item.step ? isStepAvailable(state, item.step) : true;
 
     if (!available) {
-      const target = stepToRoute[firstIncomplete] ?? "/import";
       const reason = `Чтобы открыть «${item.label}», сначала завершите: ${stepTitle[firstIncomplete]}`;
       return (
         <button
@@ -97,8 +76,7 @@ export default function Sidebar({
           className="navItem navItem--locked"
           aria-label={item.label}
           onClick={() => {
-            onCloseMobile();
-            nav(target, { state: { reason } });
+            showBlockedNavigationToast(reason);
           }}
         >
           <LockIcon />
@@ -135,6 +113,14 @@ export default function Sidebar({
             </div>
           )}
         </div>
+        <button
+          type="button"
+          className="appSidebarMobileClose"
+          onClick={onCloseMobile}
+          aria-label="Закрыть навигацию"
+        >
+          ×
+        </button>
       </div>
 
       <ScrollShadow className="appSidebarScroll" hideScrollBar>

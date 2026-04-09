@@ -25,11 +25,7 @@ export default function Button({ variant = "primary", loading, iconLeft, childre
       size="md"
       color={visualMap.color}
       variant={visualMap.variant}
-      className={classNames("appButton", `appButton--${variant}`, className)}
-      classNames={{
-        base: "appButtonBase",
-        content: "appButtonContent",
-      }}
+      className={classNames("appButton", "appButtonBase", `appButton--${variant}`, className)}
       isLoading={loading}
       startContent={iconLeft}
       isDisabled={loading || rest.isDisabled || rest.disabled}

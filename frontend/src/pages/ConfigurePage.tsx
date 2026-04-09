@@ -1,35 +1,30 @@
 import { Key, useEffect, useMemo, useState } from "react";
 import {
   Accordion,
-  AccordionItem,
-  Checkbox,
   Chip,
+  Checkbox,
+  CheckboxGroup,
+  Description,
   Input,
+  Label,
+  ListBox,
+  ListBoxItem,
   Select,
-  SelectItem,
-  Tab,
-  Tabs,
-  Textarea,
+  Slider,
+  TextArea,
+  Tooltip,
+  toast,
 } from "@heroui/react";
 import { flushSync } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import Button from "../components/Button";
-import Checklist from "../components/Checklist";
-import HelpTooltip from "../components/HelpTooltip";
 import Card from "../ui/Card";
-import {
-  CompareBarsChart,
-  DonutGauge,
-  GlassPanel,
-  Reveal,
-  Sparkline,
-  StaggerGroup,
-  StaggerItem,
-} from "../components/rich/RichVisuals";
+import { Reveal } from "../components/rich/RichVisuals";
 import { useAppData } from "../state/appDataStore";
 import { demoScenarios } from "../mock/demoData";
 import { useWorkflow } from "../workflow/workflowStore";
 import { WorkflowStep } from "../workflow/workflowTypes";
+import { runRiskCalculation } from "../api/services/risk";
 
 type MetricKey =
   | "var_hist"
@@ -157,7 +152,39 @@ const metricCards: MetricCard[] = [
 ];
 
 const recommendedSet: MetricKey[] = ["var_hist", "es_hist", "lc_var", "greeks", "stress"];
-const targetMetricCount = 4;
+
+const metricGlyphByKey: Record<MetricKey, string> = {
+  var_hist: "VH",
+  var_param: "VP",
+  es_hist: "EH",
+  es_param: "EP",
+  lc_var: "LC",
+  greeks: "GR",
+  stress: "ST",
+  correlations: "CR",
+  margin_capital: "MC",
+};
+
+function ParamInfo({ text, title }: { text: string; title: string }) {
+  return (
+    <Tooltip delay={0}>
+      <Tooltip.Trigger aria-label={`More information: ${title}`}>
+        <div className="configureParamInfoTrigger">
+          <span className="configureParamInfoGlyph" aria-hidden="true">?</span>
+        </div>
+      </Tooltip.Trigger>
+      <Tooltip.Content className="configureParamTooltip" showArrow placement="top" offset={4}>
+        <Tooltip.Arrow className="configureParamTooltipArrow" />
+        <div className="configureParamTooltipInner">
+          <p className="configureParamTooltipTitle">More information</p>
+          <p className="configureParamTooltipText">
+            <strong>{title}:</strong> {text}
+          </p>
+        </div>
+      </Tooltip.Content>
+    </Tooltip>
+  );
+}
 
 export default function ConfigurePage() {
   const nav = useNavigate();
@@ -174,6 +201,8 @@ export default function ConfigurePage() {
   const [historyDays, setHistoryDays] = useState<number>(() => Number(wf.calcConfig.params?.historyDays ?? 250));
   const [baseCurrency, setBaseCurrency] = useState<string>(() => String(wf.calcConfig.params?.baseCurrency ?? "RUB").toUpperCase());
   const [liquidityModel, setLiquidityModel] = useState<string>(() => String(wf.calcConfig.params?.liquidityModel ?? "fraction_of_position_value"));
+  const [alphaBand, setAlphaBand] = useState<[number, number]>(() => [95, 99]);
+  const [isRunning, setIsRunning] = useState(false);
   const [fxRatesText, setFxRatesText] = useState<string>(() => {
     const raw = wf.calcConfig.params?.fxRates;
     if (!raw || typeof raw !== "object") return "{}";
@@ -185,10 +214,6 @@ export default function ConfigurePage() {
       dataDispatch({ type: "SET_SCENARIOS", scenarios: demoScenarios });
     }
   }, [dataState.scenarios.length, dataDispatch]);
-
-  const toggle = (key: MetricKey) => {
-    setSelected((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
-  };
 
   const fxRatesResult = useMemo(() => {
     const text = fxRatesText.trim();
@@ -245,306 +270,427 @@ export default function ConfigurePage() {
   ]);
 
   const selectedScenarioPreview = dataState.scenarios.slice(0, 5);
-  const selectedMetricBars = useMemo(
-    () =>
-      metricCards.map((metric) => ({
-        label: metric.key,
-        value: selected.includes(metric.key) ? 100 : 18,
-        tone: selected.includes(metric.key) ? "positive" as const : "neutral" as const,
-      })),
-    [selected]
-  );
-  const readinessScore = useMemo(
-    () => {
-      const paramsReady = readiness.alphaOk && readiness.tailModelOk && readiness.baseCurrencyOk && readiness.fxOk;
-      const metricsCoverage = Math.min(selected.length / targetMetricCount, 1);
+  const alphaPercent = Math.min(99.9, Math.max(90, Number((alpha * 100).toFixed(1))));
 
-      return Math.round(
-        (readiness.hasPortfolio ? 15 : 0) +
-          (readiness.noCritical ? 15 : 0) +
-          (readiness.marketOk ? 15 : 0) +
-          (paramsReady ? 15 : 0) +
-          metricsCoverage * 40
-      );
-    },
-    [
-      readiness.alphaOk,
-      readiness.baseCurrencyOk,
-      readiness.fxOk,
-      readiness.hasMetrics,
-      readiness.hasPortfolio,
-      readiness.marketOk,
-      readiness.noCritical,
-      readiness.tailModelOk,
-      selected.length,
-    ]
-  );
-  const selectedTrendData = useMemo(
-    () =>
-      selectedMetricBars.slice(0, 6).map((item, index) => ({
-        label: `${index + 1}`,
-        value: item.value,
-      })),
-    [selectedMetricBars]
-  );
+  const handleSaveAndGoToResults = async () => {
+    if (isRunning || !readiness.ready) return;
+
+    setIsRunning(true);
+    const calcRunId = crypto.randomUUID();
+    const startedAt = new Date().toISOString();
+
+    flushSync(() => {
+      dataDispatch({ type: "RESET_RESULTS" });
+      dispatch({ type: "RESET_DOWNSTREAM", fromStep: WorkflowStep.Configure });
+      dispatch({
+        type: "SET_CALC_CONFIG",
+        selectedMetrics: selected,
+        params: {
+          alpha,
+          horizonDays,
+          parametricTailModel,
+          historyDays,
+          baseCurrency,
+          fxRates: fxRatesResult.value,
+          liquidityModel,
+        },
+        marginEnabled: selected.includes("margin_capital"),
+      });
+      dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Configure });
+      dispatch({ type: "SET_CALC_RUN", calcRunId, status: "running", startedAt });
+    });
+
+    try {
+      const metrics = await runRiskCalculation({
+        positions: dataState.portfolio.positions,
+        scenarios: dataState.scenarios,
+        limits: dataState.limits ?? undefined,
+        alpha,
+        horizonDays,
+        parametricTailModel,
+        baseCurrency,
+        fxRates: fxRatesResult.value,
+        liquidityModel,
+        selectedMetrics: selected,
+        marginEnabled: selected.includes("margin_capital"),
+        marketDataSessionId: dataState.marketDataSummary?.session_id,
+      });
+
+      flushSync(() => {
+        dataDispatch({ type: "SET_RESULTS", metrics });
+        dispatch({ type: "SET_CALC_RUN", calcRunId, status: "success", startedAt, finishedAt: new Date().toISOString() });
+        dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.CalcRun });
+        dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Results });
+      });
+
+      nav("/dashboard");
+    } catch (error: any) {
+      dispatch({ type: "SET_CALC_RUN", calcRunId, status: "error", startedAt, finishedAt: new Date().toISOString() });
+      toast.danger("Не удалось выполнить расчёт", {
+        description: error?.message ?? "Проверьте параметры и доступность API.",
+      });
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  const statusColor = readiness.ready ? "success" : "warning";
+  const statusText  = readiness.ready ? "Готово к запуску" : "Не всё готово";
 
   return (
-    <Card>
-      <div className="pageHeader">
-        <div className="pageHeaderText">
+    <div className="importPagePlain">
+
+      {/* ── Hero ── */}
+      <div className="importHeroRow">
+        <div>
           <h1 className="pageTitle">Настройка расчёта</h1>
-          <p className="pageHint">
-            Один экран для выбора метрик, параметров и набора сценариев. Здесь важно только то, что влияет на расчёт.
-          </p>
+          <div className="importHeroMeta">
+            <Chip color={statusColor} variant="soft" size="sm">{statusText}</Chip>
+            <span className="importFileTag">{selected.length} метрик · α={alpha} · {horizonDays}д</span>
+          </div>
         </div>
-        <div className="pageActions">
-          <Button variant="secondary" onClick={() => setSelected(recommendedSet)}>
-            Рекомендуемый набор
-          </Button>
-          <Button variant="secondary" onClick={() => nav("/market")}>
-            Назад
-          </Button>
+
+        <div className="validateHeroRight">
+          <button
+            type="button"
+            className="importHeroNextLink validateHeroNavLink"
+            disabled={!readiness.ready || isRunning}
+            onClick={handleSaveAndGoToResults}
+            aria-label={isRunning ? "Идёт запуск расчёта" : "Перейти к результатам"}
+          >
+            <span className="importHeroNextLinkText pageTitle">{isRunning ? "Запуск…" : "К результатам"}</span>
+            <span className="importHeroNextLinkArrow pageTitle" aria-hidden>→</span>
+          </button>
+          <button
+            type="button"
+            className="importHeroNextLink validateHeroNavLink validateHeroBackLink"
+            onClick={() => nav("/market")}
+            aria-label="К рыночным данным"
+          >
+            <span className="importHeroNextLinkArrow pageTitle" aria-hidden>←</span>
+            <span className="importHeroNextLinkText pageTitle">К рыночным данным</span>
+          </button>
         </div>
       </div>
 
-      <div className="configureLayout">
-        <div className="configureMain">
-          <StaggerGroup className="visualSplitPanel">
-            <StaggerItem>
-              <GlassPanel
-                title="Контур расчёта"
-                subtitle="Сразу видно, сколько обязательных условий уже выполнено и какие блоки реально попадут в расчёт."
-                badge={<Chip color={readiness.ready ? "success" : "warning"} variant="flat" radius="sm">{readiness.ready ? "ready" : "draft"}</Chip>}
-              >
-                <div className="visualSplitPanel">
-                  <DonutGauge value={readinessScore} label="config" subtitle="Полнота конфигурации и набора выбранных метрик." />
-                  <CompareBarsChart data={selectedMetricBars.slice(0, 6)} height={240} />
-                </div>
-              </GlassPanel>
-            </StaggerItem>
-            <StaggerItem>
-              <GlassPanel title="Ритм выбора" subtitle="Sparkline показывает, насколько насыщен набор активированных метрик и сценариев.">
-                <Sparkline data={selectedTrendData} color={readiness.ready ? "#6eff8e" : "#7da7ff"} height={110} />
-                <div className="visualChipRow">
-                  {selected.slice(0, 8).map((metric) => (
-                    <Chip key={metric} color="primary" variant="flat" radius="sm">
-                      {metric}
-                    </Chip>
-                  ))}
-                </div>
-              </GlassPanel>
-            </StaggerItem>
-          </StaggerGroup>
-
-          <Tabs
-            aria-label="Настройка расчёта"
-            radius="sm"
-            color="primary"
-            classNames={{
-              tabList: "importTabsList",
-              tab: "importTab",
-              cursor: "importTabCursor",
-              panel: "importTabPanel",
-            }}
-          >
-            <Tab key="metrics" title="Что считать">
-              <Card>
-                <div className="cardTitle">Набор метрик</div>
-                <div className="cardSubtitle">Отметьте только то, что действительно нужно пользователю на выходе.</div>
-
-                <div className="metricInlineList">
-                  {metricCards.map((metric) => (
-                    <label key={metric.key} className={`metricInlineOption ${selected.includes(metric.key) ? "metricInlineOption--selected" : ""}`}>
+      {/* ── Body ── */}
+      <div className="importBody">
+        <div className="importBodyMain">
+          <Reveal delay={0.05}>
+            <div className="configureTopGrid">
+              <Card className="configureMetricsCard configureMetricsCard--compact">
+                <CheckboxGroup
+                  name="calc-metrics"
+                  className="configureMetricGroup"
+                  value={selected}
+                  onChange={(values) => setSelected(values as MetricKey[])}
+                >
+                  <div className="configureMetricHeaderRow">
+                    <div className="configureMetricHeaderCopy">
+                      <Label>Набор метрик</Label>
+                      <Description className="configureMetricHeaderHint">
+                        Выберите метрики, которые нужно включить в расчёт.
+                      </Description>
+                    </div>
+                    <Button variant="secondary" onClick={() => setSelected(recommendedSet)}>
+                      Рекомендуемые
+                    </Button>
+                  </div>
+                  <div className="configureMetricList configureMetricList--compact">
+                    {metricCards.map((metric) => (
                       <Checkbox
-                        isSelected={selected.includes(metric.key)}
-                        onValueChange={() => toggle(metric.key)}
-                        classNames={{
-                          base: "metricInlineCheckbox",
-                          wrapper: "metricInlineCheckboxBox",
-                          icon: "metricInlineCheckboxIcon",
-                          label: "metricInlineCheckboxLabel",
-                        }}
+                        key={metric.key}
+                        value={metric.key}
+                        variant="secondary"
+                        className={`configureMetricOption${selected.includes(metric.key) ? " configureMetricOption--selected" : ""}`}
                       >
-                        <span className="metricInlineTitle">{metric.title}</span>
-                      </Checkbox>
-                      <HelpTooltip
-                        text={
-                          <div className="metricTooltipContent">
-                            <div className="metricTooltipTitle">{metric.title}</div>
-                            <div className="metricTooltipSection">
-                              <span>Что это</span>
-                              <p>{metric.tooltip.what}</p>
-                            </div>
-                            <div className="metricTooltipSection">
-                              <span>Зачем нужна</span>
-                              <p>{metric.tooltip.purpose}</p>
-                            </div>
-                            <div className="metricTooltipSection">
-                              <span>Что считает</span>
-                              <p>{metric.tooltip.calculates}</p>
-                            </div>
+                        <Checkbox.Control className="configureMetricControl rounded-full before:rounded-full">
+                          <Checkbox.Indicator />
+                        </Checkbox.Control>
+                        <Checkbox.Content className="configureMetricContent">
+                          <span className="configureMetricGlyph" aria-hidden="true">
+                            {metricGlyphByKey[metric.key]}
+                          </span>
+                          <div className="configureMetricCopy">
+                            <Label>{metric.title}</Label>
+                            <Description>{metric.summary}</Description>
                           </div>
-                        }
-                      />
-                    </label>
-                  ))}
-                </div>
+                        </Checkbox.Content>
+                      </Checkbox>
+                    ))}
+                  </div>
+                </CheckboxGroup>
               </Card>
-            </Tab>
 
-            <Tab key="params" title="Параметры">
-              <Card>
+              <Card className="configureSectionCard configureSectionCard--params configureParamsCard">
                 <div className="cardTitle">Параметры VaR/ES и агрегации</div>
-                <div className="cardSubtitle">Только параметры, которые меняют методику расчёта.</div>
+                <div className="cardSubtitle">Основные параметры управляются слайдерами для быстрого тюнинга.</div>
 
-                <div className="formGrid">
-                  <Input type="number" label="Уровень доверия (alpha)" step="0.001" value={String(alpha)} onValueChange={(value) => setAlpha(Number(value))} />
-                  <Input type="number" label="Горизонт, дней" min={1} value={String(horizonDays)} onValueChange={(value) => setHorizonDays(Number(value))} />
-                  <Input type="number" label="Окно истории, дней" min={30} value={String(historyDays)} onValueChange={(value) => setHistoryDays(Number(value))} />
-                  <Input label="Базовая валюта" maxLength={3} value={baseCurrency} onValueChange={(value) => setBaseCurrency(value.toUpperCase())} />
+                <div className="configureSliderGrid">
+                  <Slider
+                    className="configureParamSlider"
+                    minValue={90}
+                    maxValue={99.9}
+                    step={0.1}
+                    value={alphaPercent}
+                    onChange={(value) => {
+                      if (typeof value === "number") {
+                        setAlpha(Number((value / 100).toFixed(4)));
+                      }
+                    }}
+                    formatOptions={{ maximumFractionDigits: 1, minimumFractionDigits: 1 }}
+                  >
+                    <Label className="configureParamLabel">
+                      <span>Уровень доверия α, %</span>
+                      <ParamInfo
+                        title="Уровень доверия α"
+                        text="Определяет, какую часть хвоста риска вы отсекате: чем выше значение, тем консервативнее оценка VaR/ES."
+                      />
+                    </Label>
+                    <Slider.Output className="configureParamSliderOutput" />
+                    <Slider.Track className="configureParamSliderTrack">
+                      <Slider.Fill className="configureParamSliderFill" />
+                      <Slider.Thumb className="configureParamSliderThumb" />
+                    </Slider.Track>
+                  </Slider>
 
-                  <Select
-                    label="Tail-модель"
-                    selectedKeys={[parametricTailModel]}
-                    onSelectionChange={(keys) => {
-                      const [key] = Array.from(keys as Set<Key>);
-                      if (key) setParametricTailModel(String(key));
+                  <Slider
+                    className="configureParamSlider"
+                    minValue={1}
+                    maxValue={30}
+                    step={1}
+                    value={horizonDays}
+                    onChange={(value) => {
+                      if (typeof value === "number") {
+                        setHorizonDays(Math.round(value));
+                      }
                     }}
                   >
-                    <SelectItem key="cornish_fisher">Cornish-Fisher</SelectItem>
-                    <SelectItem key="normal">Normal</SelectItem>
-                  </Select>
+                    <Label className="configureParamLabel">
+                      <span>Горизонт расчёта, дней</span>
+                      <ParamInfo
+                        title="Горизонт расчёта"
+                        text="Показывает, на какой период агрегируется риск: короткий горизонт для оперативного контроля, длинный для стресс-оценок."
+                      />
+                    </Label>
+                    <Slider.Output className="configureParamSliderOutput" />
+                    <Slider.Track className="configureParamSliderTrack">
+                      <Slider.Fill className="configureParamSliderFill" />
+                      <Slider.Thumb className="configureParamSliderThumb" />
+                    </Slider.Track>
+                  </Slider>
 
-                  <Select
-                    label="Модель ликвидности"
-                    selectedKeys={[liquidityModel]}
-                    onSelectionChange={(keys) => {
-                      const [key] = Array.from(keys as Set<Key>);
-                      if (key) setLiquidityModel(String(key));
+                  <Slider
+                    className="configureParamSlider"
+                    minValue={60}
+                    maxValue={750}
+                    step={10}
+                    value={historyDays}
+                    onChange={(value) => {
+                      if (typeof value === "number") {
+                        setHistoryDays(Math.round(value / 10) * 10);
+                      }
                     }}
                   >
-                    <SelectItem key="fraction_of_position_value">Haircut как доля от стоимости позиции</SelectItem>
-                    <SelectItem key="half_spread_fraction">Haircut как half-spread доля</SelectItem>
-                    <SelectItem key="absolute_per_contract">Haircut как абсолют на контракт</SelectItem>
-                  </Select>
+                    <Label className="configureParamLabel">
+                      <span>Окно истории, дней</span>
+                      <ParamInfo
+                        title="Окно истории"
+                        text="Определяет глубину выборки рыночных наблюдений: больше окно даёт устойчивость, меньше — чувствительность к текущему режиму рынка."
+                      />
+                    </Label>
+                    <Slider.Output className="configureParamSliderOutput" />
+                    <Slider.Track className="configureParamSliderTrack">
+                      <Slider.Fill className="configureParamSliderFill" />
+                      <Slider.Thumb className="configureParamSliderThumb" />
+                    </Slider.Track>
+                  </Slider>
+
+                  <Slider
+                    className="configureParamSlider"
+                    minValue={90}
+                    maxValue={99.9}
+                    step={0.1}
+                    value={alphaBand}
+                    onChange={(value) => {
+                      if (Array.isArray(value) && value.length === 2) {
+                        setAlphaBand([value[0], value[1]]);
+                      }
+                    }}
+                  >
+                    <Label className="configureParamLabel">
+                      <span>Контрольный диапазон доверия</span>
+                      <ParamInfo
+                        title="Контрольный диапазон"
+                        text="Визуальный диапазон для быстрой калибровки: помогает сравнить чувствительность результата при разных уровнях доверия."
+                      />
+                    </Label>
+                    <Slider.Output className="configureParamSliderOutput" />
+                    <Slider.Track className="configureParamSliderTrack">
+                      {({ state }) => (
+                        <>
+                          <Slider.Fill className="configureParamSliderFill" />
+                          {state.values.map((_, index) => (
+                            <Slider.Thumb key={index} index={index} className="configureParamSliderThumb" />
+                          ))}
+                        </>
+                      )}
+                    </Slider.Track>
+                  </Slider>
+                </div>
+
+                <div className="formGrid configureParamsFormGrid">
+                  <div className="configureParamField configureParamField--full">
+                    <div className="configureParamSelectLabel">
+                      <span className="cardSubtitle">Базовая валюта</span>
+                      <ParamInfo
+                        title="Базовая валюта"
+                        text="В этой валюте будут приведены итоговые метрики и агрегированные оценки риска по портфелю."
+                      />
+                    </div>
+                    <Input aria-label="Базовая валюта" maxLength={3} value={baseCurrency} onChange={(event) => setBaseCurrency(event.target.value.toUpperCase())} />
+                  </div>
+
+                  <div className="configureParamField">
+                    <div className="configureParamSelectLabel">
+                      <span className="cardSubtitle">Tail-модель</span>
+                      <ParamInfo
+                        title="Tail-модель"
+                        text="Задаёт способ аппроксимации хвоста распределения доходностей и влияет на величину VaR/ES в экстремальных точках."
+                      />
+                    </div>
+                    <Select
+                      aria-label="Tail-модель"
+                      selectedKey={parametricTailModel}
+                      onSelectionChange={(key: Key) => {
+                        if (key) setParametricTailModel(String(key));
+                      }}
+                    >
+                      <Select.Trigger>
+                        <Select.Value />
+                        <Select.Indicator />
+                      </Select.Trigger>
+                      <Select.Popover>
+                        <ListBox>
+                          <ListBoxItem id="cornish_fisher">Cornish-Fisher</ListBoxItem>
+                          <ListBoxItem id="normal">Normal</ListBoxItem>
+                        </ListBox>
+                      </Select.Popover>
+                    </Select>
+                  </div>
+
+                  <div className="configureParamField">
+                    <div className="configureParamSelectLabel">
+                      <span className="cardSubtitle">Модель ликвидности</span>
+                      <ParamInfo
+                        title="Модель ликвидности"
+                        text="Определяет, как добавляется надбавка за издержки выхода из позиции и как ликвидность увеличивает риск."
+                      />
+                    </div>
+                    <Select
+                      aria-label="Модель ликвидности"
+                      selectedKey={liquidityModel}
+                      onSelectionChange={(key: Key) => {
+                        if (key) setLiquidityModel(String(key));
+                      }}
+                    >
+                      <Select.Trigger>
+                        <Select.Value />
+                        <Select.Indicator />
+                      </Select.Trigger>
+                      <Select.Popover>
+                        <ListBox>
+                          <ListBoxItem id="fraction_of_position_value">Haircut как доля от стоимости позиции</ListBoxItem>
+                          <ListBoxItem id="half_spread_fraction">Haircut как half-spread доля</ListBoxItem>
+                          <ListBoxItem id="absolute_per_contract">Haircut как абсолют на контракт</ListBoxItem>
+                        </ListBox>
+                      </Select.Popover>
+                    </Select>
+                  </div>
                 </div>
 
                 <Accordion variant="splitted" className="configureAccordion">
-                  <AccordionItem
-                    key="fx"
-                    aria-label="Продвинутые FX-настройки"
-                    title="FX rates и продвинутые настройки"
-                    subtitle="Откройте только если расчёт мультивалютный или нужен ручной override."
-                    classNames={{ base: "validateAccordionItem", trigger: "validateAccordionTrigger", content: "validateAccordionContent" }}
-                  >
-                    <Textarea
-                      label="FX rates (JSON, опционально)"
-                      minRows={5}
-                      value={fxRatesText}
-                      onValueChange={setFxRatesText}
-                      className="configureTextarea"
-                    />
-                    {fxRatesResult.error && (
-                      <Chip color="danger" variant="flat" radius="sm" className="importIssueChip">
-                        {fxRatesResult.error}
-                      </Chip>
-                    )}
-                  </AccordionItem>
+                  <Accordion.Item id="fx" className="validateAccordionItem">
+                    <Accordion.Heading>
+                      <Accordion.Trigger className="validateAccordionTrigger">
+                        <div className="validateAccordionTitleBlock">
+                          <div className="validateAccordionTitle">
+                            <span>FX rates и продвинутые настройки</span>
+                          </div>
+                          <div className="cardSubtitle">
+                            Откройте только если расчёт мультивалютный или нужен ручной override.
+                          </div>
+                        </div>
+                        <Accordion.Indicator />
+                      </Accordion.Trigger>
+                    </Accordion.Heading>
+                    <Accordion.Panel className="validateAccordionContent">
+                      <Accordion.Body>
+                        <TextArea
+                          label="FX rates (JSON, опционально)"
+                          rows={5}
+                          value={fxRatesText}
+                          onChange={(event) => setFxRatesText(event.target.value)}
+                          className="configureTextarea"
+                        />
+                        {fxRatesResult.error && (
+                          <Chip color="danger" variant="soft" className="importIssueChip">
+                            {fxRatesResult.error}
+                          </Chip>
+                        )}
+                      </Accordion.Body>
+                    </Accordion.Panel>
+                  </Accordion.Item>
                 </Accordion>
               </Card>
-            </Tab>
+            </div>
+          </Reveal>
 
-            <Tab key="scenarios" title="Сценарии">
-              <Card>
+          <Reveal delay={0.08}>
+            <div className="configureWorkspaceGrid">
+              <Card className="configureSectionCard configureSectionCard--scenarios">
                 <div className="cardTitle">Набор сценариев для расчёта</div>
                 <div className="cardSubtitle">Полный редактор будет на шаге стресс-сценариев, но уже здесь видно, что пойдёт в расчёт.</div>
 
-                <div className="scenarioPreviewList">
+                <Accordion allowsMultipleExpanded className="configureScenarioAccordion">
                   {selectedScenarioPreview.map((scenario) => (
-                    <div key={scenario.scenario_id} className="scenarioPreviewItem">
-                      <div>
-                        <strong>{scenario.scenario_id}</strong>
-                        <div className="textMuted">{scenario.description ?? "Без описания"}</div>
-                      </div>
-                      <div className="scenarioPreviewValues">
-                        <span>ΔS {scenario.underlying_shift}</span>
-                        <span>ΔVol {scenario.volatility_shift}</span>
-                        <span>Δr {scenario.rate_shift}</span>
-                      </div>
-                    </div>
+                    <Accordion.Item key={scenario.scenario_id} id={scenario.scenario_id} className="configureScenarioItem">
+                      <Accordion.Heading>
+                        <Accordion.Trigger className="configureScenarioTrigger">
+                          <div className="configureScenarioHead">
+                            <strong>{scenario.scenario_id}</strong>
+                            <span>{scenario.description ?? "Без описания"}</span>
+                          </div>
+                          <Accordion.Indicator />
+                        </Accordion.Trigger>
+                      </Accordion.Heading>
+                      <Accordion.Panel className="configureScenarioPanel">
+                        <Accordion.Body>
+                          <div className="configureScenarioBody">
+                            <div className="configureScenarioMetric">
+                              <span>ΔS</span>
+                              <strong>{scenario.underlying_shift}</strong>
+                            </div>
+                            <div className="configureScenarioMetric">
+                              <span>ΔVol</span>
+                              <strong>{scenario.volatility_shift}</strong>
+                            </div>
+                            <div className="configureScenarioMetric">
+                              <span>Δr</span>
+                              <strong>{scenario.rate_shift}</strong>
+                            </div>
+                          </div>
+                        </Accordion.Body>
+                      </Accordion.Panel>
+                    </Accordion.Item>
                   ))}
-                </div>
+                </Accordion>
               </Card>
-            </Tab>
-          </Tabs>
-        </div>
-
-        <aside className="importAside">
-          <Reveal delay={0.08}>
-            <Card>
-            <div className="cardTitle">Готовность к запуску</div>
-            <div className="cardSubtitle">Если что-то не выполнено, расчёт не стартует.</div>
-            <Checklist
-              items={[
-                { label: "Портфель загружен", done: readiness.hasPortfolio },
-                { label: "Критических ошибок нет", done: readiness.noCritical },
-                { label: "Рыночные данные готовы", done: readiness.marketOk },
-                { label: `Метрики выбраны (${selected.length})`, done: readiness.hasMetrics },
-                { label: "Параметры корректны", done: readiness.alphaOk && readiness.tailModelOk && readiness.baseCurrencyOk && readiness.fxOk },
-              ]}
-            />
-            </Card>
-          </Reveal>
-
-          <Reveal delay={0.1}>
-            <Card>
-            <div className="cardTitle">Итоговый набор</div>
-            <div className="cardSubtitle">Что реально будет посчитано.</div>
-            <div className="configureSelectedChips">
-              {selected.map((metric) => (
-                <Chip key={metric} color="primary" variant="flat" radius="sm">
-                  {metric}
-                </Chip>
-              ))}
             </div>
-            </Card>
           </Reveal>
-
-          <Reveal delay={0.12}>
-            <Card>
-            <div className="cardTitle">Следующий шаг</div>
-            <div className="cardSubtitle">На экране запуска будет только финальная проверка и сам расчёт.</div>
-            <Button
-              disabled={!readiness.ready}
-              onClick={() => {
-                flushSync(() => {
-                  dataDispatch({ type: "RESET_RESULTS" });
-                  dispatch({ type: "RESET_DOWNSTREAM", fromStep: WorkflowStep.Configure });
-                  dispatch({
-                    type: "SET_CALC_CONFIG",
-                    selectedMetrics: selected,
-                    params: {
-                      alpha,
-                      horizonDays,
-                      parametricTailModel,
-                      historyDays,
-                      baseCurrency,
-                      fxRates: fxRatesResult.value,
-                      liquidityModel,
-                    },
-                    marginEnabled: selected.includes("margin_capital"),
-                  });
-                  dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Configure });
-                });
-                nav("/run");
-              }}
-            >
-              Сохранить и перейти к запуску
-            </Button>
-            </Card>
-          </Reveal>
-        </aside>
+        </div>
       </div>
-    </Card>
+
+    </div>
   );
 }

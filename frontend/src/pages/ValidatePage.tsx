@@ -1,17 +1,13 @@
 import { useEffect, useMemo } from "react";
-import { Accordion, AccordionItem, Checkbox, Chip, Divider } from "@heroui/react";
+import { Accordion, Chip, ProgressCircle, Separator } from "@heroui/react";
 import { flushSync } from "react-dom";
 import { useNavigate } from "react-router-dom";
+import AppCheckbox from "../components/AppCheckbox";
 import Button from "../components/Button";
-import Card from "../ui/Card";
 import {
   CircularScore,
   CompareBarsChart,
-  GlassPanel,
-  LineTrendChart,
   Reveal,
-  StaggerGroup,
-  StaggerItem,
 } from "../components/rich/RichVisuals";
 import { useAppData } from "../state/appDataStore";
 import { useWorkflow } from "../workflow/workflowStore";
@@ -86,7 +82,6 @@ function groupByIssue(log: ImportLogEntry[]) {
     const key = issueKey(entry);
     map.set(key, [...(map.get(key) ?? []), entry]);
   }
-
   return Array.from(map.entries())
     .map(([key, entries]) => ({ key, entries, hint: issueHint(key) }))
     .sort((a, b) => b.entries.length - a.entries.length);
@@ -98,32 +93,22 @@ export default function ValidatePage() {
   const { state: wf, dispatch } = useWorkflow();
 
   const log = dataState.validationLog;
+  const hasImportAttempt = Boolean(dataState.portfolio.importedAt);
   const critical = useMemo(() => log.filter((x) => x.severity === "ERROR").length, [log]);
   const warnings = useMemo(() => log.filter((x) => x.severity === "WARNING").length, [log]);
   const issueGroups = useMemo(() => groupByIssue(log), [log]);
-  const cleanRows = Math.max(dataState.portfolio.positions.length - critical - warnings, 0);
+  const totalPositions = dataState.portfolio.positions.length;
+  const hasInvalidImportedPortfolio = hasImportAttempt && totalPositions === 0 && log.length > 0;
+  const cleanRows = Math.max(totalPositions - critical - warnings, 0);
+  const readyRatio = totalPositions > 0 ? (cleanRows / totalPositions) * 100 : 0;
+
   const severityChartData = useMemo(
     () => [
       { label: "Ошибки", value: critical, tone: "negative" as const },
-      { label: "Warnings", value: warnings, tone: "neutral" as const },
+      { label: "Предупреждения", value: warnings, tone: "neutral" as const },
       { label: "Чистые", value: cleanRows, tone: "positive" as const },
     ],
     [cleanRows, critical, warnings]
-  );
-  const issueTrendData = useMemo(
-    () =>
-      (issueGroups.length
-        ? issueGroups.slice(0, 6)
-        : [
-            { hint: { title: "Данные" }, entries: [{ message: "Нет проблем" }] },
-            { hint: { title: "Готовность" }, entries: [{ message: "0" }] },
-          ]
-      ).map((group, index) => ({
-        label: group.hint.title.split(" ")[0] ?? `G${index + 1}`,
-        value: group.entries.length,
-        secondary: Math.max(group.entries.length - 1, 0),
-      })),
-    [issueGroups]
   );
 
   useEffect(() => {
@@ -136,177 +121,222 @@ export default function ValidatePage() {
   }, [critical, warnings, dispatch, wf.validation.acknowledged]);
 
   const canContinue = critical === 0 && (warnings === 0 || wf.validation.acknowledged);
+  const isClean = critical === 0 && warnings === 0;
+  const statusColor = critical > 0 ? "danger" : warnings > 0 ? "warning" : totalPositions > 0 ? "success" : "default";
+  const statusText = critical > 0 ? `${critical} ошибок` : warnings > 0 ? `${warnings} предупр.` : totalPositions > 0 ? "Данные чистые" : "Нет данных";
+
+  const handleContinue = () => {
+    flushSync(() => {
+      dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Validate });
+    });
+    nav("/market");
+  };
 
   return (
-    <Card>
-      <div className="pageHeader">
-        <div className="pageHeaderText">
+    <div className="importPagePlain">
+
+      {/* ── Header ── */}
+      <div className="importHeroRow">
+        <div>
           <h1 className="pageTitle">Проверка данных</h1>
-          <p className="pageHint">
-            На этом шаге решается только один вопрос: можно ли доверять входу и запускать расчёт дальше.
-          </p>
+          <div className="importHeroMeta">
+            <Chip color={statusColor} variant="flat" radius="sm" size="sm">{statusText}</Chip>
+            {totalPositions > 0 && (
+              <span className="importFileTag">{totalPositions} позиций</span>
+            )}
+          </div>
         </div>
-        <div className="pageActions">
-          <Button variant="secondary" onClick={() => nav("/import")}>
-            Назад к импорту
-          </Button>
-          <Button variant="secondary" disabled={log.length === 0} onClick={() => downloadJson("validation_log.json", log)}>
-            Скачать лог
-          </Button>
+
+        <div className="validateHeroRight">
+          <button
+            type="button"
+            className="importHeroNextLink validateHeroNavLink"
+            disabled={!canContinue}
+            onClick={handleContinue}
+            aria-label="К рыночным данным"
+          >
+            <span className="importHeroNextLinkText pageTitle">К рыночным данным</span>
+            <span className="importHeroNextLinkArrow pageTitle" aria-hidden>→</span>
+          </button>
+          <button
+            type="button"
+            className="importHeroNextLink validateHeroNavLink validateHeroBackLink"
+            onClick={() => nav("/import")}
+            aria-label="К импорту"
+          >
+            <span className="importHeroNextLinkArrow pageTitle" aria-hidden>←</span>
+            <span className="importHeroNextLinkText pageTitle">К импорту</span>
+          </button>
         </div>
       </div>
 
-      <div className="validateLayout">
-        <div className="validateMain">
-          <StaggerGroup className="visualSplitPanel">
-            <StaggerItem>
-              <GlassPanel
-                title="Надёжность входа"
-                subtitle="Слева мгновенная оценка готовности, справа видно, что именно ломает сессию."
-                badge={<Chip color={critical > 0 ? "danger" : warnings > 0 ? "warning" : "success"} variant="flat" radius="sm">{canContinue ? "OK" : "Нужно внимание"}</Chip>}
-              >
-                <div className="visualSplitPanel">
-                  <CircularScore
-                    value={dataState.portfolio.positions.length ? Math.max(0, Math.min(100, (cleanRows / dataState.portfolio.positions.length) * 100)) : 0}
-                    label="Чистые строки"
-                    color={critical > 0 ? "danger" : warnings > 0 ? "warning" : "success"}
-                    hint="Доля строк без блокирующих проблем"
-                  />
-                  <CompareBarsChart data={severityChartData} height={210} />
+      {/* ── Status zone ── */}
+      <div className={`importZone${isClean && totalPositions > 0 ? " importZone--loaded" : ""}`}>
+        <div className="importUploadSplit">
+
+          {/* Left: adaptive status visual */}
+          <div className="validateStatusPane">
+            {isClean && totalPositions > 0 ? (
+              <div className="validateCleanState">
+                <ProgressCircle
+                  aria-label="Готовность данных"
+                  value={100}
+                  color="success"
+                  size="lg"
+                  showValueLabel
+                />
+                <div className="validateCleanText">
+                  <div className="validateCleanTitle">{totalPositions} строк готовы к расчёту</div>
+                  <div className="validateCleanSub">Критических ошибок и предупреждений нет</div>
                 </div>
-              </GlassPanel>
-            </StaggerItem>
-            <StaggerItem>
-              <GlassPanel
-                title="Распределение проблем"
-                subtitle="Линейный график показывает, какие группы ошибок сейчас доминируют."
-                badge={<Chip color="primary" variant="flat" radius="sm">{issueGroups.length} групп</Chip>}
-              >
-                <LineTrendChart data={issueTrendData} color="#ff7777" secondaryColor="#7da7ff" showSecondary />
-              </GlassPanel>
-            </StaggerItem>
-          </StaggerGroup>
-
-          <Reveal delay={0.06}>
-            <Card>
-            <div className="cardTitle">Итог проверки</div>
-            <div className="cardSubtitle">Сначала статус, потом причины, потом переход к следующему шагу.</div>
-
-            <div className="validateKpiRow">
-              <div className="importKpiCard">
-                <span>Позиции</span>
-                <strong>{dataState.portfolio.positions.length}</strong>
               </div>
-              <div className="importKpiCard">
-                <span>Ошибки</span>
-                <strong className={critical > 0 ? "isNegative" : ""}>{critical}</strong>
+            ) : hasInvalidImportedPortfolio ? (
+              <div className="validateInvalidImportPane">
+                <svg className="validateEmptyIcon" viewBox="0 0 24 24" aria-hidden>
+                  <path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 14h-2v-2h2Zm0-4h-2V7h2Z" />
+                </svg>
+                <div className="validateInvalidImportTitle">Портфель загружен, но файл не прошел проверку</div>
+                <div className="validateInvalidImportSub">
+                  Найдены критические ошибки в структуре данных. Исправьте файл и загрузите его снова.
+                </div>
               </div>
-              <div className="importKpiCard">
-                <span>Предупреждения</span>
-                <strong>{warnings}</strong>
+            ) : totalPositions > 0 ? (
+              <div className="validateIssueState">
+                <CircularScore
+                  value={Math.max(0, Math.min(100, readyRatio))}
+                  label="Чистые строки"
+                  color={statusColor}
+                  hint="Доля строк без блокирующих проблем"
+                />
+                <div className="validateIssueChart">
+                  <CompareBarsChart data={severityChartData} height={190} />
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="validateEmptyPane">
+                <svg className="validateEmptyIcon" viewBox="0 0 24 24">
+                  <path fill="currentColor" d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41Z"/>
+                </svg>
+                <div className="validateEmptyTitle">Загрузите портфель</div>
+                <div className="validateEmptySub">Перейдите на страницу импорта и загрузите файл</div>
+              </div>
+            )}
+          </div>
 
-            <div className="validateStatusRow">
-              <Chip color={critical > 0 ? "danger" : warnings > 0 ? "warning" : "success"} variant="flat" radius="sm">
-                {critical > 0 ? "Нужно исправить файл" : warnings > 0 ? "Можно продолжать с оговорками" : "Всё готово"}
-              </Chip>
-              {warnings > 0 && critical === 0 && (
-                <Checkbox
-                  isSelected={wf.validation.acknowledged}
-                  onValueChange={(checked) =>
-                    dispatch({ type: "SET_VALIDATION", criticalErrors: critical, warnings, acknowledged: checked })
-                  }
-                >
-                  Я просмотрел предупреждения и понимаю, что продолжаю с ними
-                </Checkbox>
+          {/* Right: tips tile */}
+          <div className="validateTipTile">
+            <div className="validateTipTileTop">
+              <span className="validateTipEyebrow">Частые причины ошибок</span>
+              {issueGroups.length > 0 && (
+                <Chip size="sm" color="warning" variant="flat" radius="sm">{issueGroups.length} групп</Chip>
               )}
             </div>
-            </Card>
-          </Reveal>
-
-          <Reveal delay={0.1}>
-            <Card>
-            <div className="validateIssuesHeader">
-              <div>
-                <div className="cardTitle">Типы проблем</div>
-                <div className="cardSubtitle">Каждый блок показывает, что не так и как это быстро исправить.</div>
+            <div className="validateTipList">
+              <div className="validateTipItem">
+                <span className="validateTipDot" />
+                <span><span className="code">maturity_date</span> позже <span className="code">valuation_date</span></span>
               </div>
-              <Button
-                disabled={!canContinue}
-                onClick={() => {
-                  flushSync(() => {
-                    dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Validate });
-                  });
-                  nav("/market");
-                }}
-              >
-                К рыночным данным
-              </Button>
+              <div className="validateTipItem">
+                <span className="validateTipDot" />
+                <span><span className="code">currency</span> в формате ISO 4217 (RUB, USD, EUR)</span>
+              </div>
+              <div className="validateTipItem">
+                <span className="validateTipDot" />
+                <span><span className="code">quantity</span> не равен нулю</span>
+              </div>
+              <div className="validateTipItem">
+                <span className="validateTipDot" />
+                <span><span className="code">volatility</span> заполнена корректно для опциона</span>
+              </div>
             </div>
+            <div className="validateTipFooter">
+              Следующий шаг — рыночные данные для очищенного портфеля.
+            </div>
+          </div>
 
-            {log.length === 0 ? (
-              <div className="textMuted statusMessage">Ошибок и предупреждений нет. Можно переходить дальше.</div>
-            ) : (
-              <Accordion variant="splitted" className="validateAccordion">
-                {issueGroups.map(({ key, entries, hint }) => (
-                  <AccordionItem
-                    key={key}
-                    aria-label={hint.title}
-                    title={
-                      <div className="validateAccordionTitle">
-                        <span>{hint.title}</span>
-                        <Chip size="sm" variant="flat" radius="sm">
-                          {entries.length}
-                        </Chip>
-                      </div>
-                    }
-                    subtitle={hint.howToFix}
-                    classNames={{ base: "validateAccordionItem", trigger: "validateAccordionTrigger", content: "validateAccordionContent" }}
-                  >
-                    <div className="validateHintExample">
-                      Пример: <span className="code">{hint.example}</span>
-                    </div>
-                    <Divider className="importAsideDivider" />
-                    <div className="validateEntries">
-                      {entries.slice(0, 8).map((entry, idx) => (
-                        <Chip
-                          key={`${entry.message}-${idx}`}
-                          color={entry.severity === "ERROR" ? "danger" : entry.severity === "WARNING" ? "warning" : "success"}
-                          variant="flat"
-                          radius="sm"
-                          className="importIssueChip"
-                        >
-                          {entry.row ? `Строка ${entry.row}: ` : ""}{entry.message}
-                        </Chip>
-                      ))}
-                    </div>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            )}
-            </Card>
-          </Reveal>
         </div>
 
-        <aside className="importAside">
-          <Card>
-            <div className="cardTitle">Частые причины</div>
-            <div className="cardSubtitle">Проверьте эти поля в первую очередь.</div>
-            <ul className="importFieldList">
-              <li><span className="code">maturity_date</span> позже <span className="code">valuation_date</span></li>
-              <li><span className="code">currency</span> в формате ISO 4217</li>
-              <li><span className="code">quantity</span> не равен нулю</li>
-              <li><span className="code">volatility</span> заполнена корректно</li>
-            </ul>
-          </Card>
-
-          <Card>
-            <div className="cardTitle">Переход дальше</div>
-            <div className="cardSubtitle">Следующий шаг подтягивает и проверяет рыночные данные для уже очищенного портфеля.</div>
-          </Card>
-        </aside>
+        {/* Acknowledge block inside zone */}
+        {warnings > 0 && critical === 0 && (
+          <div className="validateAckZone">
+            <AppCheckbox
+              id="validate-acknowledged"
+              isSelected={wf.validation.acknowledged}
+              onChange={(checked) =>
+                dispatch({ type: "SET_VALIDATION", criticalErrors: critical, warnings, acknowledged: checked })
+              }
+              label="Я просмотрел предупреждения и понимаю, что продолжаю с ними"
+            />
+          </div>
+        )}
       </div>
-    </Card>
+
+      {/* ── Issues body ── */}
+      <div className="importBody">
+        <div className="importBodyMain">
+          <Reveal delay={0.08}>
+            <div className="validateIssuesSection">
+              <div className="validateIssuesHeader">
+                <div>
+                  <div className="cardTitle">Типы проблем</div>
+                  <div className="cardSubtitle">Каждый блок показывает, что не так и как это быстро исправить.</div>
+                </div>
+              </div>
+
+              {log.length === 0 ? (
+                <div className="textMuted statusMessage">Ошибок и предупреждений нет. Можно переходить дальше.</div>
+              ) : (
+                <Accordion variant="splitted" className="validateAccordion">
+                  {issueGroups.map(({ key, entries, hint }) => (
+                    <Accordion.Item key={key} id={key} className="validateAccordionItem">
+                      <Accordion.Heading>
+                        <Accordion.Trigger className="validateAccordionTrigger">
+                          <div className="validateAccordionTitleBlock">
+                            <div className="validateAccordionTitle">
+                              <span>{hint.title}</span>
+                              <Chip size="sm" variant="flat" radius="sm">{entries.length}</Chip>
+                            </div>
+                            <div className="cardSubtitle">{hint.howToFix}</div>
+                          </div>
+                          <Accordion.Indicator />
+                        </Accordion.Trigger>
+                      </Accordion.Heading>
+                      <Accordion.Panel className="validateAccordionContent">
+                        <Accordion.Body>
+                          <div className="validateHintExample">
+                            Пример: <span className="code">{hint.example}</span>
+                          </div>
+                          <Separator className="importAsideDivider" />
+                          <div className="validateEntries">
+                            {entries.slice(0, 8).map((entry, idx) => (
+                              <Chip
+                                key={`${entry.message}-${idx}`}
+                                color={entry.severity === "ERROR" ? "danger" : entry.severity === "WARNING" ? "warning" : "success"}
+                                variant="flat"
+                                radius="sm"
+                                className="importIssueChip"
+                              >
+                                {entry.row ? `Строка ${entry.row}: ` : ""}{entry.message}
+                              </Chip>
+                            ))}
+                          </div>
+                        </Accordion.Body>
+                      </Accordion.Panel>
+                    </Accordion.Item>
+                  ))}
+                </Accordion>
+              )}
+            </div>
+          </Reveal>
+        </div>
+      </div>
+
+      <div className="validateBottomActions">
+        <Button variant="secondary" disabled={log.length === 0} onClick={() => downloadJson("validation_log.json", log)}>
+          Скачать лог
+        </Button>
+      </div>
+
+    </div>
   );
 }

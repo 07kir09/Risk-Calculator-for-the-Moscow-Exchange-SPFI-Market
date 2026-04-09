@@ -123,7 +123,7 @@ export function isStepAvailable(state: WorkflowState, step: WorkflowStep): boole
     case WorkflowStep.CalcRun:
       return done(WorkflowStep.Configure);
     case WorkflowStep.Results:
-      return done(WorkflowStep.CalcRun);
+      return done(WorkflowStep.Configure);
     case WorkflowStep.Stress:
     case WorkflowStep.Limits:
     case WorkflowStep.Export:

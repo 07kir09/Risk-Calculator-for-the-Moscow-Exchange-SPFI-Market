@@ -1,17 +1,10 @@
 import { useEffect, useMemo } from "react";
-import {
-  Chip,
-  Tab,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-  Tabs,
-} from "@heroui/react";
+import { Chip } from "@heroui/react";
 import { useNavigate } from "react-router-dom";
+import AppTabs from "../components/AppTabs";
+import AppTable from "../components/AppTable";
 import Button from "../components/Button";
+import Checklist from "../components/Checklist";
 import Card from "../ui/Card";
 import { useAppData } from "../state/appDataStore";
 import { useWorkflow } from "../workflow/workflowStore";
@@ -46,6 +39,18 @@ type ContributorRow = {
   abs_pnl_contribution: number;
 };
 
+function formatComputedAt(iso?: string) {
+  if (!iso) return "не запускался";
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return "не запускался";
+  return date.toLocaleString("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+  });
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { state: dataState } = useAppData();
@@ -71,10 +76,10 @@ export default function DashboardPage() {
   }, [metrics?.top_contributors]);
 
   const contributorBars = useMemo(() => {
-    const max = Math.max(...topContributors.map((row) => row.abs_pnl_contribution), 1);
+    const maxAbs = Math.max(...topContributors.map((row) => row.abs_pnl_contribution), 1);
     return topContributors.map((row) => ({
       label: row.metric ? `${row.metric} · ${row.position_id}` : row.position_id,
-      value: (row.abs_pnl_contribution / max) * 100,
+      value: (row.abs_pnl_contribution / maxAbs) * 100,
       tone: row.pnl_contribution < 0 ? "negative" as const : "positive" as const,
     }));
   }, [topContributors]);
@@ -92,6 +97,8 @@ export default function DashboardPage() {
   }, [metrics?.base_value, metrics?.lc_var, metrics?.limits]);
 
   const worstStress = stressRows.length ? Math.min(...stressRows.map((row) => row.pnl)) : undefined;
+  const breachedCount = stressRows.filter((row) => row.breached).length;
+
   const distributionData = useMemo(
     () =>
       (metrics?.pnl_distribution?.length
@@ -106,7 +113,7 @@ export default function DashboardPage() {
 
   const stressTrendData = useMemo(
     () =>
-      (stressRows.length ? stressRows : [{ scenario_id: "Base", pnl: 0, limit: 0, breached: false }]).map((row) => ({
+      (stressRows.length ? stressRows : [{ scenario_id: "base", pnl: 0, limit: 0, breached: false }]).map((row) => ({
         label: row.scenario_id,
         value: row.pnl,
         secondary: row.limit ?? 0,
@@ -114,247 +121,274 @@ export default function DashboardPage() {
     [stressRows]
   );
 
-  const limitBars = useMemo(
-    () => {
-      const source = metrics?.limits?.length
-        ? metrics.limits
-        : ([["lc_var", metrics?.lc_var ?? 0, metrics?.base_value ?? 1, false]] as const);
+  const limitBars = useMemo(() => {
+    const source = metrics?.limits?.length
+      ? metrics.limits
+      : ([["lc_var", metrics?.lc_var ?? 0, metrics?.base_value ?? 1, false]] as const);
 
-      return source.map(([metric, value, limit, breached]) => ({
-        label: String(metric),
-        value: limit ? Math.abs((value / limit) * 100) : 0,
-        tone: breached ? "negative" as const : "positive" as const,
-      }));
-    },
-    [metrics?.base_value, metrics?.lc_var, metrics?.limits]
+    return source.map(([metric, value, limit, breached]) => ({
+      label: String(metric),
+      value: Math.min(100, limit ? Math.abs((value / limit) * 100) : 0),
+      tone: breached ? "negative" as const : "positive" as const,
+    }));
+  }, [metrics?.base_value, metrics?.lc_var, metrics?.limits]);
+
+  const liquidityBars = useMemo(() => {
+    const base = Math.max(Math.abs(metrics?.base_value ?? 0), 1);
+    return [
+      { label: "Capital", value: Math.min(100, (Math.abs(metrics?.capital ?? 0) / base) * 100), tone: "positive" as const },
+      { label: "Initial margin", value: Math.min(100, (Math.abs(metrics?.initial_margin ?? 0) / base) * 100), tone: "neutral" as const },
+      { label: "Variation margin", value: Math.min(100, (Math.abs(metrics?.variation_margin ?? 0) / base) * 100), tone: "negative" as const },
+    ];
+  }, [metrics?.base_value, metrics?.capital, metrics?.initial_margin, metrics?.variation_margin]);
+
+  const breachShare = stressRows.length ? (breachedCount / stressRows.length) * 100 : 0;
+  const scenarioSpark = useMemo(
+    () => stressTrendData.map((item, idx) => ({ label: `${idx + 1}`, value: Math.abs(item.value) })),
+    [stressTrendData]
   );
-
-  const liquidityBars = useMemo(
-    () => [
-      { label: "Capital", value: Math.abs(metrics?.capital ?? 0), tone: "positive" as const },
-      { label: "Initial margin", value: Math.abs(metrics?.initial_margin ?? 0), tone: "neutral" as const },
-      { label: "Variation margin", value: Math.abs(metrics?.variation_margin ?? 0), tone: "negative" as const },
-    ],
-    [metrics?.capital, metrics?.initial_margin, metrics?.variation_margin]
-  );
-
-  const breachShare = stressRows.length ? (stressRows.filter((row) => row.breached).length / stressRows.length) * 100 : 0;
 
   if (!metrics) {
     return (
-      <Card>
-        <div className="pageHeader">
-          <div className="pageHeaderText">
+      <div className="importPagePlain dashboardPage dashboardPage--revamp">
+        <div className="importHeroRow">
+          <div>
             <h1 className="pageTitle">Панель риска</h1>
-            <p className="pageHint">После запуска расчёта здесь появятся итоговые метрики, стрессы, лимиты и объяснение источников риска.</p>
+            <div className="importHeroMeta">
+              <Chip color="warning" variant="soft" size="sm">Расчёт не выполнен</Chip>
+              <span className="importFileTag">Нет итоговых метрик</span>
+            </div>
           </div>
+          <button type="button" className="importHeroNextLink" onClick={() => navigate("/configure")} aria-label="К настройке расчёта">
+            <span className="importHeroNextLinkText pageTitle">К настройке расчёта</span>
+            <span className="importHeroNextLinkArrow pageTitle" aria-hidden>→</span>
+          </button>
         </div>
-        <Button onClick={() => navigate("/run")}>Перейти к запуску</Button>
-      </Card>
+
+        <Card>
+          <div className="cardTitle">Почему панель пустая</div>
+          <div className="cardSubtitle">Нужно завершить базовые шаги и запустить расчёт из настройки.</div>
+          <div className="dashboardEmptyChecklist">
+            <Checklist
+              items={[
+                { label: "Портфель загружен", done: dataState.portfolio.positions.length > 0 },
+                { label: "Критических ошибок нет", done: wf.validation.criticalErrors === 0 },
+                { label: "Рыночные данные готовы", done: wf.marketData.status === "ready" && wf.marketData.missingFactors === 0 },
+                { label: "Метрики выбраны", done: wf.calcConfig.selectedMetrics.length > 0 },
+              ]}
+            />
+          </div>
+          <div className="dashboardEmptyActions">
+            <Button onClick={() => navigate("/configure")}>Перейти к расчёту</Button>
+          </div>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <div className="pageHeader">
-        <div className="pageHeaderText">
+    <div className="importPagePlain dashboardPage dashboardPage--revamp">
+      <div className="importHeroRow">
+        <div>
           <h1 className="pageTitle">Панель риска</h1>
-          <p className="pageHint">Сначала итог, затем причина, затем детализация. Без лишних решений на одном экране.</p>
+          <div className="importHeroMeta">
+            <Chip color={utilization >= 100 ? "danger" : utilization >= 75 ? "warning" : "success"} variant="soft" size="sm">
+              {utilization >= 100 ? "Есть превышения" : utilization >= 75 ? "Требуется контроль" : "Риск в норме"}
+            </Chip>
+            <span className="importFileTag">Обновлено: {formatComputedAt(dataState.results.computedAt)}</span>
+            <span className="importFileTag">Валюта: {baseCurrency}</span>
+          </div>
         </div>
-        <div className="pageActions">
-          <Chip color={utilization >= 100 ? "danger" : utilization >= 75 ? "warning" : "success"} variant="flat" radius="sm">
-            {utilization >= 100 ? "Есть превышения" : utilization >= 75 ? "Нужен контроль" : "Риск в норме"}
-          </Chip>
-          <Button variant="secondary" onClick={() => navigate("/stress")}>
-            Стресс-сценарии
-          </Button>
-          <Button variant="secondary" onClick={() => navigate("/limits")}>
-            Лимиты
-          </Button>
+        <div className="dashboardHeroActions">
+          <Button variant="secondary" onClick={() => navigate("/stress")}>Стрессы</Button>
+          <Button variant="secondary" onClick={() => navigate("/limits")}>Лимиты</Button>
+          <Button variant="secondary" onClick={() => navigate("/export")}>Экспорт</Button>
         </div>
       </div>
 
-      <div className="dashboardLayout">
-        <div className="dashboardMain">
-          <StaggerGroup className="dashboardHeroGrid">
-            <StaggerItem>
-              <MetricHero
-                label="Стоимость портфеля"
-                value={metrics.base_value ?? 0}
-                hint={baseCurrency}
-                chart={<Sparkline data={distributionData.slice(-8)} />}
-              />
-            </StaggerItem>
-            <StaggerItem>
-              <MetricHero
-                label="VaR / ES"
-                value={metrics.var_hist ?? metrics.var_param ?? 0}
-                suffix=""
-                tone={utilization >= 100 ? "danger" : "success"}
-                hint={`ES ${formatNumber(metrics.es_hist ?? metrics.es_param ?? 0, 2)}`}
-                chart={
-                  <div className="heroInlineStats">
-                    <div className="heroInlineStat">
-                      <span>VaR</span>
-                      <strong>{formatNumber(metrics.var_hist ?? metrics.var_param ?? 0, 2)}</strong>
-                    </div>
-                    <div className="heroInlineStat">
-                      <span>ES</span>
-                      <strong>{formatNumber(metrics.es_hist ?? metrics.es_param ?? 0, 2)}</strong>
-                    </div>
-                    <div className="heroInlineStat">
-                      <span>LC VaR</span>
-                      <strong>{formatNumber(metrics.lc_var ?? 0, 2)}</strong>
-                    </div>
-                  </div>
-                }
-              />
-            </StaggerItem>
-            <StaggerItem>
-              <MetricHero
-                label="Худший стресс"
-                value={worstStress ?? 0}
-                tone={worstStress !== undefined && worstStress < 0 ? "danger" : "success"}
-                hint={baseCurrency}
-                chart={<Sparkline data={stressTrendData.slice(0, 8)} color={worstStress !== undefined && worstStress < 0 ? "#ff7777" : "#6eff8e"} />}
-              />
-            </StaggerItem>
-          </StaggerGroup>
+      <div className="dashboardPulseRow">
+        <div className="dashboardPulseCard">
+          <span>Позиции</span>
+          <strong>{dataState.portfolio.positions.length}</strong>
+        </div>
+        <div className="dashboardPulseCard">
+          <span>Сценарии</span>
+          <strong>{stressRows.length || dataState.scenarios.length}</strong>
+        </div>
+        <div className="dashboardPulseCard">
+          <span>Превышения</span>
+          <strong>{breachedCount}</strong>
+        </div>
+        <div className="dashboardPulseCard">
+          <span>Использование лимитов</span>
+          <strong>{Math.round(utilization)}%</strong>
+        </div>
+      </div>
 
-          <Tabs
-            aria-label="Результаты расчёта"
-            radius="sm"
-            color="primary"
-            classNames={{
-              tabList: "importTabsList",
-              tab: "importTab",
-              cursor: "importTabCursor",
-              panel: "importTabPanel",
-            }}
+      <StaggerGroup className="dashboardHeroGrid">
+        <StaggerItem>
+          <MetricHero
+            label="Стоимость портфеля"
+            value={metrics.base_value ?? 0}
+            hint={baseCurrency}
+            chart={<Sparkline data={distributionData.slice(-10)} />}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <MetricHero
+            label="VaR / ES"
+            value={metrics.var_hist ?? metrics.var_param ?? 0}
+            tone={utilization >= 100 ? "danger" : "success"}
+            hint={`ES ${formatNumber(metrics.es_hist ?? metrics.es_param ?? 0, 2)}`}
+            chart={
+              <div className="heroInlineStats">
+                <div className="heroInlineStat">
+                  <span>VaR</span>
+                  <strong>{formatNumber(metrics.var_hist ?? metrics.var_param ?? 0, 2)}</strong>
+                </div>
+                <div className="heroInlineStat">
+                  <span>ES</span>
+                  <strong>{formatNumber(metrics.es_hist ?? metrics.es_param ?? 0, 2)}</strong>
+                </div>
+                <div className="heroInlineStat">
+                  <span>LC VaR</span>
+                  <strong>{formatNumber(metrics.lc_var ?? 0, 2)}</strong>
+                </div>
+              </div>
+            }
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <MetricHero
+            label="Худший стресс"
+            value={worstStress ?? 0}
+            tone={worstStress !== undefined && worstStress < 0 ? "danger" : "success"}
+            hint={baseCurrency}
+            chart={<Sparkline data={scenarioSpark} color={worstStress !== undefined && worstStress < 0 ? "#ff7777" : "#6eff8e"} />}
+          />
+        </StaggerItem>
+      </StaggerGroup>
+
+      <div className="dashboardFlowGrid">
+        <Reveal>
+          <GlassPanel
+            title="Профиль stress P&L"
+            subtitle="Возвращённый сравнительный график: основной P&L и лимит на одной оси."
+            badge={<Chip color={worstStress !== undefined && worstStress < 0 ? "danger" : "success"} variant="flat" radius="sm">{stressTrendData.length} сцен.</Chip>}
           >
-            <Tab key="overview" title="Обзор">
-              <div className="visualBentoGrid">
-                <Reveal>
-                  <GlassPanel
-                    title="Распределение PnL"
-                    subtitle="Area-кривая показывает форму хвоста, а линия лимита даёт быстрый ориентир."
-                    badge={<Chip color="primary" variant="flat" radius="sm">animated</Chip>}
-                  >
-                    <AreaTrendChart data={distributionData} color="#6eff8e" accent="#7da7ff" showSecondary={false} />
-                  </GlassPanel>
-                </Reveal>
-                <div className="visualBentoStack">
-                  <Reveal delay={0.05}>
-                    <GlassPanel
-                      title="Загрузка лимитов"
-                      subtitle="Доля использованного лимита по самым важным метрикам."
-                      badge={<Chip color={utilization >= 100 ? "danger" : "success"} variant="flat" radius="sm">{Math.round(utilization)}%</Chip>}
-                    >
-                      <DonutGauge value={utilization} label="utilization" subtitle="Отношение текущего факта к заданным лимитам." />
-                    </GlassPanel>
-                  </Reveal>
-                  <Reveal delay={0.08}>
-                    <GlassPanel title="Вкладчики риска" subtitle="Сразу видно, какой драйвер формирует основную часть хвоста риска.">
-                      <CompareBarsChart data={contributorBars} height={220} />
-                    </GlassPanel>
-                  </Reveal>
-                  <Reveal delay={0.1}>
-                    <GlassPanel title="Тренд нагрузки" subtitle="Линейный график показывает, как факторы и стрессовая просадка движутся относительно друг друга.">
-                      <LineTrendChart data={stressTrendData} color="#7da7ff" secondaryColor="#6eff8e" showSecondary />
-                    </GlassPanel>
-                  </Reveal>
-                </div>
-              </div>
-            </Tab>
+            <AreaTrendChart data={stressTrendData} color="#7da7ff" accent="#6eff8e" showSecondary />
+            <LineTrendChart data={stressTrendData} color="#7da7ff" secondaryColor="#6eff8e" showSecondary primaryLabel="Stress P&L" secondaryLabel="Лимит" />
+          </GlassPanel>
+        </Reveal>
+        <Reveal delay={0.05}>
+          <GlassPanel
+            title="Контроль лимитов и вклада"
+            subtitle="Сверху — общая загрузка, ниже — вклад крупнейших драйверов риска."
+          >
+            <div className="dashboardGaugeRow">
+              <DonutGauge value={utilization} label="лимиты" subtitle="Текущий уровень использования лимитов." />
+              <DonutGauge value={breachShare} label="breach" subtitle="Доля stress-сценариев с превышением." color="#ff7777" />
+            </div>
+            <CompareBarsChart data={contributorBars} height={230} />
+          </GlassPanel>
+        </Reveal>
+      </div>
 
-            <Tab key="stress" title="Стрессы">
+      <AppTabs
+        ariaLabel="Вкладки результатов риска"
+        tabs={[
+          {
+            id: "overview",
+            label: "Обзор",
+            content: (
               <div className="visualSplitPanel">
-                <GlassPanel
-                  title="Stress P&L по сценариям"
-                  subtitle="Кривая даёт общую картину, а таблица остаётся рабочим слоем для точных значений."
-                >
+                <GlassPanel title="Ключевые показатели" subtitle="Главные числа в одном месте, без лишнего шума.">
+                  <AppTable
+                    ariaLabel="Ключевые показатели риска"
+                    headers={["Метрика", "Значение", "Комментарий"]}
+                    rows={[
+                      { key: "var", cells: ["VaR", formatNumber(metrics.var_hist ?? metrics.var_param ?? 0, 2), "Пороговый убыток"] },
+                      { key: "es", cells: ["ES", formatNumber(metrics.es_hist ?? metrics.es_param ?? 0, 2), "Средний убыток хвоста"] },
+                      { key: "lcvar", cells: ["LC VaR", formatNumber(metrics.lc_var ?? 0, 2), "С поправкой на ликвидность"] },
+                      { key: "capital", cells: ["Capital", formatNumber(metrics.capital ?? 0, 2), "Требуемый капитал"] },
+                      { key: "im", cells: ["Initial margin", formatNumber(metrics.initial_margin ?? 0, 2), "Начальная маржа"] },
+                    ]}
+                  />
+                </GlassPanel>
+                <GlassPanel title="Вкладчики риска" subtitle="Кто сейчас формирует риск портфеля.">
+                  <CompareBarsChart data={contributorBars} height={260} />
+                </GlassPanel>
+              </div>
+            ),
+          },
+          {
+            id: "stress",
+            label: "Стрессы",
+            content: (
+              <div className="visualSplitPanel">
+                <GlassPanel title="Stress P&L по сценариям" subtitle="Подробный список сценариев и их статусов.">
+                  <AppTable
+                    ariaLabel="Стресс-сценарии"
+                    headers={["Сценарий", "P&L", "Лимит", "Статус"]}
+                    rows={stressRows.map((row) => ({
+                      key: row.scenario_id,
+                      cells: [
+                        row.scenario_id,
+                        formatNumber(row.pnl, 2),
+                        row.limit ?? "—",
+                        <Chip key={`${row.scenario_id}-status`} color={row.breached ? "danger" : "success"} variant="flat" radius="sm">
+                          {row.breached ? "Превышен" : "Ок"}
+                        </Chip>,
+                      ],
+                    }))}
+                    emptyContent="Стресс-сценарии не рассчитывались."
+                  />
+                </GlassPanel>
+                <GlassPanel title="Форма стресс-профиля" subtitle="Сравнение сценариев с лимитной границей.">
                   <AreaTrendChart data={stressTrendData} color="#ff7777" accent="#7da7ff" showSecondary />
-                  <Table
-                    removeWrapper
-                    aria-label="Стресс-сценарии"
-                    classNames={{ table: "heroTable", th: "heroTableHeader", td: "heroTableCell", tr: "heroTableRow" }}
-                  >
-                    <TableHeader>
-                      <TableColumn>Сценарий</TableColumn>
-                      <TableColumn>P&L</TableColumn>
-                      <TableColumn>Лимит</TableColumn>
-                      <TableColumn>Статус</TableColumn>
-                    </TableHeader>
-                    <TableBody emptyContent="Стресс-сценарии не рассчитывались.">
-                      {stressRows.map((row) => (
-                        <TableRow key={row.scenario_id}>
-                          <TableCell>{row.scenario_id}</TableCell>
-                          <TableCell>{formatNumber(row.pnl, 2)}</TableCell>
-                          <TableCell>{row.limit ?? "—"}</TableCell>
-                          <TableCell>
-                            <Chip color={row.breached ? "danger" : "success"} variant="flat" radius="sm">
-                              {row.breached ? "Превышен" : "Ок"}
-                            </Chip>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
                 </GlassPanel>
-                <div className="visualBentoStack">
-                  <GlassPanel title="Доля breach" subtitle="Сколько сценариев уже пересекают лимит.">
-                    <DonutGauge value={breachShare} label="breach share" subtitle="Процент стрессов с нарушением лимита." color="#ff7777" />
-                  </GlassPanel>
-                  <GlassPanel title="Хвостовые вкладчики" subtitle="Какие позиции сильнее всего ухудшают худший сценарий.">
-                    <CompareBarsChart data={contributorBars} height={240} />
-                  </GlassPanel>
-                </div>
               </div>
-            </Tab>
-
-            <Tab key="limits" title="Лимиты">
+            ),
+          },
+          {
+            id: "limits",
+            label: "Лимиты",
+            content: (
               <div className="visualSplitPanel">
-                <GlassPanel title="Использование лимитов" subtitle="Бар-чарт показывает, какие метрики ближе всего к красной зоне.">
-                  <CompareBarsChart data={limitBars} height={280} />
+                <GlassPanel title="Использование по метрикам" subtitle="Нормировано до 100% для быстрой оценки.">
+                  <CompareBarsChart data={limitBars} height={260} />
                 </GlassPanel>
-                <GlassPanel title="Fact vs limit" subtitle="Табличный слой для точного сравнения факта и порога.">
-                  <Table
-                    removeWrapper
-                    aria-label="Лимиты"
-                    classNames={{ table: "heroTable", th: "heroTableHeader", td: "heroTableCell", tr: "heroTableRow" }}
-                  >
-                    <TableHeader>
-                      <TableColumn>Метрика</TableColumn>
-                      <TableColumn>Факт</TableColumn>
-                      <TableColumn>Лимит</TableColumn>
-                      <TableColumn>Статус</TableColumn>
-                    </TableHeader>
-                    <TableBody emptyContent="Лимиты не переданы в расчёт.">
-                      {(metrics.limits ?? []).map(([metric, value, limit, breached]) => (
-                        <TableRow key={metric}>
-                          <TableCell>{metric}</TableCell>
-                          <TableCell>{formatNumber(value, 2)}</TableCell>
-                          <TableCell>{formatNumber(limit, 2)}</TableCell>
-                          <TableCell>
-                            <Chip color={breached ? "danger" : "success"} variant="flat" radius="sm">
-                              {breached ? "Превышен" : "Ок"}
-                            </Chip>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <GlassPanel title="Факт / лимит" subtitle="Точные значения и статусы по лимитам.">
+                  <AppTable
+                    ariaLabel="Лимиты по метрикам"
+                    headers={["Метрика", "Факт", "Лимит", "Статус"]}
+                    rows={(metrics.limits ?? []).map(([metric, value, limit, breached]) => ({
+                      key: metric,
+                      cells: [
+                        metric,
+                        formatNumber(value, 2),
+                        formatNumber(limit, 2),
+                        <Chip key={`${metric}-status`} color={breached ? "danger" : "success"} variant="flat" radius="sm">
+                          {breached ? "Превышен" : "Ок"}
+                        </Chip>,
+                      ],
+                    }))}
+                    emptyContent="Лимиты не переданы в расчёт."
+                  />
                 </GlassPanel>
               </div>
-            </Tab>
-
-            <Tab key="correlations" title="Корреляции">
-              <div className="dashboardPanelGrid">
-                <GlassPanel title="Cross-correlation matrix" subtitle="Тепловая карта показывает, где факторы усиливают друг друга, а где дают естественный оффсет.">
+            ),
+          },
+          {
+            id: "factors",
+            label: "Факторы",
+            content: (
+              <div className="visualSplitPanel">
+                <GlassPanel title="Корреляции факторов" subtitle="Матрица взаимосвязей между факторами риска.">
                   <CorrelationMatrix matrix={correlations} />
                 </GlassPanel>
-                <GlassPanel title="Ликвидность и капитал" subtitle="Сводка по LC VaR, capital и марже в одном split-screen блоке.">
-                  <CompareBarsChart data={liquidityBars} height={240} />
+                <GlassPanel title="Капитал и маржа" subtitle="Показатели ликвидности и обеспечения относительно стоимости портфеля.">
+                  <CompareBarsChart data={liquidityBars} height={220} />
                   <div className="heroInlineStats">
                     <div className="heroInlineStat">
                       <span>LC VaR</span>
@@ -371,18 +405,19 @@ export default function DashboardPage() {
                   </div>
                 </GlassPanel>
               </div>
-            </Tab>
-          </Tabs>
-        </div>
+            ),
+          },
+        ]}
+      />
 
-        <UtilizationPanel
-          utilization={utilization}
-          inflow={metrics.capital && metrics.base_value ? (metrics.capital / metrics.base_value) * 100 : 12.4}
-          outflow={metrics.variation_margin && metrics.base_value ? (-metrics.variation_margin / metrics.base_value) * 100 : -4.2}
-          statusLabel={utilization >= 100 ? "критической зоны" : utilization >= 75 ? "зоны контроля" : "безопасной зоны"}
-          caption="Относительная загрузка лимитов и ликвидности сейчас находится в"
-        />
-      </div>
-    </Card>
+      <UtilizationPanel
+        utilization={utilization}
+        inflow={metrics.capital && metrics.base_value ? (metrics.capital / metrics.base_value) * 100 : 0}
+        outflow={metrics.variation_margin && metrics.base_value ? (-metrics.variation_margin / metrics.base_value) * 100 : 0}
+        statusLabel={utilization >= 100 ? "критической зоны" : utilization >= 75 ? "зоны контроля" : "безопасной зоны"}
+        caption="Относительная загрузка лимитов и ликвидности сейчас находится в"
+      />
+    </div>
   );
 }
+

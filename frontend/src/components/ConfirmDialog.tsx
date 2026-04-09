@@ -1,11 +1,5 @@
 import { ReactNode } from "react";
-import {
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-} from "@heroui/react";
+import { Modal } from "@heroui/react";
 import Button from "./Button";
 
 export default function ConfirmDialog({
@@ -33,41 +27,23 @@ export default function ConfirmDialog({
       onOpenChange={(next) => {
         if (!next) onCancel();
       }}
-      placement="center"
-      backdrop="blur"
-      motionProps={{
-        variants: {
-          enter: {
-            y: 0,
-            opacity: 1,
-            scale: 1,
-            transition: { type: "spring", stiffness: 220, damping: 22 },
-          },
-          exit: {
-            y: 12,
-            opacity: 0,
-            scale: 0.98,
-            transition: { duration: 0.18, ease: "easeIn" },
-          },
-        },
-      }}
-      classNames={{
-        base: "confirmModal",
-        backdrop: "confirmModalBackdrop",
-      }}
     >
-      <ModalContent>
-        <ModalHeader>{title}</ModalHeader>
-        <ModalBody>{description}</ModalBody>
-        <ModalFooter>
-          <Button variant="ghost" onClick={onCancel}>
-            {cancelText}
-          </Button>
-          <Button variant={danger ? "danger" : "shadow"} onClick={onConfirm}>
-            {confirmText}
-          </Button>
-        </ModalFooter>
-      </ModalContent>
+      <Modal.Backdrop className="confirmModalBackdrop" variant="blur">
+        <Modal.Container className="confirmModal" placement="center">
+          <Modal.Dialog>
+            <Modal.Header>{title}</Modal.Header>
+            <Modal.Body>{description}</Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" onClick={onCancel}>
+                {cancelText}
+              </Button>
+              <Button variant={danger ? "danger" : "primary"} onClick={onConfirm}>
+                {confirmText}
+              </Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </Modal>
   );
 }

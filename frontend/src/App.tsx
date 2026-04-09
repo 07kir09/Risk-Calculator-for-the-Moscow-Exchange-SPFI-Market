@@ -5,7 +5,6 @@ import ImportPage from "./pages/ImportPage";
 import ValidatePage from "./pages/ValidatePage";
 import MarketDataPage from "./pages/MarketDataPage";
 import ConfigurePage from "./pages/ConfigurePage";
-import RunPage from "./pages/RunPage";
 import DashboardPage from "./pages/DashboardPage";
 import StressPage from "./pages/StressPage";
 import LimitsPage from "./pages/LimitsPage";
@@ -31,7 +30,7 @@ export default function App() {
           <Route path="/validate" element={<GateRoute requiredStep={WorkflowStep.Validate}><ValidatePage /></GateRoute>} />
           <Route path="/market" element={<GateRoute requiredStep={WorkflowStep.MarketData}><MarketDataPage /></GateRoute>} />
           <Route path="/configure" element={<GateRoute requiredStep={WorkflowStep.Configure}><ConfigurePage /></GateRoute>} />
-          <Route path="/run" element={<GateRoute requiredStep={WorkflowStep.CalcRun}><RunPage /></GateRoute>} />
+          <Route path="/run" element={<Navigate to="/dashboard" replace />} />
 
           <Route path="/dashboard" element={<GateRoute requiredStep={WorkflowStep.Results}><DashboardPage /></GateRoute>} />
           <Route path="/stress" element={<GateRoute requiredStep={WorkflowStep.Stress}><StressPage /></GateRoute>} />

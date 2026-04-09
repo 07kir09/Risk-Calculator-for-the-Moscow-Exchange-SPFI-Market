@@ -1,3 +1,5 @@
+import AppCheckbox from "./AppCheckbox";
+
 interface Props {
   alpha: number;
   setAlpha: (v: number) => void;
@@ -8,14 +10,20 @@ interface Props {
 export default function MetricsSelector({ alpha, setAlpha, useParametric, setUseParametric }: Props) {
   return (
     <div>
-      <label>
+      <label htmlFor="metrics-alpha">
         Уровень доверия (VaR/ES)
-        <input type="number" step={0.001} min={0.8} max={0.999} value={alpha} onChange={(e) => setAlpha(Number(e.target.value))} />
+        <input id="metrics-alpha" type="number" step={0.001} min={0.8} max={0.999} value={alpha} onChange={(e) => setAlpha(Number(e.target.value))} />
       </label>
-      <label style={{ display: "block", marginTop: 12 }}>
-        <input type="checkbox" checked={useParametric} onChange={(e) => setUseParametric(e.target.checked)} />
-        Использовать параметрический VaR/ES (иначе исторический)
-      </label>
+      <div style={{ marginTop: 12 }}>
+        <AppCheckbox
+          id="metrics-use-parametric"
+          isSelected={useParametric}
+          onChange={setUseParametric}
+          label="Использовать параметрический VaR/ES"
+          description="Если выключено, используется исторический сценарный подход."
+          size="sm"
+        />
+      </div>
       <p className="code">Подписи формул: VaR = zσ√t; ES = E[Loss | Loss ≥ VaR]; LC VaR = VaR + ∑|qty|*liquidity_haircut.</p>
     </div>
   );

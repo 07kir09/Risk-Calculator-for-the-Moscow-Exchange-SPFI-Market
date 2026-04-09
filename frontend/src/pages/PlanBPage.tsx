@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Checkbox } from "@heroui/react";
+import AppCheckbox from "../components/AppCheckbox";
 import Button from "../components/Button";
 import ConfirmDialog from "../components/ConfirmDialog";
 import Card from "../ui/Card";
@@ -126,7 +126,7 @@ export default function PlanBPage() {
       <Card>
         <h1 className="pageTitle">План действий (Plan B)</h1>
         <p className="pageHint">Пока нет результатов. Сначала запустите расчёт.</p>
-        <Button onClick={() => nav("/run")}>Перейти к запуску</Button>
+        <Button onClick={() => nav("/dashboard")}>Перейти к результатам</Button>
       </Card>
     );
   }
@@ -189,15 +189,14 @@ export default function PlanBPage() {
                 const done = doneMap[key] ?? false;
                 return (
                   <div key={key} className="checkRow">
-                    <Checkbox
+                    <AppCheckbox
+                      id={`plan-task-${p.id}-${t.id}`}
                       isSelected={done}
-                      onValueChange={(checked) => setDoneMap((prev) => ({ ...prev, [key]: checked }))}
+                      onChange={(checked) => setDoneMap((prev) => ({ ...prev, [key]: checked }))}
                       size="sm"
                       radius="sm"
+                      label={<span className={done ? "checkRowText--done" : ""}>{t.text}</span>}
                     />
-                    <span className={`checkRowText ${done ? "checkRowText--done" : ""}`}>
-                      {t.text}
-                    </span>
                   </div>
                 );
               })}

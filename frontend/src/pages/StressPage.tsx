@@ -2,17 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Chip,
   Input,
-  Tab,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-  Tabs,
-  Textarea,
+  TextArea,
 } from "@heroui/react";
 import { useNavigate } from "react-router-dom";
+import AppTabs from "../components/AppTabs";
+import AppTable from "../components/AppTable";
 import Button from "../components/Button";
 import ConfirmDialog from "../components/ConfirmDialog";
 import Card from "../ui/Card";
@@ -185,7 +179,7 @@ export default function StressPage() {
         <Card>
           <div className="textMuted">Нет результатов. Сначала выполните расчёт.</div>
           <div className="runActionRow">
-            <Button onClick={() => nav("/run")}>К запуску</Button>
+            <Button onClick={() => nav("/dashboard")}>К результатам</Button>
           </div>
         </Card>
       ) : (
@@ -214,61 +208,56 @@ export default function StressPage() {
 
             <Reveal delay={0.06}>
               <Card>
-                <Tabs
-                  aria-label="Работа со стрессами"
-                  radius="sm"
-                  color="primary"
-                  classNames={{
-                    tabList: "importTabsList",
-                    tab: "importTab",
-                    cursor: "importTabCursor",
-                    panel: "importTabPanel",
-                  }}
-                >
-                  <Tab key="results" title="Результаты">
-                    <div className="runSummaryHeader">
-                      <div>
-                        <div className="cardTitle">Результаты стрессов</div>
-                        <div className="cardSubtitle">Худший сценарий должен быть понятен без дополнительных кликов.</div>
-                      </div>
-                      <Chip color={worst !== undefined && worst < 0 ? "danger" : "success"} variant="flat" radius="sm">
-                        Худший stress P&L: {worst !== undefined ? formatNumber(worst, 2) : "—"}
-                      </Chip>
-                    </div>
+                <AppTabs
+                  ariaLabel="Работа со стрессами"
+                  tabs={[
+                    {
+                      id: "results",
+                      label: "Результаты",
+                      content: (
+                        <>
+                          <div className="runSummaryHeader">
+                            <div>
+                              <div className="cardTitle">Результаты стрессов</div>
+                              <div className="cardSubtitle">Худший сценарий должен быть понятен без дополнительных кликов.</div>
+                            </div>
+                            <Chip color={worst !== undefined && worst < 0 ? "danger" : "success"} variant="flat" radius="sm">
+                              Худший stress P&L: {worst !== undefined ? formatNumber(worst, 2) : "—"}
+                            </Chip>
+                          </div>
 
-                    <Table
-                      removeWrapper
-                      aria-label="Stress P&L"
-                      classNames={{ table: "heroTable", th: "heroTableHeader", td: "heroTableCell", tr: "heroTableRow" }}
-                    >
-                      <TableHeader>
-                        <TableColumn>Сценарий</TableColumn>
-                        <TableColumn>P&L</TableColumn>
-                        <TableColumn>Лимит</TableColumn>
-                        <TableColumn>Статус</TableColumn>
-                      </TableHeader>
-                      <TableBody emptyContent="Стресс-сценарии не были рассчитаны.">
-                        {stress.map((scenario) => (
-                          <TableRow key={scenario.scenario_id}>
-                            <TableCell>{scenario.scenario_id}</TableCell>
-                            <TableCell>{formatNumber(scenario.pnl, 2)}</TableCell>
-                            <TableCell>{scenario.limit ?? "—"}</TableCell>
-                            <TableCell>
-                              <Chip color={scenario.breached ? "danger" : "success"} variant="flat" radius="sm">
-                                {scenario.breached ? "Превышен" : "Ок"}
-                              </Chip>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </Tab>
-                  <Tab key="contributors" title="Вкладчики">
-                    <div className="cardTitle">Вкладчики в худший стресс</div>
-                    <div className="cardSubtitle">Помогает понять, какие позиции формируют основную просадку.</div>
-                    <ContributorBars rows={contributorBars} />
-                  </Tab>
-                </Tabs>
+                          <AppTable
+                            ariaLabel="Stress P&L"
+                            headers={["Сценарий", "P&L", "Лимит", "Статус"]}
+                            rows={stress.map((scenario) => ({
+                              key: scenario.scenario_id,
+                              cells: [
+                                scenario.scenario_id,
+                                formatNumber(scenario.pnl, 2),
+                                scenario.limit ?? "—",
+                                <Chip key={`${scenario.scenario_id}-status`} color={scenario.breached ? "danger" : "success"} variant="flat" radius="sm">
+                                  {scenario.breached ? "Превышен" : "Ок"}
+                                </Chip>,
+                              ],
+                            }))}
+                            emptyContent="Стресс-сценарии не были рассчитаны."
+                          />
+                        </>
+                      ),
+                    },
+                    {
+                      id: "contributors",
+                      label: "Вкладчики",
+                      content: (
+                        <>
+                          <div className="cardTitle">Вкладчики в худший стресс</div>
+                          <div className="cardSubtitle">Помогает понять, какие позиции формируют основную просадку.</div>
+                          <ContributorBars rows={contributorBars} />
+                        </>
+                      ),
+                    },
+                  ]}
+                />
 
                 {status && (
                   <Chip color="success" variant="flat" radius="sm" className="importIssueChip statusMessage">
@@ -283,13 +272,24 @@ export default function StressPage() {
             <Card>
               <div className="cardTitle">Редактор сценария</div>
               <div className="formGrid">
-                <Input label="ID сценария" value={draftId} onValueChange={setDraftId} />
-                <Input type="number" label="ΔS" value={String(draftS)} onValueChange={(value) => setDraftS(Number(value))} />
-                <Input type="number" label="ΔVol" value={String(draftVol)} onValueChange={(value) => setDraftVol(Number(value))} />
-                <Input type="number" label="Δr" value={String(draftR)} onValueChange={(value) => setDraftR(Number(value))} />
-                <Input type="number" label="Probability" value={draftProb === "" ? "" : String(draftProb)} onValueChange={(value) => setDraftProb(value === "" ? "" : Number(value))} />
+                <Input label="ID сценария" value={draftId} onChange={(event) => setDraftId(event.target.value)} />
+                <Input type="number" label="ΔS" value={String(draftS)} onChange={(event) => setDraftS(Number(event.target.value))} />
+                <Input type="number" label="ΔVol" value={String(draftVol)} onChange={(event) => setDraftVol(Number(event.target.value))} />
+                <Input type="number" label="Δr" value={String(draftR)} onChange={(event) => setDraftR(Number(event.target.value))} />
+                <Input
+                  type="number"
+                  label="Probability"
+                  value={draftProb === "" ? "" : String(draftProb)}
+                  onChange={(event) => setDraftProb(event.target.value === "" ? "" : Number(event.target.value))}
+                />
               </div>
-              <Textarea label="Описание" minRows={3} value={draftDesc} onValueChange={setDraftDesc} className="configureTextarea" />
+              <TextArea
+                label="Описание"
+                rows={3}
+                value={draftDesc}
+                onChange={(event) => setDraftDesc(event.target.value)}
+                className="configureTextarea"
+              />
               <div className="runActionRow">
                 <Button variant="secondary" onClick={handleCreate}>Сохранить сценарий</Button>
               </div>

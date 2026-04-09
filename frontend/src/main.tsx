@@ -2,7 +2,6 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
-import { HeroUIProvider } from "@heroui/react";
 import App from "./App";
 import { WorkflowProvider } from "./workflow/workflowStore";
 import { AppDataProvider } from "./state/appDataStore";
@@ -31,11 +30,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={client}>
       <WorkflowProvider>
         <AppDataProvider>
-          <HeroUIProvider>
-            <BrowserRouter>
-              <App />
-            </BrowserRouter>
-          </HeroUIProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
         </AppDataProvider>
       </WorkflowProvider>
     </QueryClientProvider>

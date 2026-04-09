@@ -38,7 +38,7 @@ export default function ActionsPage() {
           <div className="pageEmptyState">
             <div className="badge warn">Нет результатов. Сначала запустите расчёт.</div>
             <div className="pageEmptyActions">
-              <Button onClick={() => nav("/run")}>Перейти к запуску</Button>
+              <Button onClick={() => nav("/dashboard")}>Перейти к результатам</Button>
             </div>
           </div>
         </Card>

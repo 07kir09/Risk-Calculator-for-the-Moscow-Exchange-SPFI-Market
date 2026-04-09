@@ -1,15 +1,17 @@
-import Card from "../ui/Card";
-
 export default function HelpPage() {
   return (
-    <Card>
-      <h1 className="pageTitle">Справка</h1>
-      <p className="pageHint">
-        Здесь коротко и по-человечески объясняется, что делать на сайте и как читать основные результаты.
-      </p>
+    <div className="importPagePlain">
+      <div className="importHeroRow">
+        <div>
+          <h1 className="pageTitle">Справка</h1>
+          <div className="importHeroMeta">
+            <span className="importFileTag">Быстрый гид по шагам расчета</span>
+          </div>
+        </div>
+      </div>
 
-      <div className="grid pageSection--tight">
-        <Card>
+      <div className="importUploadSplit helpGrid">
+        <section className="helpTile">
           <div className="cardTitle">Как пользоваться</div>
           <ol className="orderedList pageSection--tight">
             <li>Откройте шаг импорта и загрузите файл портфеля или демо-данные.</li>
@@ -18,9 +20,9 @@ export default function HelpPage() {
             <li>Выберите нужные метрики и параметры расчёта.</li>
             <li>Запустите расчёт и смотрите результат на панели риска.</li>
           </ol>
-        </Card>
+        </section>
 
-        <Card>
+        <section className="helpTile">
           <div className="cardTitle">Как читать метрики</div>
           <div className="detailList pageSection--tight">
             <div className="detailListRow">
@@ -44,16 +46,16 @@ export default function HelpPage() {
               <strong>Сравнение факта с допустимым уровнем</strong>
             </div>
           </div>
-        </Card>
+        </section>
       </div>
 
-      <Card className="pageSection--tight">
+      <section className="helpTile helpTile--wide">
         <div className="cardTitle">Точность чисел</div>
         <div className="cardSubtitle">Интерфейс округляет значения только для чтения. Выгрузка сохраняет исходную точность.</div>
         <div className="textMuted statusMessage--compact">
           Если нужно проверить точные значения, используйте экспорт в Excel или JSON на шаге отчёта.
         </div>
-      </Card>
-    </Card>
+      </section>
+    </div>
   );
 }

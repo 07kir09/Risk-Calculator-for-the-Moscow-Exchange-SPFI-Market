@@ -91,7 +91,7 @@ export default function WhatIfPage() {
       <Card>
         <h1 className="pageTitle">Песочница “Что если”</h1>
         <p className="pageHint">Сначала нужен базовый расчёт. Запустите расчёт и вернитесь сюда.</p>
-        <Button onClick={() => nav("/run")}>Перейти к запуску</Button>
+        <Button onClick={() => nav("/dashboard")}>Перейти к результатам</Button>
       </Card>
     );
   }

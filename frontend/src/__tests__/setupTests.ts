@@ -62,10 +62,24 @@ class MockIntersectionObserver implements IntersectionObserver {
   unobserve() {}
 }
 
+class MockResizeObserver implements ResizeObserver {
+  disconnect() {}
+
+  observe() {}
+
+  unobserve() {}
+}
+
 Object.defineProperty(globalThis, "IntersectionObserver", {
   writable: true,
   configurable: true,
   value: MockIntersectionObserver,
+});
+
+Object.defineProperty(globalThis, "ResizeObserver", {
+  writable: true,
+  configurable: true,
+  value: MockResizeObserver,
 });
 
 Object.defineProperty(window, "matchMedia", {

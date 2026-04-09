@@ -1,19 +1,16 @@
 import { CSSProperties, ReactNode } from "react";
 import classNames from "classnames";
-import { Card as HeroCard, CardBody } from "@heroui/react";
+import { Card as HeroCard } from "@heroui/react";
 
 export default function Card({ children, className, style }: { children: ReactNode; className?: string; style?: CSSProperties }) {
   return (
     <HeroCard
-      className={classNames("card", className)}
+      className={classNames("card", "cardBase", className)}
       radius="lg"
       shadow="sm"
       style={style}
-      classNames={{
-        base: "cardBase",
-      }}
     >
-      <CardBody className="cardBody">{children}</CardBody>
+      <HeroCard.Content className="cardBody">{children}</HeroCard.Content>
     </HeroCard>
   );
 }

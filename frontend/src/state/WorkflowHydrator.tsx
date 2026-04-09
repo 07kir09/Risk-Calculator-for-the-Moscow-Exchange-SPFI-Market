@@ -22,6 +22,7 @@ export default function WorkflowHydrator() {
   const { state: workflowState, dispatch } = useWorkflow();
 
   const positionsCount = dataState.portfolio.positions.length;
+  const hasImportAttempt = Boolean(dataState.portfolio.importedAt);
   const criticalErrors = dataState.validationLog.filter((entry) => entry.severity === "ERROR").length;
   const warnings = dataState.validationLog.filter((entry) => entry.severity === "WARNING").length;
   const validationReady = positionsCount > 0 && criticalErrors === 0 && (warnings === 0 || workflowState.validation.acknowledged);
@@ -34,7 +35,7 @@ export default function WorkflowHydrator() {
   );
 
   useEffect(() => {
-    if (!positionsCount) return;
+    if (!hasImportAttempt) return;
     if (!workflowState.snapshotId) {
       dispatch({
         type: "SET_SNAPSHOT",
@@ -44,7 +45,7 @@ export default function WorkflowHydrator() {
     if (!workflowState.completedSteps.includes(WorkflowStep.Import)) {
       dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Import });
     }
-  }, [dataState.portfolio.importedAt, dispatch, positionsCount, workflowState.completedSteps, workflowState.snapshotId]);
+  }, [dataState.portfolio.importedAt, dispatch, hasImportAttempt, positionsCount, workflowState.completedSteps, workflowState.snapshotId]);
 
   useEffect(() => {
     if (

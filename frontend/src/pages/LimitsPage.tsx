@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
-import { Chip, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/react";
+import { Chip } from "@heroui/react";
 import { useNavigate } from "react-router-dom";
+import AppTable from "../components/AppTable";
 import Button from "../components/Button";
 import Card from "../ui/Card";
 import {
@@ -66,7 +67,7 @@ export default function LimitsPage() {
         <Card>
           <div className="textMuted">Результатов ещё нет. Сначала запустите расчёт.</div>
           <div className="runActionRow">
-            <Button onClick={() => nav("/run")}>К запуску</Button>
+            <Button onClick={() => nav("/dashboard")}>К результатам</Button>
           </div>
         </Card>
       ) : (
@@ -99,37 +100,26 @@ export default function LimitsPage() {
               <div className="cardTitle">Факт против лимита</div>
               <div className="cardSubtitle">Статус виден сразу, а таблица остаётся компактной и читаемой.</div>
 
-              <Table
-                removeWrapper
-                aria-label="Таблица лимитов"
-                classNames={{ table: "heroTable", th: "heroTableHeader", td: "heroTableCell", tr: "heroTableRow" }}
-              >
-                <TableHeader>
-                  <TableColumn>Метрика</TableColumn>
-                  <TableColumn>Факт</TableColumn>
-                  <TableColumn>Лимит</TableColumn>
-                  <TableColumn>Использование</TableColumn>
-                  <TableColumn>Статус</TableColumn>
-                </TableHeader>
-                <TableBody emptyContent="Лимиты не были переданы в расчёт.">
-                  {limits.map(([metric, value, limit, breached]) => {
-                    const utilization = limit ? Math.abs((value / limit) * 100) : 0;
-                    return (
-                      <TableRow key={metric}>
-                        <TableCell>{metric}</TableCell>
-                        <TableCell>{formatNumber(value, 2)}</TableCell>
-                        <TableCell>{formatNumber(limit, 2)}</TableCell>
-                        <TableCell>{formatNumber(utilization, 1)}%</TableCell>
-                        <TableCell>
-                          <Chip color={breached ? "danger" : utilization > 80 ? "warning" : "success"} variant="flat" radius="sm">
-                            {breached ? "Превышен" : utilization > 80 ? "Близко к лимиту" : "Ок"}
-                          </Chip>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+              <AppTable
+                ariaLabel="Таблица лимитов"
+                headers={["Метрика", "Факт", "Лимит", "Использование", "Статус"]}
+                rows={limits.map(([metric, value, limit, breached]) => {
+                  const utilization = limit ? Math.abs((value / limit) * 100) : 0;
+                  return {
+                    key: metric,
+                    cells: [
+                      metric,
+                      formatNumber(value, 2),
+                      formatNumber(limit, 2),
+                      `${formatNumber(utilization, 1)}%`,
+                      <Chip key={`${metric}-status`} color={breached ? "danger" : utilization > 80 ? "warning" : "success"} variant="flat" radius="sm">
+                        {breached ? "Превышен" : utilization > 80 ? "Близко к лимиту" : "Ок"}
+                      </Chip>,
+                    ],
+                  };
+                })}
+                emptyContent="Лимиты не были переданы в расчёт."
+              />
               </Card>
             </Reveal>
           </div>

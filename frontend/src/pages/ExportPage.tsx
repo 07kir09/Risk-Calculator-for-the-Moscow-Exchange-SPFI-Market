@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Checkbox, Chip } from "@heroui/react";
+import { Chip } from "@heroui/react";
 import * as XLSX from "xlsx";
+import AppCheckbox from "../components/AppCheckbox";
 import Button from "../components/Button";
 import Card from "../ui/Card";
 import {
@@ -99,7 +100,7 @@ export default function ExportPage() {
           <div className="pageEmptyState">
             <div className="badge warn">Нет результатов. Сначала запустите расчёт.</div>
             <div className="pageEmptyActions">
-              <Button onClick={() => nav("/run")}>Перейти к запуску</Button>
+              <Button onClick={() => nav("/dashboard")}>Перейти к результатам</Button>
             </div>
           </div>
         </Card>
@@ -132,16 +133,15 @@ export default function ExportPage() {
             <div className="stack pageSection--tight">
               {(["Summary", "Metrics", "Greeks", "Stress", "Limits", "Params", "ValidationLog"] as SectionKey[]).map((s) => (
                 <div key={s} className="checkRow">
-                  <Checkbox
+                  <AppCheckbox
+                    id={`export-section-${s}`}
                     isSelected={sections.includes(s)}
-                    onValueChange={() => toggle(s)}
+                    onChange={() => toggle(s)}
                     size="sm"
                     radius="sm"
+                    label={<span className="checkRowTitle">{sectionMeta[s].title}</span>}
+                    description={<span className="checkRowHint">{sectionMeta[s].hint}</span>}
                   />
-                  <span className="checkRowText">
-                    <span className="checkRowTitle">{sectionMeta[s].title}</span>
-                    <span className="checkRowHint">{sectionMeta[s].hint}</span>
-                  </span>
                 </div>
               ))}
             </div>

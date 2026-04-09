@@ -5,7 +5,7 @@ export const stepToRoute: Record<WorkflowStep, string> = {
   [WorkflowStep.Validate]: "/validate",
   [WorkflowStep.MarketData]: "/market",
   [WorkflowStep.Configure]: "/configure",
-  [WorkflowStep.CalcRun]: "/run",
+  [WorkflowStep.CalcRun]: "/dashboard",
   [WorkflowStep.Results]: "/dashboard",
   [WorkflowStep.Stress]: "/stress",
   [WorkflowStep.Limits]: "/limits",
@@ -13,4 +13,3 @@ export const stepToRoute: Record<WorkflowStep, string> = {
   [WorkflowStep.Export]: "/export",
   [WorkflowStep.PostActions]: "/actions",
 };
-
