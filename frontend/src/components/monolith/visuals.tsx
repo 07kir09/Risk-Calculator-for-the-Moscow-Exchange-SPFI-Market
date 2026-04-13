@@ -31,6 +31,82 @@ function toneColor(value: number) {
   return "rgba(244,241,234,0.42)";
 }
 
+function clampCorrelation(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(-1, Math.min(1, value));
+}
+
+function trimMatrixLabel(label: string, max = 14) {
+  return label.length > max ? `${label.slice(0, max - 1)}…` : label;
+}
+
+function matrixCellBackground(value: number, diagonal: boolean) {
+  if (diagonal) return "rgba(125, 167, 255, 0.26)";
+  const alpha = 0.08 + Math.abs(value) * 0.52;
+  return value >= 0
+    ? `rgba(110, 255, 142, ${alpha.toFixed(3)})`
+    : `rgba(255, 119, 119, ${alpha.toFixed(3)})`;
+}
+
+function matrixCellTextColor(value: number, diagonal: boolean) {
+  if (diagonal || Math.abs(value) >= 0.55) return "rgba(255,255,255,0.96)";
+  if (Math.abs(value) >= 0.28) return "rgba(255,255,255,0.84)";
+  return "rgba(244,241,234,0.72)";
+}
+
+function normalizeCorrelationMatrix(matrix: number[][], labels?: string[], size = 9) {
+  const rows = matrix.filter((row) => Array.isArray(row) && row.length > 0);
+  if (!rows.length) return null;
+
+  const minCols = Math.min(...rows.map((row) => row.length));
+  const sourceSize = Math.min(rows.length, minCols);
+  if (sourceSize <= 0) return null;
+
+  const viewSize = Math.min(Math.max(size, 1), sourceSize);
+  const values = Array.from({ length: viewSize }, (_, rowIndex) =>
+    Array.from({ length: viewSize }, (_, colIndex) => {
+      if (rowIndex === colIndex) return 1;
+      const direct = Number(rows[rowIndex]?.[colIndex]);
+      const reverse = Number(rows[colIndex]?.[rowIndex]);
+      const hasDirect = Number.isFinite(direct);
+      const hasReverse = Number.isFinite(reverse);
+      const raw = hasDirect && hasReverse ? (direct + reverse) / 2 : hasDirect ? direct : hasReverse ? reverse : 0;
+      return clampCorrelation(raw);
+    })
+  );
+
+  const axis = Array.from({ length: viewSize }, (_, index) => labels?.[index] ?? `P${index + 1}`);
+  return {
+    values,
+    axis,
+    sourceSize,
+    truncated: sourceSize > viewSize,
+  };
+}
+
+function findStrongestPair(matrix: number[][], labels: string[], mode: "positive" | "negative") {
+  let bestValue = mode === "positive" ? -Infinity : Infinity;
+  let bestPair: { left: string; right: string; value: number } | null = null;
+
+  for (let rowIndex = 0; rowIndex < matrix.length; rowIndex += 1) {
+    for (let colIndex = rowIndex + 1; colIndex < matrix[rowIndex].length; colIndex += 1) {
+      const value = matrix[rowIndex][colIndex];
+      if (
+        (mode === "positive" && value > bestValue) ||
+        (mode === "negative" && value < bestValue)
+      ) {
+        bestValue = value;
+        bestPair = { left: labels[rowIndex], right: labels[colIndex], value };
+      }
+    }
+  }
+
+  if (!bestPair) return null;
+  if (mode === "positive" && bestPair.value <= 0) return null;
+  if (mode === "negative" && bestPair.value >= 0) return null;
+  return bestPair;
+}
+
 function buildCurvePath(values: number[], width: number, height: number) {
   if (!values.length) return { line: "", area: "" };
 
@@ -162,39 +238,86 @@ export function UtilizationPanel({
 }
 
 export function CorrelationMatrix({ matrix, labels, size = 9 }: CorrelationMatrixProps) {
-  const safeMatrix =
-    matrix.length > 0
-      ? matrix.slice(0, size).map((row) => row.slice(0, size))
-      : Array.from({ length: size }, (_, rowIndex) =>
-          Array.from({ length: size }, (_, colIndex) => {
-            if (rowIndex === colIndex) return 1;
-            const seed = Math.sin((rowIndex + 1) * (colIndex + 2)) * 0.72;
-            return Number(seed.toFixed(2));
-          })
-        );
+  const normalized = normalizeCorrelationMatrix(matrix, labels, size);
 
-  const axis = labels?.slice(0, safeMatrix.length) ?? safeMatrix.map((_, index) => `F${index + 1}`);
+  if (!normalized) {
+    return (
+      <div className="matrixEmpty">
+        Корреляции не рассчитаны.
+        <br />
+        Нужно минимум две позиции и два сценария с ненулевой вариативностью P&amp;L.
+      </div>
+    );
+  }
+
+  const { values, axis, sourceSize, truncated } = normalized;
+  const strongestPositive = findStrongestPair(values, axis, "positive");
+  const strongestNegative = findStrongestPair(values, axis, "negative");
+  const tableStyle = {
+    gridTemplateColumns: `minmax(132px, 160px) repeat(${values.length}, minmax(52px, 1fr))`,
+  } as CSSProperties;
 
   return (
     <div className="matrixWrap">
-      <div
-        className="matrixGrid"
-        style={{ gridTemplateColumns: `repeat(${safeMatrix.length}, minmax(0, 1fr))` }}
-      >
-        {safeMatrix.flatMap((row, rowIndex) =>
-          row.map((value, colIndex) => (
-            <div
-              key={`${rowIndex}-${colIndex}`}
-              className="matrixCell"
-              title={`${axis[rowIndex]} x ${axis[colIndex]}: ${value.toFixed(2)}`}
-              style={{
-                background: `radial-gradient(circle at 50% 50%, ${toneColor(value)} 0%, rgba(255,255,255,0.02) 65%)`,
-                opacity: 0.4 + clamp01(Math.abs(value)) * 0.6,
-              }}
-            />
-          ))
-        )}
+      <div className="matrixSummary">
+        <div className="matrixSummaryItem">
+          <span>Размер</span>
+          <strong>{values.length}x{values.length}</strong>
+        </div>
+        <div className="matrixSummaryItem">
+          <span>Max +</span>
+          <strong>{strongestPositive ? `${strongestPositive.value.toFixed(2)} · ${trimMatrixLabel(strongestPositive.left, 10)} / ${trimMatrixLabel(strongestPositive.right, 10)}` : "нет"}</strong>
+        </div>
+        <div className="matrixSummaryItem">
+          <span>Max -</span>
+          <strong>{strongestNegative ? `${strongestNegative.value.toFixed(2)} · ${trimMatrixLabel(strongestNegative.left, 10)} / ${trimMatrixLabel(strongestNegative.right, 10)}` : "нет"}</strong>
+        </div>
       </div>
+
+      {truncated ? (
+        <div className="matrixNote">
+          Показаны первые {values.length} позиций из {sourceSize}, чтобы матрица оставалась читаемой.
+        </div>
+      ) : null}
+
+      <div className="matrixTableWrap">
+        <div className="matrixTable" style={tableStyle}>
+          <div className="matrixCorner">Позиции</div>
+          {axis.map((label) => (
+            <div key={`top-${label}`} className="matrixAxisLabel matrixAxisLabel--top" title={label}>
+              {trimMatrixLabel(label, 10)}
+            </div>
+          ))}
+
+          {values.flatMap((row, rowIndex) => [
+            <div
+              key={`side-${axis[rowIndex]}`}
+              className="matrixAxisLabel matrixAxisLabel--side"
+              title={axis[rowIndex]}
+            >
+              {trimMatrixLabel(axis[rowIndex], 16)}
+            </div>,
+            ...row.map((value, colIndex) => {
+              const diagonal = rowIndex === colIndex;
+              return (
+                <div
+                  key={`${rowIndex}-${colIndex}`}
+                  className={`matrixCell ${diagonal ? "matrixCell--diagonal" : ""}`}
+                  title={`${axis[rowIndex]} × ${axis[colIndex]}: ${value.toFixed(2)}`}
+                  style={{
+                    background: matrixCellBackground(value, diagonal),
+                    color: matrixCellTextColor(value, diagonal),
+                    boxShadow: diagonal ? "inset 0 0 0 1px rgba(125,167,255,0.28)" : undefined,
+                  }}
+                >
+                  <span>{value.toFixed(2)}</span>
+                </div>
+              );
+            }),
+          ])}
+        </div>
+      </div>
+
       <div className="matrixLegend">
         <span>-1.0 (inverse)</span>
         <div className="matrixLegendBar" />

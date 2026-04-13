@@ -66,12 +66,6 @@ stop_api_orphans() {
   fi
 
   for pid in $pids; do
-    local cmd
-    cmd="$(ps -p "$pid" -o command= 2>/dev/null || true)"
-    if ! echo "$cmd" | grep -E "uvicorn .*option_risk\\.api:app" >/dev/null 2>&1; then
-      continue
-    fi
-
     # Безопасность: останавливаем только API-процессы, запущенные из этого проекта (cwd заканчивается на /backend).
     local cwd
     cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)"

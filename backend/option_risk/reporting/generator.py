@@ -2,10 +2,23 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
 
+_MPL_CONFIG_DIR = Path(tempfile.gettempdir()) / "option_risk_mpl"
+_MPL_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+
+# На macOS/GUI-less окружениях pyplot может падать с Abort trap при выборе интерактивного backend.
+# Жёстко переводим отчёты в headless-режим и уводим кэши в writable temp-директорию.
+os.environ.setdefault("MPLBACKEND", "Agg")
+os.environ.setdefault("MPLCONFIGDIR", str(_MPL_CONFIG_DIR))
+os.environ.setdefault("XDG_CACHE_HOME", str(_MPL_CONFIG_DIR))
+
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 

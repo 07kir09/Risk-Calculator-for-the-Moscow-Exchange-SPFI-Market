@@ -1533,6 +1533,7 @@ a:hover {
 .topbarMenuSlot {
   display: flex;
   align-items: center;
+  gap: 12px;
   justify-self: start;
   min-width: 0;
 }
@@ -1616,6 +1617,32 @@ a:hover {
 .topbarMenuButton svg {
   width: 18px;
   height: 18px;
+}
+
+.topbarPageContext {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 2px 0;
+}
+
+.topbarPageEyebrow {
+  color: rgba(11, 18, 32, 0.46);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.topbarPageTitle {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .navigationDrawerBackdrop {
@@ -2966,16 +2993,125 @@ a:hover {
   margin-top: 18px;
 }
 
-.matrixGrid {
+.matrixSummary {
   display: grid;
-  gap: 2px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.matrixSummaryItem {
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
-  padding: 2px;
+}
+
+.matrixSummaryItem span {
+  display: block;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.matrixSummaryItem strong {
+  display: block;
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.matrixNote {
+  margin-bottom: 12px;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.matrixTableWrap {
+  overflow: auto;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.025);
+  padding: 10px;
+}
+
+.matrixTable {
+  display: grid;
+  gap: 6px;
+  min-width: max-content;
+  align-items: stretch;
+}
+
+.matrixCorner,
+.matrixAxisLabel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.matrixCorner {
+  justify-content: flex-start;
+  padding-left: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.matrixAxisLabel--top {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  min-height: 132px;
+  letter-spacing: 0.03em;
+}
+
+.matrixAxisLabel--side {
+  justify-content: flex-start;
+  padding-left: 12px;
 }
 
 .matrixCell {
-  aspect-ratio: 1;
-  background: rgba(255, 255, 255, 0.03);
+  aspect-ratio: 1 / 1;
+  min-width: 52px;
+  min-height: 52px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.matrixCell span {
+  line-height: 1;
+}
+
+.matrixCell--diagonal {
+  letter-spacing: 0.01em;
+}
+
+.matrixEmpty {
+  min-height: 240px;
+  border-radius: 18px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(255, 255, 255, 0.58);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 20px;
+  line-height: 1.6;
 }
 
 .matrixLegend {
@@ -2993,6 +3129,12 @@ a:hover {
 .matrixLegendBar {
   height: 2px;
   background: linear-gradient(90deg, rgba(255, 42, 42, 0.92), rgba(255,255,255,0.15), rgba(110, 255, 142, 0.92));
+}
+
+@media (max-width: 860px) {
+  .matrixSummary {
+    grid-template-columns: 1fr;
+  }
 }
 
 .curvePanel {
@@ -3208,6 +3350,10 @@ a:hover {
 @media (max-width: 760px) {
   .appTopbar {
     padding: 0 18px;
+  }
+
+  .topbarPageContext {
+    display: none;
   }
 
   .appMainScroll {
@@ -4651,7 +4797,160 @@ a:hover {
 }
 
 .dashboardPage--revamp {
-  padding-bottom: 18px;
+  gap: 26px;
+  padding-bottom: 24px;
+}
+
+.dashboardPage--revamp .pageTitle {
+  font-size: clamp(32px, 4vw, 44px);
+  letter-spacing: -0.05em;
+}
+
+.dashboardPage--revamp .importFileTag {
+  font-size: 11px;
+}
+
+.dashboardPage--revamp .metricHero {
+  min-height: 214px;
+  padding: 18px 18px 16px;
+  border-radius: 22px;
+}
+
+.dashboardPage--revamp .metricHeroHead span {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+}
+
+.dashboardPage--revamp .metricHeroValue {
+  margin-top: 14px;
+  font-size: clamp(34px, 3.8vw, 54px);
+}
+
+.dashboardPage--revamp .metricHeroChart {
+  margin-top: 18px;
+}
+
+.dashboardPage--revamp .glassPanel {
+  padding: 18px;
+  border-radius: 22px;
+}
+
+.dashboardPage--revamp .glassPanelTitle,
+.dashboardPage--revamp .richChartTitle {
+  font-size: 16px;
+}
+
+.dashboardPage--revamp .glassPanelSubtitle,
+.dashboardPage--revamp .richChartSubtitle {
+  margin-top: 4px;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.dashboardPage--revamp .heroInlineStats {
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.dashboardPage--revamp .heroInlineStat {
+  padding: 12px 14px;
+  border-radius: 16px;
+}
+
+.dashboardPage--revamp .heroInlineStat span {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+
+.dashboardPage--revamp .heroInlineStat strong {
+  margin-top: 8px;
+  font-size: clamp(18px, 1.8vw, 22px);
+}
+
+.dashboardPage--revamp .donutGaugeValue {
+  font-size: 18px !important;
+}
+
+.dashboardPage--revamp .importTabsList {
+  padding: 5px !important;
+  border-radius: 16px !important;
+}
+
+.dashboardPage--revamp .importTab {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+.dashboardPage--revamp .importTabPanel {
+  padding-top: 16px !important;
+}
+
+.dashboardSection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dashboardSectionHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 2px;
+}
+
+.dashboardSectionIntro {
+  max-width: 760px;
+}
+
+.dashboardSectionEyebrow {
+  color: rgba(244, 241, 234, 0.46);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.dashboardSectionTitle {
+  margin: 6px 0 0;
+  font-size: clamp(18px, 2vw, 24px);
+  line-height: 1.06;
+  letter-spacing: -0.04em;
+  font-weight: 800;
+}
+
+.dashboardSectionText {
+  margin: 8px 0 0;
+  color: rgba(244, 241, 234, 0.58);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.dashboardSectionMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.dashboardSectionTag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(244, 241, 234, 0.72);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dashboardSectionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .dashboardHeroActions {
@@ -4716,8 +5015,8 @@ a:hover {
 }
 
 .dashboardPulseCard {
-  padding: 12px 14px;
-  border-radius: 12px;
+  padding: 11px 12px;
+  border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02)),
@@ -4727,17 +5026,17 @@ a:hover {
 .dashboardPulseCard span {
   display: block;
   color: rgba(244, 241, 234, 0.54);
-  font-size: 11px;
-  letter-spacing: 0.12em;
+  font-size: 10px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .dashboardPulseCard strong {
   display: block;
-  margin-top: 9px;
-  font-size: 24px;
+  margin-top: 8px;
+  font-size: 20px;
   line-height: 1;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.03em;
 }
 
 .dashboardFlowGrid {
@@ -4746,10 +5045,251 @@ a:hover {
   gap: 16px;
 }
 
+.dashboardInsightGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: 16px;
+}
+
 .dashboardGaugeRow {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.compositionDonut {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.8fr);
+  gap: 18px;
+  align-items: center;
+}
+
+.compositionDonutChart {
+  position: relative;
+  min-height: 280px;
+}
+
+.compositionDonutCenter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.compositionDonutCenter strong {
+  font-size: clamp(28px, 3vw, 40px);
+  line-height: 0.92;
+  letter-spacing: -0.06em;
+}
+
+.compositionDonutCenter span {
+  margin-top: 6px;
+  color: rgba(244, 241, 234, 0.56);
+  font-size: 12px;
+  text-align: center;
+}
+
+.compositionLegend {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.compositionLegendItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.compositionLegendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.compositionLegendMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.compositionLegendMeta strong {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.compositionLegendMeta span {
+  color: rgba(244, 241, 234, 0.54);
+  font-size: 12px;
+}
+
+.stackedMetricChart {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.stackedMetricLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.stackedMetricLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(244, 241, 234, 0.72);
+  font-size: 12px;
+}
+
+.stackedMetricLegendSwatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.stackedMetricEmpty,
+.riskConnectionEmpty {
+  min-height: 280px;
+  padding: 22px;
+  border-radius: 18px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: rgba(244, 241, 234, 0.56);
+  line-height: 1.6;
+}
+
+.riskConnectionWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.riskConnectionViewport {
+  width: 100%;
+  min-height: 320px;
+}
+
+.riskConnectionSvg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.riskConnectionRing {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-dasharray: 4 7;
+}
+
+.riskConnectionRing--outer {
+  stroke: rgba(255, 255, 255, 0.06);
+}
+
+.riskConnectionSpine {
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 1;
+}
+
+.riskConnectionLink {
+  stroke: rgba(125, 167, 255, 0.88);
+  stroke-linecap: round;
+}
+
+.riskConnectionCenterNode {
+  fill: rgba(255, 255, 255, 0.08);
+  stroke: rgba(125, 167, 255, 0.26);
+  stroke-width: 1.4;
+}
+
+.riskConnectionCenterLabel {
+  fill: rgba(244, 241, 234, 0.92);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.riskConnectionCenterSubLabel {
+  fill: rgba(244, 241, 234, 0.44);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.riskConnectionNode {
+  stroke: rgba(10, 10, 12, 0.34);
+  stroke-width: 1.6;
+}
+
+.riskConnectionNode--metric {
+  filter: drop-shadow(0 0 16px rgba(125, 167, 255, 0.2));
+}
+
+.riskConnectionMetricLabel,
+.riskConnectionPositionLabel {
+  fill: rgba(244, 241, 234, 0.8);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.riskConnectionLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.riskConnectionLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(244, 241, 234, 0.68);
+  font-size: 12px;
+}
+
+.riskConnectionLegendSwatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.riskConnectionLegendSwatch--metric {
+  background: rgba(125, 167, 255, 0.96);
+}
+
+.riskConnectionLegendSwatch--positive {
+  background: rgba(110, 255, 142, 0.96);
+}
+
+.riskConnectionLegendSwatch--negative {
+  background: rgba(255, 119, 119, 0.96);
+}
+
+.dashboardUtilizationWrap {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .importHeroMeta {
@@ -4761,6 +5301,15 @@ a:hover {
 }
 
 @media (max-width: 1100px) {
+  .dashboardSectionHead {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dashboardSectionMeta {
+    justify-content: flex-start;
+  }
+
   .dashboardQuickStats {
     margin-left: 0;
     min-width: 0;
@@ -4772,14 +5321,47 @@ a:hover {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .dashboardFlowGrid {
+  .dashboardFlowGrid,
+  .dashboardInsightGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .compositionDonut {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 760px) {
+  .dashboardPage--revamp {
+    gap: 22px;
+  }
+
+  .dashboardPage--revamp .pageTitle {
+    font-size: 30px;
+  }
+
+  .dashboardSectionText {
+    font-size: 12px;
+  }
+
+  .dashboardPage--revamp .metricHero {
+    min-height: 196px;
+  }
+
+  .dashboardPage--revamp .metricHeroValue {
+    font-size: 32px;
+  }
+
   .dashboardGaugeRow {
     grid-template-columns: 1fr;
+  }
+
+  .riskConnectionLegend {
+    flex-direction: column;
+  }
+
+  .dashboardUtilizationWrap {
+    justify-content: stretch;
   }
 }
 
@@ -5333,6 +5915,13 @@ a:hover {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
+}
+
+.importStructureTopRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: stretch;
   margin-bottom: 12px;
 }
 
@@ -5357,6 +5946,79 @@ a:hover {
   font-size: 19px;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
+}
+
+.importStructureMini {
+  min-width: 236px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 11px;
+  background:
+    radial-gradient(circle at top right, rgba(125, 167, 255, 0.12), transparent 62%),
+    rgba(255, 255, 255, 0.018);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.importStructureMiniTitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(244, 241, 234, 0.52);
+}
+
+.importStructureMiniBody {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.importStructureMiniLegend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.importStructureMiniLegendItem {
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 6px;
+  min-height: 18px;
+}
+
+.importStructureMiniLegendDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  opacity: 0.95;
+}
+
+.importStructureMiniLegendLabel {
+  font-size: 12px;
+  color: rgba(244, 241, 234, 0.84);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.importStructureMiniLegendShare {
+  font-size: 12px;
+  color: rgba(244, 241, 234, 0.56);
+  font-variant-numeric: tabular-nums;
+}
+
+.importStructureMiniEmpty {
+  min-height: 118px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  color: rgba(244, 241, 234, 0.46);
+  border-radius: 9px;
+  border: 1px dashed rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.012);
 }
 
 /* Columns reference */
@@ -5415,6 +6077,18 @@ a:hover {
 
   .importPortfolioKpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .importStructureTopRow {
+    grid-template-columns: 1fr;
+  }
+
+  .importStructureMini {
+    min-width: 0;
+  }
+
+  .importStructureMiniBody {
+    grid-template-columns: 98px minmax(0, 1fr);
   }
 }
 

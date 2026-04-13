@@ -1,5 +1,5 @@
 import { ReactElement } from "react";
-import { render } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { WorkflowProvider } from "../workflow/workflowStore";
@@ -21,6 +21,16 @@ export function renderWithProviders(ui: ReactElement, opts?: { route?: string })
       </WorkflowProvider>
     </QueryClientProvider>
   );
+}
+
+export async function runConfiguredCalculation(user: { click: (element: Element) => Promise<void> }) {
+  expect(await screen.findByRole("heading", { name: /Настройка расчёта/i })).toBeInTheDocument();
+
+  const goToResultsButton = await screen.findByRole("button", { name: /Перейти к результатам/i });
+  await waitFor(() => expect(goToResultsButton).toBeEnabled());
+  await user.click(goToResultsButton);
+
+  expect(await screen.findByRole("heading", { name: /Панель риска/i })).toBeInTheDocument();
 }
 
 export function seedReadyForConfigure() {

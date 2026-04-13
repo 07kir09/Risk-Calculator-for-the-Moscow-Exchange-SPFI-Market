@@ -8,7 +8,7 @@ import { useWorkflow } from "../workflow/workflowStore";
 import { utilityItems, workflowItems } from "./navigationModel";
 
 export default function Topbar({
-  title: _title,
+  title,
 }: {
   title: string;
 }) {
@@ -58,6 +58,10 @@ export default function Topbar({
 
       <div className="topbarMenuSlot">
         <NavigationDrawer />
+        <div className="topbarPageContext" aria-label={`Текущий раздел: ${title}`}>
+          <div className="topbarPageEyebrow">Раздел</div>
+          <div className="topbarPageTitle">{title}</div>
+        </div>
         <nav className="srOnly" aria-label="Быстрые ссылки">
           {[...workflowItems, ...utilityItems].map((item) => (
             <Link key={item.to} to={item.to}>

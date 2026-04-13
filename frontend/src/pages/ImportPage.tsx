@@ -12,6 +12,7 @@ import {
   Table,
   Tabs,
 } from "@heroui/react";
+import { Cell, Pie, PieChart } from "recharts";
 import { useNavigate } from "react-router-dom";
 import { uploadMarketDataBundleFile } from "../api/endpoints";
 import Button from "../components/Button";
@@ -137,6 +138,17 @@ function instrumentTypeLabel(type: string) {
     case "forward":  return "Форварды";
     case "swap_ir":  return "Свопы";
     default:         return type;
+  }
+}
+
+const importStructurePalette = ["#7da7ff", "#6eff8e", "#ffb86a", "#7be0d6", "#ffd166", "#8ec7ff"];
+
+function instrumentTypeColor(type: string, index: number) {
+  switch (type) {
+    case "option": return "#7da7ff";
+    case "forward": return "#6eff8e";
+    case "swap_ir": return "#ffb86a";
+    default: return importStructurePalette[index % importStructurePalette.length];
   }
 }
 
@@ -273,6 +285,16 @@ export default function ImportPage() {
       share: positions.length ? (count / positions.length) * 100 : 0,
     })).sort((a, b) => b.count - a.count),
     [positions.length, stats]
+  );
+  const structurePieData = useMemo(
+    () => mixRows.map((row, index) => ({
+      key: row.key,
+      label: row.label,
+      value: row.count,
+      share: row.share,
+      color: instrumentTypeColor(row.key, index),
+    })),
+    [mixRows]
   );
 
   const uniqueUnderlyings = useMemo(
@@ -559,22 +581,63 @@ export default function ImportPage() {
                   </Tabs.Panel>
 
                   <Tabs.Panel className="importTabsPanel" id="structure">
-                    <div className="importPortfolioKpis">
-                      <div className="importPortfolioKpi">
-                        <span>Всего</span>
-                        <strong>{positions.length}</strong>
+                    <div className="importStructureTopRow">
+                      <div className="importPortfolioKpis">
+                        <div className="importPortfolioKpi">
+                          <span>Всего</span>
+                          <strong>{positions.length}</strong>
+                        </div>
+                        <div className="importPortfolioKpi">
+                          <span>Типов</span>
+                          <strong>{mixRows.length}</strong>
+                        </div>
+                        <div className="importPortfolioKpi">
+                          <span>Активов</span>
+                          <strong>{uniqueUnderlyings}</strong>
+                        </div>
+                        <div className="importPortfolioKpi">
+                          <span>Валют</span>
+                          <strong>{uniqueCurrencies}</strong>
+                        </div>
                       </div>
-                      <div className="importPortfolioKpi">
-                        <span>Типов</span>
-                        <strong>{mixRows.length}</strong>
-                      </div>
-                      <div className="importPortfolioKpi">
-                        <span>Активов</span>
-                        <strong>{uniqueUnderlyings}</strong>
-                      </div>
-                      <div className="importPortfolioKpi">
-                        <span>Валют</span>
-                        <strong>{uniqueCurrencies}</strong>
+
+                      <div className="importStructureMini">
+                        <div className="importStructureMiniTitle">Мини-структура</div>
+                        {structurePieData.length === 0 ? (
+                          <div className="importStructureMiniEmpty">Нет данных для диаграммы</div>
+                        ) : (
+                          <div className="importStructureMiniBody">
+                            <PieChart width={118} height={118} aria-label="Мини-диаграмма состава портфеля">
+                              <Pie
+                                data={structurePieData}
+                                dataKey="value"
+                                nameKey="label"
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={30}
+                                outerRadius={50}
+                                paddingAngle={2}
+                                stroke="rgba(255, 255, 255, 0.09)"
+                                strokeWidth={1}
+                                isAnimationActive={false}
+                              >
+                                {structurePieData.map((slice) => (
+                                  <Cell key={`${slice.key}-${slice.label}`} fill={slice.color} />
+                                ))}
+                              </Pie>
+                            </PieChart>
+
+                            <div className="importStructureMiniLegend">
+                              {structurePieData.slice(0, 4).map((slice) => (
+                                <div key={`legend-${slice.key}`} className="importStructureMiniLegendItem">
+                                  <span className="importStructureMiniLegendDot" style={{ background: slice.color }} aria-hidden="true" />
+                                  <span className="importStructureMiniLegendLabel">{slice.label}</span>
+                                  <span className="importStructureMiniLegendShare">{Math.round(slice.share)}%</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 

@@ -1,23 +1,17 @@
 import { screen } from "@testing-library/react";
-import { waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../App";
-import { renderWithProviders, seedReadyForConfigure } from "./testUtils";
+import { renderWithProviders, runConfiguredCalculation, seedReadyForConfigure } from "./testUtils";
 
 test("экспорт: формирование Excel файла (вызов download)", async () => {
   const user = userEvent.setup();
   seedReadyForConfigure();
   renderWithProviders(<App />, { route: "/configure" });
 
-  expect(await screen.findByRole("heading", { name: /Настройка расчёта/i })).toBeInTheDocument();
-  await waitFor(() => expect(screen.getByRole("button", { name: /Сохранить и перейти к запуску/i })).toBeEnabled());
-  await user.click(screen.getByRole("button", { name: /Сохранить и перейти к запуску/i }));
-  expect(await screen.findByRole("heading", { name: /Запуск расчёта/i })).toBeInTheDocument();
-  await waitFor(() => expect(screen.getByRole("button", { name: /Запустить расчёт/i })).toBeEnabled());
-  await user.click(screen.getByRole("button", { name: /Запустить расчёт/i }));
+  await runConfiguredCalculation(user);
 
-  const exportLink = await screen.findByRole("link", { name: /^Экспорт$/i }, { timeout: 3000 });
-  await user.click(exportLink);
+  const exportButton = await screen.findByRole("button", { name: /^Экспорт$/i });
+  await user.click(exportButton);
 
   expect(await screen.findByRole("heading", { name: /Шаг 10\. Отчёты и экспорт/i })).toBeInTheDocument();
 
