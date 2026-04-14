@@ -275,9 +275,9 @@ def run_calculation(
         position_pnl = pnl_matrix(portfolio, scenarios, market=market)
         position_pnl_base = position_pnl * fx_rates[:, None]
         pnl_dist = np.sum(position_pnl_base, axis=0, dtype=np.float64).tolist()
-        if position_pnl_base.size <= max(0, int(cfg.max_pnl_matrix_cells)):
+        if cfg.calc_correlations and position_pnl_base.size <= max(0, int(cfg.max_pnl_matrix_cells)):
             pnl_mat = position_pnl_base.tolist()
-        else:
+        elif cfg.calc_correlations:
             validation_log.append(
                 ValidationMessage(
                     severity="WARNING",
@@ -366,7 +366,7 @@ def run_calculation(
             },
             limits_cfg or {},
         )
-        if limits_cfg
+        if (limits_cfg and cfg.calc_var_es)
         else None
     )
 

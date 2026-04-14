@@ -13,9 +13,6 @@ test("демо: настройка → запуск → дашборд", async (
 
   await waitFor(() => expect(screen.getByRole("button", { name: /Сохранить и перейти к запуску/i })).toBeEnabled());
   await user.click(screen.getByRole("button", { name: /Сохранить и перейти к запуску/i }));
-  expect(await screen.findByRole("heading", { name: /Запуск расчёта/i })).toBeInTheDocument();
 
-  await waitFor(() => expect(screen.getByRole("button", { name: /Запустить расчёт/i })).toBeEnabled());
-  await user.click(screen.getByRole("button", { name: /Запустить расчёт/i }));
   expect(await screen.findByRole("link", { name: /^Экспорт$/i })).toBeInTheDocument();
 });

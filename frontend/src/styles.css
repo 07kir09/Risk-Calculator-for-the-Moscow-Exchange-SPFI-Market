@@ -6184,6 +6184,40 @@ a:hover {
   align-items: stretch;
 }
 
+.configureHeroTabs {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 10px;
+}
+
+.configureHeroTab {
+  border: 0;
+  background: transparent;
+  padding: 4px 0;
+  color: rgba(244, 241, 234, 0.68);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 180ms ease, border-color 180ms ease;
+}
+
+.configureHeroTab:hover {
+  color: rgba(244, 241, 234, 0.9);
+}
+
+.configureHeroTab--active {
+  color: rgba(225, 255, 239, 0.98);
+  border-bottom-color: rgba(110, 255, 142, 0.92);
+}
+
+.configureHeroTab:focus,
+.configureHeroTab:focus-visible {
+  outline: none;
+}
+
 .configureMetricsCard--compact {
   min-height: 320px;
   max-height: none;
@@ -6594,6 +6628,11 @@ a:hover {
     grid-template-columns: 1fr;
   }
 
+  .configureHeroTabs {
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
   .configureSliderGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -6640,5 +6679,603 @@ a:hover {
 
   .configureScenarioBody {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   DashboardPage (redesign)
+═══════════════════════════════════════════ */
+
+/* KPI strip */
+.dashboardKpiRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dashboardKpiCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  transition: border-color 0.2s ease;
+}
+
+.dashboardKpiCard--danger {
+  border-color: rgba(255, 100, 100, 0.28);
+  background: linear-gradient(160deg, rgba(255, 100, 100, 0.08), rgba(255, 100, 100, 0.03));
+}
+
+.dashboardKpiCard--warning {
+  border-color: rgba(255, 182, 89, 0.28);
+  background: linear-gradient(160deg, rgba(255, 182, 89, 0.08), rgba(255, 182, 89, 0.03));
+}
+
+.dashboardKpiCard--success {
+  border-color: rgba(110, 255, 142, 0.28);
+  background: linear-gradient(160deg, rgba(110, 255, 142, 0.08), rgba(110, 255, 142, 0.03));
+}
+
+.dashboardKpiCard--neutral {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.dashboardKpiLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(244, 241, 234, 0.42);
+}
+
+.dashboardKpiValue {
+  display: block;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: rgba(244, 241, 234, 0.9);
+}
+
+.dashboardKpiHint {
+  font-size: 11px;
+  color: rgba(244, 241, 234, 0.36);
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+
+/* Zone split: chart pane */
+.dashboardChartPane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 4px;
+}
+
+.dashboardChartPaneTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dashboardChartEyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.dashboardChartArea {
+  flex: 1;
+  min-height: 160px;
+}
+
+/* Zone split: utilization tile */
+.dashboardUtilTile {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 22px;
+  border-radius: 14px;
+  background: rgba(125, 167, 255, 0.07);
+  border: 1px solid rgba(125, 167, 255, 0.2);
+  min-height: 180px;
+}
+
+.dashboardUtilEyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(170, 192, 255, 0.55);
+}
+
+.dashboardUtilCenter {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex: 1;
+  padding: 4px 0;
+}
+
+.dashboardUtilMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dashboardUtilMetaRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.dashboardUtilMetaRow strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Empty state pane */
+.dashboardEmptyPane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 20px;
+}
+
+.dashboardEmptyBtnRow {
+  margin-top: 8px;
+}
+
+/* Readiness tile (empty state right) */
+.dashboardReadinessTile {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 22px;
+  border-radius: 14px;
+  background: rgba(255, 182, 89, 0.06);
+  border: 1px solid rgba(255, 182, 89, 0.2);
+  min-height: 180px;
+}
+
+.dashboardReadinessEyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 210, 140, 0.55);
+}
+
+.dashboardReadinessChecklist {
+  flex: 1;
+}
+
+.dashboardReadinessFooter {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.3);
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  padding-top: 10px;
+}
+
+/* Tab content */
+.dashboardTabGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  padding: 8px 0;
+}
+
+.dashboardTabPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Factor stats row */
+.dashboardFactorStats {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  flex-wrap: wrap;
+}
+
+.dashboardFactorStat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dashboardFactorStat span {
+  font-size: 11px;
+  color: rgba(244, 241, 234, 0.42);
+  letter-spacing: 0.05em;
+}
+
+.dashboardFactorStat strong {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(244, 241, 234, 0.85);
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+
+/* Hero actions (populated state) */
+.dashboardHeroActions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 1100px) {
+  .dashboardKpiRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboardTabGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .dashboardKpiRow {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   RunPage
+═══════════════════════════════════════════ */
+
+.runActionTile {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 22px;
+  border-radius: 14px;
+  background: rgba(110, 255, 142, 0.06);
+  border: 1px solid rgba(110, 255, 142, 0.2);
+  min-height: 180px;
+}
+
+.runActionEyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(140, 255, 160, 0.55);
+}
+
+.runActionBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.runActionDesc {
+  font-size: 13px;
+  color: rgba(244, 241, 234, 0.55);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.runActionError {
+  font-size: 12px;
+  color: rgba(255, 120, 120, 0.9);
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 100, 100, 0.08);
+  border: 1px solid rgba(255, 100, 100, 0.2);
+}
+
+.runActionFooter {
+  padding-top: 4px;
+}
+
+/* ═══════════════════════════════════════════
+   Stress workspace (inside ConfigurePage)
+═══════════════════════════════════════════ */
+
+.stressWorkspace {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stressWorkspaceHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.stressWorkspaceActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.stressLegend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0 2px;
+}
+
+.stressLegendTitle {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: rgba(244, 241, 234, 0.5);
+}
+
+.stressLegendRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stressLegendItem {
+  font-size: 12px;
+  color: rgba(244, 241, 234, 0.66);
+}
+
+.stressMinimalTabs {
+  width: 100%;
+  padding: 4px 0 0;
+  border-radius: 0;
+  border: 0;
+  background: transparent;
+}
+
+.stressMinimalListContainer {
+  align-self: stretch;
+}
+
+.stressMinimalList {
+  min-width: 250px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.stressMinimalTab {
+  text-align: left !important;
+  min-height: 58px;
+  border-radius: 10px;
+}
+
+.stressMinimalTabInner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+
+.stressMinimalTabTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(244, 241, 234, 0.84);
+}
+
+.stressMinimalTabHint {
+  font-size: 11px;
+  color: rgba(244, 241, 234, 0.43);
+}
+
+.stressMinimalPanel {
+  width: 100%;
+  padding-inline: 16px;
+}
+
+.stressMinimalPanelTop {
+  margin-bottom: 10px;
+}
+
+.stressMinimalPanelTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: rgba(244, 241, 234, 0.9);
+}
+
+.stressMinimalPanelHint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: rgba(244, 241, 234, 0.54);
+}
+
+.stressMinimalGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.stressMinimalEmpty {
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  color: rgba(244, 241, 234, 0.55);
+}
+
+.stressMinimalCard {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 14px 14px 13px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+  text-align: left;
+}
+
+.stressMinimalCard:hover {
+  border-color: rgba(125, 167, 255, 0.28);
+  background: rgba(125, 167, 255, 0.06);
+}
+
+.stressMinimalCard:focus-visible {
+  outline: 0;
+  border-color: rgba(125, 167, 255, 0.45);
+  box-shadow: 0 0 0 1px rgba(125, 167, 255, 0.45);
+}
+
+.stressMinimalCard--active {
+  border-color: rgba(110, 255, 142, 0.38);
+  background: rgba(110, 255, 142, 0.08);
+}
+
+.stressMinimalCard--active:hover {
+  border-color: rgba(110, 255, 142, 0.5);
+  background: rgba(110, 255, 142, 0.11);
+}
+
+.stressMinimalCardTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stressMinimalCheck {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: rgba(5, 15, 8, 0.92);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.stressMinimalCheck--on {
+  border-color: rgba(110, 255, 142, 0.9);
+  background: rgba(110, 255, 142, 0.9);
+}
+
+.stressMinimalName {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(244, 241, 234, 0.88);
+  line-height: 1.3;
+}
+
+.stressMinimalBadge {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(110, 255, 142, 0.88);
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(110, 255, 142, 0.32);
+  background: rgba(110, 255, 142, 0.08);
+}
+
+.stressMinimalBadge--off {
+  color: rgba(244, 241, 234, 0.48);
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.stressMinimalDesc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(244, 241, 234, 0.62);
+}
+
+.stressMinimalShiftRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.stressShiftBadge {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: "SF Mono", "Fira Code", monospace;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.stressShiftBadge--pos {
+  border-color: rgba(110, 255, 142, 0.3);
+  background: rgba(110, 255, 142, 0.07);
+  color: rgba(110, 255, 142, 0.85);
+}
+
+.stressShiftBadge--neg {
+  border-color: rgba(255, 120, 120, 0.3);
+  background: rgba(255, 120, 120, 0.07);
+  color: rgba(255, 120, 120, 0.85);
+}
+
+.stressShiftBadge--warn {
+  border-color: rgba(255, 182, 89, 0.3);
+  background: rgba(255, 182, 89, 0.07);
+  color: rgba(255, 182, 89, 0.85);
+}
+
+.stressPresetOnlyNote {
+  margin-top: 2px;
+  color: rgba(244, 241, 234, 0.5);
+  font-size: 12px;
+}
+
+@media (max-width: 1000px) {
+  .stressMinimalList {
+    min-width: 240px;
+  }
+}
+
+@media (max-width: 640px) {
+  .stressMinimalTabs {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .stressMinimalListContainer {
+    align-self: auto;
+  }
+
+  .stressMinimalList {
+    min-width: 0;
+  }
+
+  .stressMinimalPanel {
+    padding-inline: 0;
   }
 }

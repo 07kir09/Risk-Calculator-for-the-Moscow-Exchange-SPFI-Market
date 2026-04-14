@@ -8,7 +8,7 @@ export const workflowItems: NavItem[] = [
   { to: "/market", label: "Рыночные данные", step: WorkflowStep.MarketData },
   { to: "/configure", label: "Настройка расчета", step: WorkflowStep.Configure },
   { to: "/dashboard", label: "Панель риска", step: WorkflowStep.Results },
-  { to: "/stress", label: "Стресс-сценарии", step: WorkflowStep.Stress },
+
   { to: "/limits", label: "Лимиты", step: WorkflowStep.Limits },
   { to: "/margin", label: "Маржа и капитал", step: WorkflowStep.Margin },
   { to: "/export", label: "Экспорт", step: WorkflowStep.Export },

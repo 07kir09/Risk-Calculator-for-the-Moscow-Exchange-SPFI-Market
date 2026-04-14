@@ -12,13 +12,12 @@ test("стресс: запуск → показ топ‑вкладчиков", 
   expect(await screen.findByRole("heading", { name: /Настройка расчёта/i })).toBeInTheDocument();
   await waitFor(() => expect(screen.getByRole("button", { name: /Сохранить и перейти к запуску/i })).toBeEnabled());
   await user.click(screen.getByRole("button", { name: /Сохранить и перейти к запуску/i }));
-  expect(await screen.findByRole("heading", { name: /Запуск расчёта/i })).toBeInTheDocument();
-  await waitFor(() => expect(screen.getByRole("button", { name: /Запустить расчёт/i })).toBeEnabled());
-  await user.click(screen.getByRole("button", { name: /Запустить расчёт/i }));
 
-  await user.click(await screen.findByRole("link", { name: /Стресс/i }));
+  // After run → dashboard. Find and click the Стрессы tab.
+  expect(await screen.findByRole("heading", { name: /Панель риска/i })).toBeInTheDocument();
 
-  expect(await screen.findByRole("heading", { name: /Стресс-сценарии/i })).toBeInTheDocument();
+  const stressTab = await screen.findByRole("tab", { name: /Стрессы/i });
+  await user.click(stressTab);
 
-  expect(await screen.findByText(/Драйверы stress/i)).toBeInTheDocument();
+  expect(await screen.findByText(/Форма стресс-профиля/i)).toBeInTheDocument();
 });
