@@ -11,7 +11,7 @@ import { useWorkflow } from "../workflow/workflowStore";
 import { WorkflowStep } from "../workflow/workflowTypes";
 import { formatNumber } from "../utils/format";
 import { PositionDTO } from "../api/types";
-import { CorrelationMatrix, UtilizationPanel } from "../components/monolith/visuals";
+import { CorrelationMatrix } from "../components/monolith/visuals";
 import {
   MetricCompositionChart,
   PortfolioCompositionDonut,
@@ -68,6 +68,9 @@ const METRIC_LABELS: Record<string, string> = {
 
 const COMPOSITION_PALETTE = ["#7da7ff", "#6eff8e", "#ffb86a", "#82e6ff", "#ff9b85", "#cdb8ff"];
 const CONTRIBUTOR_PALETTE = ["#7da7ff", "#6eff8e", "#ffb86a", "#ff8f8f"];
+const DASHBOARD_CHART_HEIGHT = 220;
+const DASHBOARD_INSIGHT_HEIGHT = 260;
+const DASHBOARD_NETWORK_HEIGHT = 280;
 
 function formatMetricLabel(metric?: string) {
   if (!metric) return "Метрика";
@@ -114,7 +117,7 @@ export default function DashboardPage() {
   const contributorBars = useMemo(() => {
     const maxAbs = Math.max(...topContributors.map((row) => row.abs_pnl_contribution), 1);
     return topContributors.map((row) => ({
-      label: row.metric ? `${row.metric} · ${row.position_id}` : row.position_id,
+      label: row.metric ? `${formatMetricLabel(row.metric)} · ${row.position_id}` : row.position_id,
       value: (row.abs_pnl_contribution / maxAbs) * 100,
       tone: row.pnl_contribution < 0 ? "negative" as const : "positive" as const,
     }));
@@ -172,9 +175,9 @@ export default function DashboardPage() {
   const liquidityBars = useMemo(() => {
     const base = Math.max(Math.abs(metrics?.base_value ?? 0), 1);
     return [
-      { label: "Capital", value: Math.min(100, (Math.abs(metrics?.capital ?? 0) / base) * 100), tone: "positive" as const },
-      { label: "Initial margin", value: Math.min(100, (Math.abs(metrics?.initial_margin ?? 0) / base) * 100), tone: "neutral" as const },
-      { label: "Variation margin", value: Math.min(100, (Math.abs(metrics?.variation_margin ?? 0) / base) * 100), tone: "negative" as const },
+      { label: "Капитал", value: Math.min(100, (Math.abs(metrics?.capital ?? 0) / base) * 100), tone: "positive" as const },
+      { label: "Начальная маржа", value: Math.min(100, (Math.abs(metrics?.initial_margin ?? 0) / base) * 100), tone: "neutral" as const },
+      { label: "Вариационная маржа", value: Math.min(100, (Math.abs(metrics?.variation_margin ?? 0) / base) * 100), tone: "negative" as const },
     ];
   }, [metrics?.base_value, metrics?.capital, metrics?.initial_margin, metrics?.variation_margin]);
 
@@ -187,6 +190,10 @@ export default function DashboardPage() {
     () => dataState.portfolio.positions.map((position) => position.position_id),
     [dataState.portfolio.positions]
   );
+  const correlationMatrixSize = Math.min(Math.max(correlationLabels.length, 2), 5);
+  const capitalInflow = metrics?.capital && metrics?.base_value ? (metrics.capital / metrics.base_value) * 100 : 0;
+  const variationOutflow = metrics?.variation_margin && metrics?.base_value ? (-metrics.variation_margin / metrics.base_value) * 100 : 0;
+  const utilizationStatusLabel = utilization >= 100 ? "критическая зона" : utilization >= 75 ? "зона контроля" : "спокойная зона";
   const confidenceLabel = metrics?.confidence_level ? `${Math.round(metrics.confidence_level * 100)}% confidence` : null;
   const horizonLabel = metrics?.horizon_days ? `${metrics.horizon_days} дн. горизонт` : null;
   const modeLabel = metrics?.mode ? `режим ${metrics.mode}` : null;
@@ -451,21 +458,22 @@ export default function DashboardPage() {
             </StaggerItem>
             <StaggerItem>
               <MetricHero
+                className="metricHero--riskCompact"
                 label="VaR / ES"
                 value={metrics.var_hist ?? metrics.var_param ?? 0}
                 tone={utilization >= 100 ? "danger" : "success"}
                 hint={`ES ${formatNumber(metrics.es_hist ?? metrics.es_param ?? 0, 2)}`}
                 chart={
-                  <div className="heroInlineStats">
-                    <div className="heroInlineStat">
+                  <div className="heroInlineStats heroInlineStats--riskCompact">
+                    <div className="heroInlineStat heroInlineStat--riskCompact">
                       <span>VaR</span>
                       <strong>{formatNumber(metrics.var_hist ?? metrics.var_param ?? 0, 2)}</strong>
                     </div>
-                    <div className="heroInlineStat">
+                    <div className="heroInlineStat heroInlineStat--riskCompact">
                       <span>ES</span>
                       <strong>{formatNumber(metrics.es_hist ?? metrics.es_param ?? 0, 2)}</strong>
                     </div>
-                    <div className="heroInlineStat">
+                    <div className="heroInlineStat heroInlineStat--riskCompact">
                       <span>LC VaR</span>
                       <strong>{formatNumber(metrics.lc_var ?? 0, 2)}</strong>
                     </div>
@@ -491,7 +499,7 @@ export default function DashboardPage() {
           <div className="dashboardSectionIntro">
             <div className="dashboardSectionEyebrow">Мониторинг</div>
             <h2 className="dashboardSectionTitle">Текущий риск-контур</h2>
-            <p className="dashboardSectionText">Основной контроль: stress P&amp;L, лимиты и доля сценариев, где уже есть нарушение.</p>
+            <p className="dashboardSectionText">Секция разбита на четыре одинаковых карточки: стресс-профиль, лимиты, крупнейшие вкладчики и ликвидность без визуальных перекосов.</p>
           </div>
           <div className="dashboardSectionMeta">
             <span className="dashboardSectionTag">{stressTrendData.length} сценариев</span>
@@ -499,27 +507,76 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="dashboardSectionBody">
-          <div className="dashboardFlowGrid">
+          <div className="dashboardCardGrid dashboardCardGrid--two">
             <Reveal>
               <GlassPanel
+                className="dashboardCompactPanel"
                 title="Профиль stress P&L"
-                subtitle="Возвращённый сравнительный график: основной P&L и лимит на одной оси."
+                subtitle="Один основной график без дубляжа: stress P&L и лимит на общей шкале."
                 badge={<Chip color={worstStress !== undefined && worstStress < 0 ? "danger" : "success"} variant="flat" radius="sm">{stressTrendData.length} сцен.</Chip>}
               >
-                <AreaTrendChart data={stressTrendData} color="#7da7ff" accent="#6eff8e" showSecondary />
-                <LineTrendChart data={stressTrendData} color="#7da7ff" secondaryColor="#6eff8e" showSecondary primaryLabel="Stress P&L" secondaryLabel="Лимит" />
+                <AreaTrendChart data={stressTrendData} color="#7da7ff" accent="#6eff8e" showSecondary height={DASHBOARD_CHART_HEIGHT} />
+                <div className="dashboardMiniStatGrid">
+                  <div className="dashboardMiniStat">
+                    <span>Худший стресс</span>
+                    <strong>{formatNumber(worstStress ?? 0, 2)}</strong>
+                  </div>
+                  <div className="dashboardMiniStat">
+                    <span>Превышения</span>
+                    <strong>{breachedCount}</strong>
+                  </div>
+                  <div className="dashboardMiniStat">
+                    <span>Сценарии</span>
+                    <strong>{stressRows.length || dataState.scenarios.length}</strong>
+                  </div>
+                </div>
               </GlassPanel>
             </Reveal>
             <Reveal delay={0.05}>
               <GlassPanel
-                title="Контроль лимитов и вклада"
-                subtitle="Сверху — общая загрузка, ниже — вклад крупнейших драйверов риска."
+                className="dashboardCompactPanel"
+                title="Лимиты"
+                subtitle="Короткий свод по загрузке лимитов и доле stress-сценариев с нарушением."
+                badge={<Chip color={utilization >= 100 ? "danger" : utilization >= 75 ? "warning" : "success"} variant="flat" radius="sm">{Math.round(utilization)}%</Chip>}
               >
-                <div className="dashboardGaugeRow">
-                  <DonutGauge value={utilization} label="лимиты" subtitle="Текущий уровень использования лимитов." />
-                  <DonutGauge value={breachShare} label="breach" subtitle="Доля stress-сценариев с превышением." color="#ff7777" />
+                <div className="dashboardGaugeRow dashboardGaugeRow--compact">
+                  <DonutGauge value={utilization} label="лимиты" subtitle="Использование текущих лимитов" />
+                  <DonutGauge value={breachShare} label="breach" subtitle="Доля сценариев с превышением" color="#ff7777" />
                 </div>
-                <CompareBarsChart data={contributorBars} height={230} />
+                <CompareBarsChart data={limitBars} height={DASHBOARD_CHART_HEIGHT} />
+              </GlassPanel>
+            </Reveal>
+            <Reveal delay={0.1}>
+              <GlassPanel
+                className="dashboardCompactPanel"
+                title="Крупнейшие вкладчики"
+                subtitle="Позиции и метрики показаны на одной нормированной шкале, чтобы без выбросов видеть относительный вклад."
+                badge={<Chip color="primary" variant="flat" radius="sm">{contributorBars.length || 0} строк</Chip>}
+              >
+                <CompareBarsChart data={contributorBars} height={DASHBOARD_CHART_HEIGHT} />
+              </GlassPanel>
+            </Reveal>
+            <Reveal delay={0.15}>
+              <GlassPanel
+                className="dashboardCompactPanel"
+                title="Ликвидность и обеспечение"
+                subtitle="Ликвидность, капитал и маржа вынесены в отдельную компактную карточку."
+              >
+                <CompareBarsChart data={liquidityBars} height={DASHBOARD_CHART_HEIGHT} />
+                <div className="dashboardMiniStatGrid">
+                  <div className="dashboardMiniStat">
+                    <span>LC VaR</span>
+                    <strong>{formatNumber(metrics.lc_var ?? 0, 2)}</strong>
+                  </div>
+                  <div className="dashboardMiniStat">
+                    <span>Capital</span>
+                    <strong>{formatNumber(metrics.capital ?? 0, 2)}</strong>
+                  </div>
+                  <div className="dashboardMiniStat">
+                    <span>Initial margin</span>
+                    <strong>{formatNumber(metrics.initial_margin ?? 0, 2)}</strong>
+                  </div>
+                </div>
               </GlassPanel>
             </Reveal>
           </div>
@@ -531,7 +588,7 @@ export default function DashboardPage() {
           <div className="dashboardSectionIntro">
             <div className="dashboardSectionEyebrow">Структура</div>
             <h2 className="dashboardSectionTitle">Драйверы и связи риска</h2>
-            <p className="dashboardSectionText">Блок показывает, где сосредоточен объём портфеля, какие позиции сильнее влияют на метрики и как они между собой связаны.</p>
+            <p className="dashboardSectionText">Три равные карточки показывают объём портфеля, композицию вкладов и карту связей в одном ритме.</p>
           </div>
           <div className="dashboardSectionMeta">
             <span className="dashboardSectionTag">{portfolioComposition.length || 1} сегм.</span>
@@ -540,18 +597,20 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="dashboardSectionBody">
-          <StaggerGroup className="dashboardInsightGrid">
+          <StaggerGroup className="dashboardCardGrid dashboardCardGrid--three">
             <StaggerItem>
               <GlassPanel
+                className="dashboardCompactPanel dashboardCompactPanel--portfolio"
                 title="Структура портфеля"
                 subtitle="Кольцевая диаграмма показывает, где сосредоточен основной объём позиций."
                 badge={<Chip color="primary" variant="flat" radius="sm">{portfolioComposition.length || 1} сегм.</Chip>}
               >
-                <PortfolioCompositionDonut data={portfolioComposition} unit={baseCurrency} />
+                <PortfolioCompositionDonut data={portfolioComposition} unit={baseCurrency} height={DASHBOARD_INSIGHT_HEIGHT} />
               </GlassPanel>
             </StaggerItem>
             <StaggerItem>
               <GlassPanel
+                className="dashboardCompactPanel"
                 title="Композиция риска по метрикам"
                 subtitle="Стек по крупнейшим позициям: каждая колонка нормирована до 100% внутри метрики."
                 badge={<Chip color="default" variant="flat" radius="sm">{contributorMetricComposition.rows.length || 0} метр.</Chip>}
@@ -559,24 +618,26 @@ export default function DashboardPage() {
                 <MetricCompositionChart
                   data={contributorMetricComposition.rows}
                   series={contributorMetricComposition.series}
+                  height={DASHBOARD_INSIGHT_HEIGHT}
+                />
+              </GlassPanel>
+            </StaggerItem>
+            <StaggerItem>
+              <GlassPanel
+                className="dashboardCompactPanel"
+                title="Карта связей риска"
+                subtitle="Радиальная схема связывает риск-метрики с позициями, которые формируют основной вклад."
+                badge={<Chip color="secondary" variant="flat" radius="sm">{riskConnectionData.links.length} связей</Chip>}
+              >
+                <RiskConnectionMap
+                  metrics={riskConnectionData.metrics}
+                  positions={riskConnectionData.positions}
+                  links={riskConnectionData.links}
+                  height={DASHBOARD_NETWORK_HEIGHT}
                 />
               </GlassPanel>
             </StaggerItem>
           </StaggerGroup>
-
-          <Reveal>
-            <GlassPanel
-              title="Карта связей риска"
-              subtitle="Радиальная схема связывает риск-метрики с позициями, которые формируют основной вклад."
-              badge={<Chip color="secondary" variant="flat" radius="sm">{riskConnectionData.links.length} связей</Chip>}
-            >
-              <RiskConnectionMap
-                metrics={riskConnectionData.metrics}
-                positions={riskConnectionData.positions}
-                links={riskConnectionData.links}
-              />
-            </GlassPanel>
-          </Reveal>
         </div>
       </section>
 
@@ -600,8 +661,8 @@ export default function DashboardPage() {
             id: "overview",
             label: "Обзор",
             content: (
-              <div className="visualSplitPanel">
-                <GlassPanel title="Ключевые показатели" subtitle="Главные числа в одном месте, без лишнего шума.">
+              <div className="dashboardDetailGrid">
+                <GlassPanel className="dashboardCompactPanel" title="Ключевые показатели" subtitle="Главные числа в одном месте, без лишнего шума.">
                   <AppTable
                     ariaLabel="Ключевые показатели риска"
                     headers={["Метрика", "Значение", "Комментарий"]}
@@ -614,8 +675,8 @@ export default function DashboardPage() {
                     ]}
                   />
                 </GlassPanel>
-                <GlassPanel title="Вкладчики риска" subtitle="Кто сейчас формирует риск портфеля.">
-                  <CompareBarsChart data={contributorBars} height={260} />
+                <GlassPanel className="dashboardCompactPanel" title="Вкладчики риска" subtitle="Кто сейчас формирует риск портфеля.">
+                  <CompareBarsChart data={contributorBars} height={DASHBOARD_CHART_HEIGHT} />
                 </GlassPanel>
               </div>
             ),
@@ -624,8 +685,8 @@ export default function DashboardPage() {
             id: "stress",
             label: "Стрессы",
             content: (
-              <div className="visualSplitPanel">
-                <GlassPanel title="Stress P&L по сценариям" subtitle="Подробный список сценариев и их статусов.">
+              <div className="dashboardDetailGrid">
+                <GlassPanel className="dashboardCompactPanel" title="Stress P&L по сценариям" subtitle="Подробный список сценариев и их статусов.">
                   <AppTable
                     ariaLabel="Стресс-сценарии"
                     headers={["Сценарий", "P&L", "Лимит", "Статус"]}
@@ -641,10 +702,18 @@ export default function DashboardPage() {
                       ],
                     }))}
                     emptyContent="Стресс-сценарии не рассчитывались."
-                  />
+                    />
                 </GlassPanel>
-                <GlassPanel title="Форма стресс-профиля" subtitle="Сравнение сценариев с лимитной границей.">
-                  <AreaTrendChart data={stressTrendData} color="#ff7777" accent="#7da7ff" showSecondary />
+                <GlassPanel className="dashboardCompactPanel" title="Форма stress-профиля" subtitle="Детальный линейный вид без перегруза основной секции.">
+                  <LineTrendChart
+                    data={stressTrendData}
+                    color="#ff7777"
+                    secondaryColor="#7da7ff"
+                    showSecondary
+                    height={DASHBOARD_CHART_HEIGHT}
+                    primaryLabel="Stress P&L"
+                    secondaryLabel="Лимит"
+                  />
                 </GlassPanel>
               </div>
             ),
@@ -653,11 +722,11 @@ export default function DashboardPage() {
             id: "limits",
             label: "Лимиты",
             content: (
-              <div className="visualSplitPanel">
-                <GlassPanel title="Использование по метрикам" subtitle="Нормировано до 100% для быстрой оценки.">
-                  <CompareBarsChart data={limitBars} height={260} />
+              <div className="dashboardDetailGrid">
+                <GlassPanel className="dashboardCompactPanel" title="Использование по метрикам" subtitle="Нормировано до 100% для быстрой оценки.">
+                  <CompareBarsChart data={limitBars} height={DASHBOARD_CHART_HEIGHT} />
                 </GlassPanel>
-                <GlassPanel title="Факт / лимит" subtitle="Точные значения и статусы по лимитам.">
+                <GlassPanel className="dashboardCompactPanel" title="Факт / лимит" subtitle="Точные значения и статусы по лимитам.">
                   <AppTable
                     ariaLabel="Лимиты по метрикам"
                     headers={["Метрика", "Факт", "Лимит", "Статус"]}
@@ -682,42 +751,71 @@ export default function DashboardPage() {
             id: "factors",
             label: "Факторы",
             content: (
-              <div className="visualSplitPanel">
-                <GlassPanel title="Корреляции P&L между позициями" subtitle="Матрица строится по сценарным P&L и показывает, какие позиции двигаются вместе, а какие компенсируют друг друга.">
-                  <CorrelationMatrix matrix={correlations} labels={correlationLabels} size={10} />
+              <div className="dashboardFactorBlock">
+                <GlassPanel className="dashboardCompactPanel dashboardFactorCard" title="Корреляции P&L">
+                  <CorrelationMatrix matrix={correlations} labels={correlationLabels} size={correlationMatrixSize} />
                 </GlassPanel>
-                <GlassPanel title="Капитал и маржа" subtitle="Показатели ликвидности и обеспечения относительно стоимости портфеля.">
-                  <CompareBarsChart data={liquidityBars} height={220} />
-                  <div className="heroInlineStats">
-                    <div className="heroInlineStat">
-                      <span>LC VaR</span>
-                      <strong>{formatNumber(metrics.lc_var ?? 0, 2)}</strong>
-                    </div>
-                    <div className="heroInlineStat">
-                      <span>Capital</span>
-                      <strong>{formatNumber(metrics.capital ?? 0, 2)}</strong>
-                    </div>
-                    <div className="heroInlineStat">
-                      <span>Initial margin</span>
-                      <strong>{formatNumber(metrics.initial_margin ?? 0, 2)}</strong>
-                    </div>
-                  </div>
+                <GlassPanel className="dashboardCompactPanel dashboardFactorCard" title="Капитал и маржа" subtitle="Небольшая табличная сводка по лимитам, капиталу и марже без лишних графиков.">
+                  <AppTable
+                    ariaLabel="Сводка по капиталу и марже"
+                    headers={["Показатель", "Значение"]}
+                    rows={[
+                      {
+                        key: "utilization",
+                        cells: ["Загрузка лимитов", <span className="dashboardFactorValue">{Math.round(utilization)}%</span>],
+                      },
+                      {
+                        key: "status",
+                        cells: [
+                          "Статус",
+                          <Chip
+                            key="utilization-status"
+                            color={utilization >= 100 ? "danger" : utilization >= 75 ? "warning" : "success"}
+                            variant="flat"
+                            radius="sm"
+                          >
+                            {utilizationStatusLabel}
+                          </Chip>,
+                        ],
+                      },
+                      {
+                        key: "lcvar",
+                        cells: ["LC VaR", <span className="dashboardFactorValue">{formatNumber(metrics.lc_var ?? 0, 2)}</span>],
+                      },
+                      {
+                        key: "capital",
+                        cells: ["Капитал", <span className="dashboardFactorValue">{formatNumber(metrics.capital ?? 0, 2)}</span>],
+                      },
+                      {
+                        key: "initial-margin",
+                        cells: ["Начальная маржа", <span className="dashboardFactorValue">{formatNumber(metrics.initial_margin ?? 0, 2)}</span>],
+                      },
+                      {
+                        key: "variation-margin",
+                        cells: ["Вариационная маржа", <span className="dashboardFactorValue">{formatNumber(metrics.variation_margin ?? 0, 2)}</span>],
+                      },
+                      {
+                        key: "flow",
+                        cells: [
+                          "Приток / отток",
+                          <span className="dashboardFactorFlow">
+                            <span className={`dashboardFactorValue ${capitalInflow >= 0 ? "dashboardValuePositive" : "dashboardValueNegative"}`}>
+                              {capitalInflow >= 0 ? `+${capitalInflow.toFixed(1)}` : capitalInflow.toFixed(1)}%
+                            </span>
+                            <span className={`dashboardFactorValue ${variationOutflow >= 0 ? "dashboardValuePositive" : "dashboardValueNegative"}`}>
+                              {variationOutflow >= 0 ? `+${variationOutflow.toFixed(1)}` : variationOutflow.toFixed(1)}%
+                            </span>
+                          </span>,
+                        ],
+                      },
+                    ]}
+                  />
                 </GlassPanel>
               </div>
             ),
           },
             ]}
           />
-
-          <div className="dashboardUtilizationWrap">
-            <UtilizationPanel
-              utilization={utilization}
-              inflow={metrics.capital && metrics.base_value ? (metrics.capital / metrics.base_value) * 100 : 0}
-              outflow={metrics.variation_margin && metrics.base_value ? (-metrics.variation_margin / metrics.base_value) * 100 : 0}
-              statusLabel={utilization >= 100 ? "критической зоны" : utilization >= 75 ? "зоны контроля" : "безопасной зоны"}
-              caption="Относительная загрузка лимитов и ликвидности сейчас находится в"
-            />
-          </div>
         </div>
       </section>
     </div>

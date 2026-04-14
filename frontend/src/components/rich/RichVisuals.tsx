@@ -548,6 +548,7 @@ export function MetricHero({
   chart,
   hint,
   tooltip,
+  className,
 }: {
   label: string;
   value: number;
@@ -556,9 +557,10 @@ export function MetricHero({
   chart?: ReactNode;
   hint?: string;
   tooltip?: string;
+  className?: string;
 }) {
   const card = (
-    <motion.div className={`metricHero metricHero--${tone}`} whileHover={{ scale: 1.018 }} transition={spring}>
+    <motion.div className={`metricHero metricHero--${tone} ${className ?? ""}`} whileHover={{ scale: 1.018 }} transition={spring}>
       <div className="metricHeroHead">
         <span>{label}</span>
         {hint ? <Chip size="sm" variant="flat" radius="sm" className="metricHeroChip">{hint}</Chip> : null}

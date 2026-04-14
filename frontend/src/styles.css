@@ -182,6 +182,14 @@ a:hover {
   flex: 0 0 auto;
 }
 
+.brandMarkImage {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  display: block;
+  flex: 0 0 auto;
+}
+
 .brandText {
   display: flex;
   flex-direction: column;
@@ -1888,6 +1896,7 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .topbarBrand--centered {
@@ -1903,7 +1912,7 @@ a:hover {
 }
 
 .topbarBrandSubtitle {
-  color: rgba(244, 241, 234, 0.58);
+  color: var(--muted);
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2990,58 +2999,25 @@ a:hover {
 }
 
 .matrixWrap {
-  margin-top: 18px;
-}
-
-.matrixSummary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  margin-bottom: 14px;
-}
-
-.matrixSummaryItem {
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.matrixSummaryItem span {
-  display: block;
-  color: rgba(255, 255, 255, 0.48);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.matrixSummaryItem strong {
-  display: block;
-  margin-top: 8px;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 13px;
-  line-height: 1.35;
-}
-
-.matrixNote {
-  margin-bottom: 12px;
-  color: rgba(255, 255, 255, 0.58);
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .matrixTableWrap {
   overflow: auto;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.025);
-  padding: 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.012)),
+    rgba(255, 255, 255, 0.018);
+  padding: 12px;
 }
 
 .matrixTable {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   min-width: max-content;
   align-items: stretch;
 }
@@ -3051,27 +3027,27 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 52px;
-  padding: 8px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 11px;
+  min-height: 48px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 10.5px;
   font-weight: 700;
 }
 
 .matrixCorner {
   justify-content: flex-start;
   padding-left: 12px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .matrixAxisLabel--top {
   writing-mode: vertical-rl;
   transform: rotate(180deg);
-  min-height: 132px;
-  letter-spacing: 0.03em;
+  min-height: 108px;
+  letter-spacing: 0.02em;
 }
 
 .matrixAxisLabel--side {
@@ -3081,13 +3057,14 @@ a:hover {
 
 .matrixCell {
   aspect-ratio: 1 / 1;
-  min-width: 52px;
-  min-height: 52px;
-  border-radius: 12px;
+  min-width: 48px;
+  min-height: 48px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
   display: grid;
   place-items: center;
   padding: 6px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   text-align: center;
@@ -3099,6 +3076,43 @@ a:hover {
 
 .matrixCell--diagonal {
   letter-spacing: 0.01em;
+}
+
+.matrixMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.matrixMetaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.matrixMetaRow span {
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.matrixMetaRow strong {
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.matrixMetaNote {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .matrixEmpty {
@@ -3114,21 +3128,78 @@ a:hover {
   line-height: 1.6;
 }
 
-.matrixLegend {
-  margin-top: 18px;
+.dashboardFactorBlock {
+  width: min(980px, 100%);
+  margin: 0 auto;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: minmax(0, 0.92fr) minmax(320px, 0.78fr);
   gap: 16px;
-  align-items: center;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  align-items: start;
 }
 
-.matrixLegendBar {
-  height: 2px;
-  background: linear-gradient(90deg, rgba(255, 42, 42, 0.92), rgba(255,255,255,0.15), rgba(110, 255, 142, 0.92));
+.dashboardFactorCard .glassPanelBody {
+  gap: 12px;
+}
+
+.dashboardFactorCard .matrixTableWrap {
+  padding: 10px;
+}
+
+.dashboardFactorCard .matrixAxisLabel--top {
+  min-height: 92px;
+}
+
+.dashboardFactorCard .matrixCell {
+  min-width: 42px;
+  min-height: 42px;
+  font-size: 10px;
+}
+
+.dashboardCompactPanel--portfolio .glassPanelSubtitle {
+  font-size: 10.5px;
+}
+
+.dashboardCompactPanel--portfolio .compositionDonutCenter strong {
+  font-size: clamp(24px, 2.4vw, 32px);
+}
+
+.dashboardCompactPanel--portfolio .compositionDonutCenter span {
+  font-size: 10px;
+}
+
+.dashboardCompactPanel--portfolio .compositionLegendItem {
+  padding: 8px 10px;
+}
+
+.dashboardCompactPanel--portfolio .compositionLegendMeta strong {
+  font-size: 12px;
+}
+
+.dashboardCompactPanel--portfolio .compositionLegendMeta span {
+  font-size: 11px;
+}
+
+.dashboardFactorCard .heroTableHeader,
+.dashboardFactorCard .heroTableCell {
+  padding: 10px 12px;
+}
+
+.dashboardFactorCard .heroTableHeader {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+
+.dashboardFactorValue {
+  color: rgba(244, 241, 234, 0.9);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboardFactorFlow {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 @media (max-width: 860px) {
@@ -4733,6 +4804,7 @@ a:hover {
   .topbarBrandTitle {
     font-size: 20px;
   }
+
 }
 
 /* ================================================================
@@ -4828,6 +4900,27 @@ a:hover {
 
 .dashboardPage--revamp .metricHeroChart {
   margin-top: 18px;
+}
+
+.dashboardPage--revamp .metricHero--riskCompact .metricHeroValue {
+  font-size: clamp(28px, 3vw, 40px);
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.dashboardPage--revamp .heroInlineStats--riskCompact {
+  gap: 8px;
+}
+
+.dashboardPage--revamp .heroInlineStat--riskCompact {
+  padding: 10px 12px;
+}
+
+.dashboardPage--revamp .heroInlineStat--riskCompact strong {
+  font-size: clamp(14px, 1.2vw, 16px);
+  line-height: 1.05;
+  white-space: nowrap;
+  overflow-wrap: normal;
 }
 
 .dashboardPage--revamp .glassPanel {
@@ -5051,10 +5144,91 @@ a:hover {
   gap: 16px;
 }
 
+.dashboardCardGrid,
+.dashboardDetailGrid {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  align-items: stretch;
+}
+
+.dashboardCardGrid > *,
+.dashboardDetailGrid > * {
+  min-width: 0;
+}
+
+.dashboardCardGrid--two,
+.dashboardDetailGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboardCardGrid--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dashboardCompactPanel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.dashboardCompactPanel .glassPanelBody {
+  flex: 1 1 auto;
+}
+
+.dashboardMiniStatGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dashboardMiniStat {
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dashboardMiniStat span {
+  display: block;
+  color: rgba(244, 241, 234, 0.52);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dashboardMiniStat strong {
+  display: block;
+  margin-top: 8px;
+  font-size: clamp(18px, 1.8vw, 22px);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboardValuePositive {
+  color: #6eff8e !important;
+}
+
+.dashboardValueNegative {
+  color: #ff8f8f !important;
+}
+
 .dashboardGaugeRow {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.dashboardGaugeRow--compact .donutGauge {
+  padding: 4px 0 0;
+}
+
+.dashboardGaugeRow--compact .donutGaugeSubtitle {
+  max-width: 180px;
 }
 
 .compositionDonut {
@@ -5222,16 +5396,16 @@ a:hover {
 
 .riskConnectionCenterLabel {
   fill: rgba(244, 241, 234, 0.92);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .riskConnectionCenterSubLabel {
   fill: rgba(244, 241, 234, 0.44);
-  font-size: 10px;
-  letter-spacing: 0.16em;
+  font-size: 8px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
@@ -5247,7 +5421,7 @@ a:hover {
 .riskConnectionMetricLabel,
 .riskConnectionPositionLabel {
   fill: rgba(244, 241, 234, 0.8);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
 }
 
@@ -5322,7 +5496,11 @@ a:hover {
   }
 
   .dashboardFlowGrid,
-  .dashboardInsightGrid {
+  .dashboardInsightGrid,
+  .dashboardCardGrid--two,
+  .dashboardCardGrid--three,
+  .dashboardFactorBlock,
+  .dashboardDetailGrid {
     grid-template-columns: 1fr;
   }
 
@@ -5353,6 +5531,10 @@ a:hover {
   }
 
   .dashboardGaugeRow {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboardMiniStatGrid {
     grid-template-columns: 1fr;
   }
 

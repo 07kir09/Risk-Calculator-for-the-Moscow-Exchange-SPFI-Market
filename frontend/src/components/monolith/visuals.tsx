@@ -254,32 +254,17 @@ export function CorrelationMatrix({ matrix, labels, size = 9 }: CorrelationMatri
   const strongestPositive = findStrongestPair(values, axis, "positive");
   const strongestNegative = findStrongestPair(values, axis, "negative");
   const tableStyle = {
-    gridTemplateColumns: `minmax(132px, 160px) repeat(${values.length}, minmax(52px, 1fr))`,
+    gridTemplateColumns: `minmax(120px, 144px) repeat(${values.length}, minmax(48px, 1fr))`,
   } as CSSProperties;
+  const strongestPositiveLabel = strongestPositive
+    ? `${strongestPositive.value.toFixed(2)} · ${trimMatrixLabel(strongestPositive.left, 11)} / ${trimMatrixLabel(strongestPositive.right, 11)}`
+    : "нет выраженной пары";
+  const strongestNegativeLabel = strongestNegative
+    ? `${strongestNegative.value.toFixed(2)} · ${trimMatrixLabel(strongestNegative.left, 11)} / ${trimMatrixLabel(strongestNegative.right, 11)}`
+    : "нет выраженной пары";
 
   return (
     <div className="matrixWrap">
-      <div className="matrixSummary">
-        <div className="matrixSummaryItem">
-          <span>Размер</span>
-          <strong>{values.length}x{values.length}</strong>
-        </div>
-        <div className="matrixSummaryItem">
-          <span>Max +</span>
-          <strong>{strongestPositive ? `${strongestPositive.value.toFixed(2)} · ${trimMatrixLabel(strongestPositive.left, 10)} / ${trimMatrixLabel(strongestPositive.right, 10)}` : "нет"}</strong>
-        </div>
-        <div className="matrixSummaryItem">
-          <span>Max -</span>
-          <strong>{strongestNegative ? `${strongestNegative.value.toFixed(2)} · ${trimMatrixLabel(strongestNegative.left, 10)} / ${trimMatrixLabel(strongestNegative.right, 10)}` : "нет"}</strong>
-        </div>
-      </div>
-
-      {truncated ? (
-        <div className="matrixNote">
-          Показаны первые {values.length} позиций из {sourceSize}, чтобы матрица оставалась читаемой.
-        </div>
-      ) : null}
-
       <div className="matrixTableWrap">
         <div className="matrixTable" style={tableStyle}>
           <div className="matrixCorner">Позиции</div>
@@ -318,10 +303,16 @@ export function CorrelationMatrix({ matrix, labels, size = 9 }: CorrelationMatri
         </div>
       </div>
 
-      <div className="matrixLegend">
-        <span>-1.0 (inverse)</span>
-        <div className="matrixLegendBar" />
-        <span>+1.0 (positive)</span>
+      <div className="matrixMeta">
+        <div className="matrixMetaRow">
+          <span>Сильная связь +</span>
+          <strong>{strongestPositiveLabel}</strong>
+        </div>
+        <div className="matrixMetaRow">
+          <span>Сильная связь -</span>
+          <strong>{strongestNegativeLabel}</strong>
+        </div>
+        {truncated ? <div className="matrixMetaNote">Показаны первые {values.length} позиций из {sourceSize}.</div> : null}
       </div>
     </div>
   );

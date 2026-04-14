@@ -343,7 +343,7 @@ export function RiskConnectionMap({
                 className="riskConnectionNode riskConnectionNode--metric"
               />
               <text x={point.x} y={point.y + point.radius + 16} textAnchor="middle" className="riskConnectionMetricLabel">
-                {trimLabel(point.node.label, 14)}
+                {trimLabel(point.node.label, 11)}
               </text>
             </g>
           ))}
@@ -366,7 +366,7 @@ export function RiskConnectionMap({
                   textAnchor={anchor}
                   className="riskConnectionPositionLabel"
                 >
-                  {trimLabel(point.node.label, 20)}
+                  {trimLabel(point.node.label, 15)}
                 </text>
               </g>
             );
