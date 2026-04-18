@@ -2,7 +2,7 @@ import client from "./client";
 import { PositionDTO } from "./types";
 import { metricsSchema, scenarioSchema } from "./contracts/metrics";
 import { marketDataSessionSummarySchema } from "./contracts/marketData";
-import { mockFetchMarketDataSession, mockUploadMarketDataBundleFile } from "./services/mock";
+import { mockFetchMarketDataSession, mockFetchScenarios, mockUploadMarketDataBundleFile } from "./services/mock";
 import { z } from "zod";
 
 const viteEnv = ((import.meta as any).env ?? {}) as Record<string, any>;
@@ -63,6 +63,9 @@ export async function fetchLimits() {
 }
 
 export async function fetchScenarioCatalog() {
+  if (demoMode) {
+    return mockFetchScenarios();
+  }
   const { data } = await client.get("/scenarios");
   const arr = z.array(scenarioSchema);
   return arr.parse(data);

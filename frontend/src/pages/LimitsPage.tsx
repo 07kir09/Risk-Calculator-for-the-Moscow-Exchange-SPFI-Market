@@ -12,10 +12,12 @@ import {
   StaggerGroup,
   StaggerItem,
 } from "../components/rich/RichVisuals";
+import { ChartInsights } from "../components/rich/ChartInsights";
 import { useAppData } from "../state/appDataStore";
 import { useWorkflow } from "../workflow/workflowStore";
 import { WorkflowStep } from "../workflow/workflowTypes";
 import { formatNumber } from "../utils/format";
+import { buildLimitComparisonInsights, buildLimitOverviewInsights } from "../lib/chartInsights";
 
 export default function LimitsPage() {
   const nav = useNavigate();
@@ -44,6 +46,14 @@ export default function LimitsPage() {
   const overallUtilization = useMemo(
     () => (limitBars.length ? Math.max(...limitBars.map((item) => item.value), 0) : 0),
     [limitBars]
+  );
+  const overallLimitInsights = useMemo(
+    () => buildLimitOverviewInsights({ limits, overallUtilization }),
+    [limits, overallUtilization]
+  );
+  const comparisonInsights = useMemo(
+    () => buildLimitComparisonInsights({ limits }),
+    [limits]
   );
 
   return (
@@ -86,11 +96,13 @@ export default function LimitsPage() {
                     subtitle={breachedCount > 0 ? "Есть прямые breach-события." : "Пока всё находится в рабочей зоне."}
                     color={breachedCount > 0 ? "#ff7777" : overallUtilization > 80 ? "#ffb86a" : "#6eff8e"}
                   />
+                  <ChartInsights items={overallLimitInsights} />
                 </GlassPanel>
               </StaggerItem>
               <StaggerItem>
                 <GlassPanel title="Сравнение по метрикам" subtitle="Бар-чарт быстрее таблицы показывает, какая метрика ближе к красной зоне.">
                   <CompareBarsChart data={limitBars} height={260} />
+                  <ChartInsights items={comparisonInsights} />
                 </GlassPanel>
               </StaggerItem>
             </StaggerGroup>

@@ -13,6 +13,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from .defaults import default_scenarios
 from .data.bootstrap import build_bootstrapped_market_data
 from .data.market_data_sessions import (
     classify_market_data_filename,
@@ -200,6 +201,11 @@ def load_default_market_datasets():
         return _json_safe(asdict(summary))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/scenarios")
+def get_default_scenario_catalog():
+    return [scenario.dict() for scenario in default_scenarios()]
 
 
 @app.get("/health")

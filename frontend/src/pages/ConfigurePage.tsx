@@ -20,11 +20,13 @@ import { useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 import Card from "../ui/Card";
 import { Reveal } from "../components/rich/RichVisuals";
+import { fetchScenarioCatalog } from "../api/endpoints";
 import { useAppData } from "../state/appDataStore";
 import { demoScenarios } from "../mock/demoData";
 import { useWorkflow } from "../workflow/workflowStore";
 import { WorkflowStep } from "../workflow/workflowTypes";
 import { runRiskCalculation } from "../api/services/risk";
+import { ScenarioDTO } from "../api/contracts/metrics";
 
 type MetricKey =
   | "var_hist"
@@ -153,6 +155,25 @@ const metricCards: MetricCard[] = [
 
 const recommendedSet: MetricKey[] = ["var_hist", "es_hist", "lc_var", "greeks", "stress"];
 
+const viteEnv = ((import.meta as any).env ?? {}) as Record<string, any>;
+const demoMode = (viteEnv.VITE_DEMO_MODE ?? "1") === "1";
+
+const apiScenarioFallback: ScenarioDTO[] = [
+  { scenario_id: "shock_0", underlying_shift: -0.1, volatility_shift: -0.05, rate_shift: 0.0 },
+  { scenario_id: "shock_1", underlying_shift: -0.05, volatility_shift: -0.025, rate_shift: 0.0 },
+  { scenario_id: "shock_2", underlying_shift: -0.02, volatility_shift: -0.01, rate_shift: 0.0 },
+  { scenario_id: "shock_3", underlying_shift: 0.0, volatility_shift: 0.0, rate_shift: 0.0 },
+  { scenario_id: "shock_4", underlying_shift: 0.02, volatility_shift: 0.01, rate_shift: 0.0 },
+  { scenario_id: "shock_5", underlying_shift: 0.05, volatility_shift: 0.025, rate_shift: 0.0 },
+  { scenario_id: "shock_6", underlying_shift: 0.1, volatility_shift: 0.05, rate_shift: 0.0 },
+];
+
+function isLegacyDemoScenarioSet(scenarios: ScenarioDTO[]) {
+  if (scenarios.length !== demoScenarios.length) return false;
+  const legacyIds = new Set(demoScenarios.map((scenario) => scenario.scenario_id));
+  return scenarios.every((scenario) => legacyIds.has(scenario.scenario_id));
+}
+
 const metricGlyphByKey: Record<MetricKey, string> = {
   var_hist: "VH",
   var_param: "VP",
@@ -210,10 +231,31 @@ export default function ConfigurePage() {
   });
 
   useEffect(() => {
-    if (!dataState.scenarios.length) {
-      dataDispatch({ type: "SET_SCENARIOS", scenarios: demoScenarios });
+    let cancelled = false;
+
+    if (demoMode) {
+      if (!dataState.scenarios.length) {
+        dataDispatch({ type: "SET_SCENARIOS", scenarios: demoScenarios });
+      }
+      return () => { cancelled = true; };
     }
-  }, [dataState.scenarios.length, dataDispatch]);
+
+    if (dataState.scenarios.length > 0 && !isLegacyDemoScenarioSet(dataState.scenarios)) {
+      return () => { cancelled = true; };
+    }
+
+    fetchScenarioCatalog()
+      .then((scenarios) => {
+        if (cancelled) return;
+        dataDispatch({ type: "SET_SCENARIOS", scenarios: scenarios.length ? scenarios : apiScenarioFallback });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        dataDispatch({ type: "SET_SCENARIOS", scenarios: apiScenarioFallback });
+      });
+
+    return () => { cancelled = true; };
+  }, [dataDispatch, dataState.scenarios]);
 
   const fxRatesResult = useMemo(() => {
     const text = fxRatesText.trim();

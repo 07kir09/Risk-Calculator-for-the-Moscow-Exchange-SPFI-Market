@@ -5,6 +5,7 @@ import argparse
 from pathlib import Path
 from typing import List
 
+from .defaults import default_scenarios
 from .data.bootstrap import build_bootstrapped_market_data
 from .data.loading import (
     load_portfolio_from_csv,
@@ -19,18 +20,7 @@ from .risk.pipeline import CalculationConfig, run_calculation
 
 
 def _default_scenarios() -> List[MarketScenario]:
-    shocks = [-0.1, -0.05, -0.02, 0.0, 0.02, 0.05, 0.1]
-    scenarios = []
-    for idx, shock in enumerate(shocks):
-        scenarios.append(
-            MarketScenario(
-                scenario_id=f"shock_{idx}",
-                underlying_shift=shock,
-                volatility_shift=shock * 0.5,
-                rate_shift=0.0,
-            )
-        )
-    return scenarios
+    return default_scenarios()
 
 
 def _load_portfolio(

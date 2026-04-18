@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Chip } from "@heroui/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { flushSync } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { fetchMarketDataSession, uploadMarketDataBundleFile } from "../api/endpoints";
+import { fetchMarketDataSession, loadDefaultMarketDataBundle, uploadMarketDataBundleFile } from "../api/endpoints";
 import { MarketDataSessionSummary } from "../api/contracts/marketData";
 import FileDropzone from "../components/FileDropzone";
 import { Reveal } from "../components/rich/RichVisuals";
@@ -43,6 +43,7 @@ export default function MarketDataPage() {
   const [localLoading, setLocalLoading] = useState(false);
   const [statusText, setStatusText] = useState<string | null>(null);
   const [statusOk, setStatusOk] = useState(true);
+  const autoLoadAttemptedRef = useRef(false);
 
   const hasPortfolio = dataState.portfolio.positions.length > 0;
   const positions = dataState.portfolio.positions;
@@ -72,6 +73,35 @@ export default function MarketDataPage() {
       .catch(() => {});
     return () => { cancelled = true; };
   }, [dataDispatch, dispatch, summary?.session_id]);
+
+  const loadDefaultBundle = async (successNote: string) => {
+    setLocalLoading(true);
+    setStatusText(null);
+    setStatusOk(true);
+    dispatch({ type: "SET_MARKET_STATUS", missingFactors: wf.marketData.missingFactors, status: "loading" });
+    try {
+      const nextSummary = await loadDefaultMarketDataBundle();
+      applySummary(nextSummary, successNote);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Не удалось автоматически загрузить bundle из datasets.";
+      setStatusText(message);
+      setStatusOk(false);
+      dispatch({ type: "SET_MARKET_STATUS", missingFactors: wf.marketData.missingFactors, status: "idle" });
+    } finally {
+      setLocalLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!hasPortfolio) {
+      autoLoadAttemptedRef.current = false;
+      return;
+    }
+    if ((summary?.files.length ?? 0) > 0) return;
+    if (autoLoadAttemptedRef.current) return;
+    autoLoadAttemptedRef.current = true;
+    void loadDefaultBundle("Bundle из datasets загружен автоматически.");
+  }, [hasPortfolio, summary?.files.length]);
 
   const isReady        = summary?.ready ?? false;
   const blockingErrors = summary?.blocking_errors ?? 0;
@@ -276,10 +306,17 @@ export default function MarketDataPage() {
 
           {/* Middle: API stub */}
           <div className="marketApiStubCol">
-            <button type="button" className="marketApiStubButton" disabled aria-disabled="true">
-              Включить API
+            <button
+              type="button"
+              className="marketApiStubButton"
+              disabled={localLoading || !hasPortfolio}
+              onClick={() => void loadDefaultBundle("Bundle из datasets обновлён.")}
+            >
+              {localLoading ? "Подгружаем…" : "Подгрузить из datasets"}
             </button>
-            <span className="marketApiStubHint">Скоро будет доступно</span>
+            <span className="marketApiStubHint">
+              {hasPortfolio ? "Подгружается автоматически при открытии шага" : "Сначала загрузите портфель"}
+            </span>
           </div>
 
           {/* Right: bundle status tile */}

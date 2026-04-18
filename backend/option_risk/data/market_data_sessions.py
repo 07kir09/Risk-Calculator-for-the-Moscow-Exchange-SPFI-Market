@@ -52,7 +52,16 @@ def _default_datasets_dir() -> Path:
     configured = os.environ.get("OPTION_RISK_DEFAULT_DATASETS_DIR")
     if configured:
         return Path(configured)
-    return Path(__file__).resolve().parents[3] / "Datasets"
+    repo_root = Path(__file__).resolve().parents[3]
+    candidates = [
+        repo_root / "datasets" / "Данные для работы",
+        repo_root / "datasets",
+        repo_root / "Datasets",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
 
 
 def _session_dir(session_id: str) -> Path:

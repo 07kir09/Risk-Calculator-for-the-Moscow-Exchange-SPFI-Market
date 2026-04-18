@@ -20,12 +20,14 @@ import {
   StaggerGroup,
   StaggerItem,
 } from "../components/rich/RichVisuals";
+import { ChartInsights } from "../components/rich/ChartInsights";
 import { useAppData } from "../state/appDataStore";
 import { useWorkflow } from "../workflow/workflowStore";
 import { WorkflowStep } from "../workflow/workflowTypes";
 import { formatNumber } from "../utils/format";
 import { runRiskCalculation } from "../api/services/risk";
 import { ContributorBars } from "../components/monolith/visuals";
+import { buildContributorInsights, buildStressInsights } from "../lib/chartInsights";
 
 export default function StressPage() {
   const nav = useNavigate();
@@ -141,6 +143,14 @@ export default function StressPage() {
     () => dataState.scenarios.slice(0, 8).map((scenario, index) => ({ label: `${index + 1}`, value: Math.abs(scenario.underlying_shift) + Math.abs(scenario.volatility_shift) + Math.abs(scenario.rate_shift) })),
     [dataState.scenarios]
   );
+  const stressProfileInsights = useMemo(
+    () => buildStressInsights({ stressRows: stress, scenarioCount: dataState.scenarios.length, baseCurrency }),
+    [baseCurrency, dataState.scenarios.length, stress]
+  );
+  const stressDriverInsights = useMemo(
+    () => buildContributorInsights({ contributors: topStressContributors }),
+    [topStressContributors]
+  );
 
   return (
     <Card>
@@ -196,12 +206,14 @@ export default function StressPage() {
                     <AreaTrendChart data={stressTrendData} color="#ff7777" accent="#7da7ff" showSecondary />
                     <DonutGauge value={breachShare} label="breach share" subtitle="Процент стресс-сценариев, которые уже пересекают лимит." color="#ff7777" />
                   </div>
+                  <ChartInsights items={stressProfileInsights} />
                 </GlassPanel>
               </StaggerItem>
               <StaggerItem>
                 <GlassPanel title="Драйверы stress" subtitle="Кто именно вносит наибольший вклад в худший stress P&L.">
                   <CompareBarsChart data={contributorBars} height={240} />
                   <Sparkline data={scenarioSpark} color="#7da7ff" height={88} />
+                  <ChartInsights items={stressDriverInsights} />
                 </GlassPanel>
               </StaggerItem>
             </StaggerGroup>
