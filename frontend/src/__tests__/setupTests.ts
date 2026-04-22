@@ -101,5 +101,5 @@ Object.defineProperty(window, "matchMedia", {
 beforeEach(() => {
   localStorage.clear();
   // Отключаем onboarding‑модалку в тестах, чтобы не ломала селекторы.
-  localStorage.setItem("onboarding_seen_v1", "1");
+  localStorage.setItem("onboarding_seen_v3", "1");
 });

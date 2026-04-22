@@ -302,6 +302,7 @@ export default function WhatIfPage() {
                   const baseCurrency = String(wf.calcConfig.params?.baseCurrency ?? "RUB").toUpperCase();
                   const fxRates = (wf.calcConfig.params?.fxRates as Record<string, number> | undefined) ?? undefined;
                   const liquidityModel = String(wf.calcConfig.params?.liquidityModel ?? "fraction_of_position_value");
+                  const useAutoMarketData = (dataState.marketDataMode ?? "api_auto") === "api_auto";
                   const metrics = await runRiskCalculation({
                     positions: afterPositions,
                     scenarios,
@@ -314,7 +315,8 @@ export default function WhatIfPage() {
                     liquidityModel,
                     selectedMetrics: wf.calcConfig.selectedMetrics,
                     marginEnabled: wf.calcConfig.marginEnabled,
-                    marketDataSessionId: dataState.marketDataSummary?.session_id,
+                    marketDataSessionId: useAutoMarketData ? undefined : dataState.marketDataSummary?.session_id,
+                    forceAutoMarketData: useAutoMarketData,
                   });
                   setAfterMetrics(metrics);
                 } catch (e: any) {

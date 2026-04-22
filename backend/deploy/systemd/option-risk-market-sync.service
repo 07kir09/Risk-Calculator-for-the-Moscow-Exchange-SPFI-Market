@@ -1,0 +1,16 @@
+[Unit]
+Description=Option Risk daily market-data sync (CBR + MOEX)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/option-risk/backend
+Environment=PYTHONPATH=/opt/option-risk/backend
+ExecStart=/opt/option-risk/.venv/bin/python /opt/option-risk/backend/scripts/sync_live_market_data.py --lookback-days 180
+ExecStartPost=/opt/option-risk/.venv/bin/python /opt/option-risk/backend/scripts/check_market_data_health.py --max-age-days 2
+User=optionrisk
+Group=optionrisk
+
+[Install]
+WantedBy=multi-user.target

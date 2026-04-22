@@ -226,6 +226,7 @@ export default function HedgePage() {
                     setErrorText(null);
                     setLoading(s.kind);
                     try {
+                      const useAutoMarketData = (dataState.marketDataMode ?? "api_auto") === "api_auto";
                       const candidate = s.buildCandidate();
                       const perUnit = await runRiskCalculation({
                         positions: [{ ...candidate, quantity: 1 }],
@@ -239,7 +240,8 @@ export default function HedgePage() {
                         liquidityModel,
                         selectedMetrics: ["greeks"],
                         marginEnabled: false,
-                        marketDataSessionId: dataState.marketDataSummary?.session_id,
+                        marketDataSessionId: useAutoMarketData ? undefined : dataState.marketDataSummary?.session_id,
+                        forceAutoMarketData: useAutoMarketData,
                       });
                       const unitExposure = perUnit.greeks?.[s.metricKey as string] ?? Number.NaN;
                       if (!Number.isFinite(unitExposure) || unitExposure === 0) {

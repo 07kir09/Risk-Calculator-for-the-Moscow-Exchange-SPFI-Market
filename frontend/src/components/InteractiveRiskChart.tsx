@@ -27,11 +27,18 @@ export default function InteractiveRiskChart({ option, emptyText, chartId, heigh
     const isJsdom = typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent);
     if (isJsdom) return;
 
+    const resolveWidth = () => {
+      if (!containerRef.current) return 0;
+      return Math.floor(containerRef.current.clientWidth || containerRef.current.getBoundingClientRect().width || 0);
+    };
+
+    const initialWidth = resolveWidth();
+
     const instance =
       chartRef.current ??
       echarts.init(container, undefined, {
         renderer: "svg",
-        width: container.clientWidth || 760,
+        ...(initialWidth > 0 ? { width: initialWidth } : {}),
         height,
       });
     chartRef.current = instance;
@@ -40,15 +47,33 @@ export default function InteractiveRiskChart({ option, emptyText, chartId, heigh
 
     const onResize = () => {
       if (!chartRef.current || !containerRef.current) return;
-      chartRef.current.resize({ width: containerRef.current.clientWidth || 760, height });
+      const nextWidth = resolveWidth();
+      chartRef.current.resize({
+        ...(nextWidth > 0 ? { width: nextWidth } : {}),
+        height,
+      });
     };
+    const resizeObserver = typeof ResizeObserver !== "undefined" ? new ResizeObserver(onResize) : null;
+    if (resizeObserver) resizeObserver.observe(container);
+    const raf = window.requestAnimationFrame(onResize);
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener("resize", onResize);
+      resizeObserver?.disconnect();
+    };
   }, [option, chartId, height]);
 
   if (!option) {
     return <div className="chartEmpty">{emptyText}</div>;
   }
 
-  return <div ref={containerRef} className="chart-box chart-box--interactive" data-testid={`interactive-chart-${chartId}`} />;
+  return (
+    <div
+      ref={containerRef}
+      className="chart-box chart-box--interactive"
+      data-testid={`interactive-chart-${chartId}`}
+      style={{ height }}
+    />
+  );
 }

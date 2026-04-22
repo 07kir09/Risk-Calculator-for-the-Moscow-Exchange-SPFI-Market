@@ -4,7 +4,6 @@ export type NavItem = { to: string; label: string; step?: WorkflowStep };
 
 export const workflowItems: NavItem[] = [
   { to: "/import", label: "Импорт", step: WorkflowStep.Import },
-  { to: "/validate", label: "Проверка данных", step: WorkflowStep.Validate },
   { to: "/market", label: "Рыночные данные", step: WorkflowStep.MarketData },
   { to: "/configure", label: "Настройка расчета", step: WorkflowStep.Configure },
   { to: "/dashboard", label: "Панель риска", step: WorkflowStep.Results },

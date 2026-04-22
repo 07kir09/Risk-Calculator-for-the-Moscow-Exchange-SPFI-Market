@@ -4,6 +4,7 @@ import { MetricsResponse, ScenarioDTO } from "../api/contracts/metrics";
 import { MarketDataSessionSummary } from "../api/contracts/marketData";
 
 export type DataSource = "demo" | "csv" | "api";
+export type MarketDataMode = "api_auto" | "manual_bundle";
 
 export interface AppDataState {
   portfolio: {
@@ -16,6 +17,7 @@ export interface AppDataState {
   scenarios: ScenarioDTO[];
   limits: Record<string, any> | null;
   marketDataSummary: MarketDataSessionSummary | null;
+  marketDataMode: MarketDataMode;
   results: {
     metrics: MetricsResponse | null;
     computedAt?: string;
@@ -28,6 +30,7 @@ export const initialAppDataState: AppDataState = {
   scenarios: [],
   limits: null,
   marketDataSummary: null,
+  marketDataMode: "api_auto",
   results: { metrics: null },
 };
 
@@ -37,6 +40,7 @@ type Action =
   | { type: "SET_SCENARIOS"; scenarios: ScenarioDTO[] }
   | { type: "SET_LIMITS"; limits: Record<string, any> | null }
   | { type: "SET_MARKET_DATA_SUMMARY"; summary: MarketDataSessionSummary | null }
+  | { type: "SET_MARKET_DATA_MODE"; mode: MarketDataMode }
   | { type: "SET_RESULTS"; metrics: MetricsResponse | null }
   | { type: "RESET_RESULTS" }
   | { type: "RESET_ALL" };
@@ -123,6 +127,8 @@ function reducer(state: AppDataState, action: Action): AppDataState {
       return { ...state, limits: action.limits };
     case "SET_MARKET_DATA_SUMMARY":
       return { ...state, marketDataSummary: action.summary, results: { metrics: null } };
+    case "SET_MARKET_DATA_MODE":
+      return { ...state, marketDataMode: action.mode, results: { metrics: null } };
     case "SET_RESULTS":
       return { ...state, results: { metrics: action.metrics, computedAt: action.metrics ? new Date().toISOString() : undefined } };
     case "RESET_RESULTS":

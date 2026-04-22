@@ -16,6 +16,7 @@ export async function runRiskCalculation(params: {
   selectedMetrics: string[];
   marginEnabled: boolean;
   marketDataSessionId?: string;
+  forceAutoMarketData?: boolean;
 }): Promise<MetricsResponse> {
   const viteEnv = ((import.meta as any).env ?? {}) as Record<string, any>;
   const demoMode = (viteEnv.VITE_DEMO_MODE ?? "1") === "1";
@@ -38,6 +39,11 @@ export async function runRiskCalculation(params: {
   const needsGreeks = params.selectedMetrics.includes("greeks");
   const needsStress = params.selectedMetrics.includes("stress");
   const needsMargin = params.marginEnabled;
+  const envAuto = (viteEnv.VITE_AUTO_MARKET_DATA ?? "1") === "1";
+  const autoMarketData =
+    params.forceAutoMarketData !== undefined
+      ? params.forceAutoMarketData
+      : !params.marketDataSessionId && envAuto;
 
   return fetchMetrics({
     positions: params.positions,
@@ -56,5 +62,6 @@ export async function runRiskCalculation(params: {
     calc_margin_capital: needsMargin,
     calc_correlations: needsCorrelations,
     market_data_session_id: params.marketDataSessionId,
+    auto_market_data: autoMarketData,
   });
 }

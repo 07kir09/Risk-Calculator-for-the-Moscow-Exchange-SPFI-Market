@@ -10,9 +10,10 @@ test("стресс: запуск → показ топ‑вкладчиков", 
 
   await runConfiguredCalculation(user);
 
-  await user.click(await screen.findByRole("button", { name: /^Стрессы$/i }));
+  const stressButtons = await screen.findAllByRole("button", { name: /^Стрессы$/i });
+  await user.click(stressButtons[0]);
 
   expect(await screen.findByRole("heading", { name: /Стресс-сценарии/i })).toBeInTheDocument();
-
-  expect(await screen.findByText(/Драйверы stress/i)).toBeInTheDocument();
+  expect(await screen.findByText(/Stress P&L по сценариям/i)).toBeInTheDocument();
+  expect(await screen.findByText(/Влияние сценария на портфель/i)).toBeInTheDocument();
 });

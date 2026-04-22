@@ -1,0 +1,2 @@
+# Daily weekday sync at 07:10 local server time
+10 7 * * 1-5 cd /opt/option-risk/backend && PYTHONPATH=/opt/option-risk/backend /opt/option-risk/.venv/bin/python scripts/sync_live_market_data.py --lookback-days 180 >> /var/log/option-risk-market-sync.log 2>&1

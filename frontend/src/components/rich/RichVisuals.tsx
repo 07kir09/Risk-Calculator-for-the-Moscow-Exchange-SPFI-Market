@@ -11,6 +11,11 @@ import {
   LabelList,
   Line,
   LineChart,
+  PolarAngleAxis,
+  PolarGrid,
+  PolarRadiusAxis,
+  Radar,
+  RadarChart,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip as RechartsTooltip,
@@ -131,6 +136,14 @@ export function AnimatedNumber({
   const ref = useRef<HTMLDivElement | null>(null);
   const inView = useInView(ref, { once: true, margin: "-40px" });
   const [display, setDisplay] = useState(0);
+  const formatter = useMemo(
+    () =>
+      new Intl.NumberFormat("ru-RU", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      }),
+    [decimals]
+  );
 
   useEffect(() => {
     if (!inView || !Number.isFinite(value)) {
@@ -156,7 +169,7 @@ export function AnimatedNumber({
 
   return (
     <div ref={ref} className={className}>
-      {prefix}{display.toFixed(decimals)}{suffix}
+      {prefix}{formatter.format(Number.isFinite(display) ? display : 0)}{suffix}
     </div>
   );
 }
@@ -468,6 +481,44 @@ export function CompareBarsChart({
             )}
           </Bar>
         </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+export function RadarProfileChart({
+  data,
+  height = 250,
+  color = "#7da7ff",
+}: {
+  data: PrimitiveDatum[];
+  height?: number;
+  color?: string;
+}) {
+  const safe = data.length
+    ? data
+    : ([
+        { label: "FX / RUB", value: 62 },
+        { label: "Ставки", value: 74 },
+        { label: "Акции", value: 58 },
+        { label: "Кредит", value: 39 },
+        { label: "Vol", value: 71 },
+        { label: "Нефть", value: 22 },
+      ] satisfies PrimitiveDatum[]);
+
+  return (
+    <div className="radarChartWrap">
+      <ResponsiveContainer width="100%" height={height}>
+        <RadarChart data={safe} outerRadius="72%">
+          <PolarGrid stroke="rgba(255,255,255,0.12)" />
+          <PolarAngleAxis dataKey="label" tick={{ fill: "rgba(244,241,234,0.62)", fontSize: 11 }} />
+          <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
+          <RechartsTooltip
+            {...tooltipStyle}
+            formatter={(value) => [`${Number(value ?? 0).toFixed(1)}%`, "Относительный вклад"]}
+          />
+          <Radar dataKey="value" stroke={color} fill={color} fillOpacity={0.2} strokeWidth={2.2} />
+        </RadarChart>
       </ResponsiveContainer>
     </div>
   );

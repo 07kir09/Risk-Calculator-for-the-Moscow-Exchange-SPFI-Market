@@ -207,6 +207,9 @@ export default function ImportPage() {
       if (positions.length > 0) {
         dispatch({ type: "SET_SNAPSHOT", snapshotId: crypto.randomUUID() });
       }
+      if (critical > 0 || positions.length === 0) {
+        nav("/validate");
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Не удалось прочитать файл портфеля.";
       const log: ImportLogEntry[] = [{ severity: "ERROR", field: "file", message }];
@@ -215,6 +218,7 @@ export default function ImportPage() {
       dispatch({ type: "RESET_ALL" });
       dispatch({ type: "SET_VALIDATION", criticalErrors: 1, warnings: 0, acknowledged: false });
       dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Import });
+      nav("/validate");
     } finally {
       setLoading(false);
     }
@@ -316,14 +320,21 @@ export default function ImportPage() {
   const statusColor = criticalErrors > 0 ? "danger" : warnings > 0 ? "warning" : positions.length > 0 ? "success" : "default";
   const statusText = criticalErrors > 0 ? `${criticalErrors} ошибок` : warnings > 0 ? `${warnings} предупр.` : positions.length > 0 ? "Портфель загружен" : "Новая сессия";
   const filename = lastFilename ?? dataState.portfolio.filename;
+  const hasPortfolioLoaded = Boolean(dataState.portfolio.importedAt);
   const canGoValidate = wf.completedSteps.includes(WorkflowStep.Import);
+  const shouldGoMarket = positions.length > 0 && criticalErrors === 0 && warnings === 0;
+  const nextRoute = shouldGoMarket ? "/market" : "/validate";
+  const nextLabel = shouldGoMarket ? "К рыночным данным" : "К проверке данных";
 
   const handleGoValidate = () => {
     if (!canGoValidate) {
       showBlockedNavigationToast("Чтобы открыть этот раздел, сначала завершите: Шаг 1. Импорт сделок");
       return;
     }
-    nav("/validate");
+    if (shouldGoMarket && !wf.completedSteps.includes(WorkflowStep.Validate)) {
+      dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Validate });
+    }
+    nav(nextRoute);
   };
 
   return (
@@ -348,15 +359,17 @@ export default function ImportPage() {
             {positions.length > 0 && <span className="importFileTag">{sourceLabel}</span>}
           </div>
         </div>
-        <button
-          type="button"
-          className="importHeroNextLink"
-          onClick={handleGoValidate}
-          aria-label="К проверке данных"
-        >
-          <span className="importHeroNextLinkText pageTitle">К проверке данных</span>
-          <span className="importHeroNextLinkArrow pageTitle" aria-hidden>→</span>
-        </button>
+        {hasPortfolioLoaded ? (
+          <button
+            type="button"
+            className="importHeroNextLink"
+            onClick={handleGoValidate}
+            aria-label={nextLabel}
+          >
+            <span className="importHeroNextLinkText pageTitle">{nextLabel}</span>
+            <span className="importHeroNextLinkArrow pageTitle" aria-hidden>→</span>
+          </button>
+        ) : null}
       </div>
 
       {/* ── Upload zone ── */}

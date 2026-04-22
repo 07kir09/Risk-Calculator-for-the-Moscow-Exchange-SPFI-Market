@@ -27,11 +27,14 @@ export default function WorkflowHydrator() {
   const warnings = dataState.validationLog.filter((entry) => entry.severity === "WARNING").length;
   const validationReady = positionsCount > 0 && criticalErrors === 0 && (warnings === 0 || workflowState.validation.acknowledged);
   const marketSummary = dataState.marketDataSummary;
+  const marketMode = dataState.marketDataMode ?? "api_auto";
+  const apiAutoMode = marketMode === "api_auto";
   const marketReady = Boolean(
-    marketSummary &&
-      marketSummary.ready &&
-      marketSummary.blocking_errors === 0 &&
-      marketSummary.missing_required_files.length === 0
+    apiAutoMode ||
+      (marketSummary &&
+        marketSummary.ready &&
+        marketSummary.blocking_errors === 0 &&
+        marketSummary.missing_required_files.length === 0)
   );
 
   useEffect(() => {
@@ -76,7 +79,7 @@ export default function WorkflowHydrator() {
 
   useEffect(() => {
     const nextStatus = marketReady ? "ready" : "idle";
-    const nextMissingFactors = marketSummary?.blocking_errors ?? 0;
+    const nextMissingFactors = apiAutoMode ? 0 : marketSummary?.blocking_errors ?? 0;
     if (
       workflowState.marketData.status !== nextStatus ||
       workflowState.marketData.missingFactors !== nextMissingFactors
@@ -96,6 +99,7 @@ export default function WorkflowHydrator() {
     }
   }, [
     dispatch,
+    apiAutoMode,
     marketReady,
     marketSummary?.blocking_errors,
     validationReady,
@@ -116,6 +120,7 @@ export default function WorkflowHydrator() {
     dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Configure });
   }, [
     dispatch,
+    apiAutoMode,
     marketReady,
     validationReady,
     workflowState.calcConfig.selectedMetrics.length,

@@ -282,7 +282,11 @@ export default function ConfigurePage() {
   const readiness = useMemo(() => {
     const hasPortfolio = dataState.portfolio.positions.length > 0;
     const noCritical = wf.validation.criticalErrors === 0;
-    const marketOk = wf.marketData.status === "ready" && wf.marketData.missingFactors === 0;
+    const marketMode = dataState.marketDataMode ?? "api_auto";
+    const marketOk =
+      marketMode === "api_auto"
+        ? true
+        : wf.marketData.status === "ready" && wf.marketData.missingFactors === 0;
     const hasMetrics = selected.length > 0;
     const alphaOk = alpha > 0.5 && alpha < 0.9999;
     const tailModelOk = ["normal", "cornish_fisher"].includes(parametricTailModel);
@@ -308,10 +312,10 @@ export default function ConfigurePage() {
     selected.length,
     wf.marketData.missingFactors,
     wf.marketData.status,
+    dataState.marketDataMode,
     wf.validation.criticalErrors,
   ]);
 
-  const selectedScenarioPreview = dataState.scenarios.slice(0, 5);
   const alphaPercent = Math.min(99.9, Math.max(90, Number((alpha * 100).toFixed(1))));
 
   const handleSaveAndGoToResults = async () => {
@@ -343,6 +347,7 @@ export default function ConfigurePage() {
     });
 
     try {
+      const useAutoMarketData = (dataState.marketDataMode ?? "api_auto") === "api_auto";
       const metrics = await runRiskCalculation({
         positions: dataState.portfolio.positions,
         scenarios: dataState.scenarios,
@@ -355,7 +360,8 @@ export default function ConfigurePage() {
         liquidityModel,
         selectedMetrics: selected,
         marginEnabled: selected.includes("margin_capital"),
-        marketDataSessionId: dataState.marketDataSummary?.session_id,
+        marketDataSessionId: useAutoMarketData ? undefined : dataState.marketDataSummary?.session_id,
+        forceAutoMarketData: useAutoMarketData,
       });
 
       flushSync(() => {
@@ -688,48 +694,6 @@ export default function ConfigurePage() {
             </div>
           </Reveal>
 
-          <Reveal delay={0.08}>
-            <div className="configureWorkspaceGrid">
-              <Card className="configureSectionCard configureSectionCard--scenarios">
-                <div className="cardTitle">Набор сценариев для расчёта</div>
-                <div className="cardSubtitle">Полный редактор будет на шаге стресс-сценариев, но уже здесь видно, что пойдёт в расчёт.</div>
-
-                <Accordion allowsMultipleExpanded className="configureScenarioAccordion">
-                  {selectedScenarioPreview.map((scenario) => (
-                    <Accordion.Item key={scenario.scenario_id} id={scenario.scenario_id} className="configureScenarioItem">
-                      <Accordion.Heading>
-                        <Accordion.Trigger className="configureScenarioTrigger">
-                          <div className="configureScenarioHead">
-                            <strong>{scenario.scenario_id}</strong>
-                            <span>{scenario.description ?? "Без описания"}</span>
-                          </div>
-                          <Accordion.Indicator />
-                        </Accordion.Trigger>
-                      </Accordion.Heading>
-                      <Accordion.Panel className="configureScenarioPanel">
-                        <Accordion.Body>
-                          <div className="configureScenarioBody">
-                            <div className="configureScenarioMetric">
-                              <span>ΔS</span>
-                              <strong>{scenario.underlying_shift}</strong>
-                            </div>
-                            <div className="configureScenarioMetric">
-                              <span>ΔVol</span>
-                              <strong>{scenario.volatility_shift}</strong>
-                            </div>
-                            <div className="configureScenarioMetric">
-                              <span>Δr</span>
-                              <strong>{scenario.rate_shift}</strong>
-                            </div>
-                          </div>
-                        </Accordion.Body>
-                      </Accordion.Panel>
-                    </Accordion.Item>
-                  ))}
-                </Accordion>
-              </Card>
-            </div>
-          </Reveal>
         </div>
       </div>
 

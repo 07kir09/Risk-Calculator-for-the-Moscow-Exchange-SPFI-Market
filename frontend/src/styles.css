@@ -768,9 +768,9 @@ textarea:focus {
 
 .chart-box--interactive {
   width: 100%;
-  border: 1px solid var(--border-soft);
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(10, 132, 255, 0.06), transparent 36%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  background: transparent;
 }
 
 .chartSelector {
@@ -1481,21 +1481,38 @@ a:hover {
   width: 100%;
 }
 
-.onboardingHint {
+.onboardingHintBackdrop {
   position: fixed;
-  top: calc(var(--topbar-h) + 18px);
-  right: 24px;
-  width: min(380px, calc(100vw - 32px));
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 18px;
+  background:
+    radial-gradient(1300px 720px at 18% -8%, rgba(125, 167, 255, 0.2), rgba(125, 167, 255, 0) 52%),
+    radial-gradient(1000px 700px at 88% 108%, rgba(110, 255, 142, 0.12), rgba(110, 255, 142, 0) 56%),
+    rgba(2, 4, 10, 0.86);
+  backdrop-filter: blur(4px);
+  z-index: 420;
+}
+
+.onboardingHint {
+  width: min(860px, calc(100vw - 36px));
+  max-height: min(90vh, 820px);
+  padding: 22px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 18px;
-  background: rgba(15, 16, 20, 0.92);
-  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.34);
-  backdrop-filter: blur(18px);
-  z-index: 220;
+  gap: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 22px;
+  background:
+    linear-gradient(125deg, rgba(125, 167, 255, 0.13), rgba(125, 167, 255, 0) 44%),
+    linear-gradient(150deg, rgba(110, 255, 142, 0.1), rgba(110, 255, 142, 0) 38%),
+    linear-gradient(145deg, rgba(19, 24, 36, 0.97), rgba(10, 12, 18, 0.98));
+  box-shadow:
+    0 48px 100px rgba(0, 0, 0, 0.52),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  overflow: auto;
 }
 
 .onboardingHintHeader {
@@ -1505,22 +1522,61 @@ a:hover {
   gap: 12px;
 }
 
+.onboardingHintEyebrow {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(125, 167, 255, 0.94);
+  margin-bottom: 8px;
+}
+
 .onboardingHintTitle {
-  font-size: 20px;
-  line-height: 1.05;
-  letter-spacing: -0.04em;
+  font-size: clamp(28px, 3vw, 36px);
+  line-height: 1;
+  letter-spacing: -0.03em;
   font-weight: 800;
 }
 
-.onboardingHintBody {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.onboardingHintLead {
+  color: rgba(244, 241, 234, 0.82);
+  max-width: 72ch;
+  line-height: 1.45;
+}
+
+.onboardingHintGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.onboardingHintCard {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.onboardingHintCardTitle {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.onboardingHintList {
+  margin: 0;
+  padding-left: 18px;
+  color: rgba(244, 241, 234, 0.78);
+  line-height: 1.5;
+}
+
+.onboardingHintList li + li {
+  margin-top: 8px;
 }
 
 .onboardingHintFooter {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 12px;
 }
 
@@ -2492,20 +2548,24 @@ a:hover {
 }
 
 @media (max-width: 980px) {
+  .onboardingHintBackdrop {
+    padding: 12px;
+  }
+
   .onboardingHint {
-    top: auto;
-    right: 16px;
-    bottom: 16px;
-    width: min(420px, calc(100vw - 24px));
+    width: min(760px, calc(100vw - 24px));
+  }
+
+  .onboardingHintGrid {
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 640px) {
   .onboardingHint {
-    right: 12px;
-    bottom: 12px;
     width: calc(100vw - 24px);
     padding: 16px;
+    max-height: calc(100vh - 24px);
   }
 
   .onboardingHintHeader,
@@ -3666,6 +3726,43 @@ a:hover {
   padding-top: 18px !important;
 }
 
+.appTabsGhostWrap {
+  display: inline-flex;
+  max-width: 100%;
+}
+
+.appTabsGhostGroup {
+  background: transparent !important;
+  border: 0 !important;
+  gap: 0 !important;
+}
+
+.appTabGhostBtn {
+  min-height: 38px;
+  padding: 0 14px !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: transparent !important;
+  color: rgba(244, 241, 234, 0.6) !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  transition: color 140ms ease, background 140ms ease !important;
+}
+
+.appTabGhostBtn:hover {
+  color: rgba(244, 241, 234, 0.88) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.appTabGhostBtn--active {
+  color: rgba(236, 242, 252, 0.98) !important;
+  background: rgba(125, 167, 255, 0.14) !important;
+}
+
+.appTabsGhostGroup [data-slot="separator"] {
+  background: rgba(255, 255, 255, 0.14) !important;
+}
+
 .heroTableHeader {
   background: rgba(255, 255, 255, 0.03);
   color: rgba(255, 255, 255, 0.54);
@@ -4010,6 +4107,986 @@ a:hover {
   color: rgba(255, 255, 255, 0.64);
 }
 
+.stressPage {
+  gap: 22px;
+}
+
+.stressPage .pageTitle {
+  font-size: clamp(34px, 4vw, 46px);
+  letter-spacing: -0.05em;
+}
+
+.stressPage .pageHint {
+  max-width: 58ch;
+}
+
+.stressHeroRow {
+  align-items: stretch;
+}
+
+.stressHeaderSide {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.stressHeaderPills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.stressHeroIntro {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  max-width: 760px;
+}
+
+.stressHeroEyebrow {
+  color: rgba(244, 241, 234, 0.46);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.stressStatusStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.stressTopGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.42fr) minmax(340px, 0.92fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.stressKpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.stressMetricCard {
+  position: relative;
+  overflow: hidden;
+  min-height: 142px;
+  padding: 18px 18px 16px;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.012)),
+    rgba(255, 255, 255, 0.012);
+}
+
+.stressMetricCard::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--stress-tone, rgba(125, 167, 255, 0.92));
+}
+
+.stressMetricLabel {
+  color: rgba(244, 241, 234, 0.52);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.stressMetricValue {
+  margin-top: 16px;
+  font-size: clamp(26px, 2.2vw, 34px);
+  line-height: 0.94;
+  letter-spacing: -0.05em;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: rgba(244, 241, 234, 0.96);
+}
+
+.stressMetricSub {
+  margin-top: 10px;
+  color: rgba(244, 241, 234, 0.58);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.stressCatalogSection {
+  overflow: hidden;
+}
+
+.stressCatalogSection--primary {
+  min-height: 100%;
+}
+
+.stressCatalogCollapsed {
+  margin-top: 14px;
+  color: rgba(244, 241, 234, 0.6);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.stressCatalogGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.stressScenarioCard {
+  text-align: left;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.016)),
+    rgba(255, 255, 255, 0.012);
+  padding: 16px;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease;
+}
+
+.stressScenarioCard:hover {
+  transform: translateY(-2px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    rgba(255, 255, 255, 0.016);
+}
+
+.stressScenarioCard--selected {
+  border-color: var(--stress-accent);
+  box-shadow: inset 0 0 0 1px var(--stress-accent);
+}
+
+.stressScenarioCard--active {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 0 0 1px var(--stress-accent),
+    0 16px 34px rgba(0, 0, 0, 0.18);
+}
+
+.stressScenarioHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.stressScenarioHeadMain {
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+}
+
+.stressScenarioIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.045);
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.stressScenarioText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.stressScenarioText strong {
+  font-size: 15px;
+  line-height: 1.38;
+  color: rgba(244, 241, 234, 0.96);
+}
+
+.stressScenarioMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 11px;
+}
+
+.stressScenarioCategory {
+  color: var(--stress-accent);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stressScenarioCheck {
+  color: rgba(244, 241, 234, 0.48);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.stressScenarioCard--selected .stressScenarioCheck {
+  color: #6eff8e;
+}
+
+.stressScenarioDesc {
+  margin: 12px 0 0;
+  color: rgba(244, 241, 234, 0.64);
+  font-size: 12px;
+  line-height: 1.55;
+  min-height: 38px;
+}
+
+.stressScenarioMetricGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.stressScenarioMetric {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.028);
+  padding: 10px 10px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.stressScenarioMetric span {
+  color: rgba(244, 241, 234, 0.5);
+  font-size: 11px;
+}
+
+.stressScenarioMetric strong {
+  color: rgba(244, 241, 234, 0.94);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.stressScenarioRelevance {
+  margin-top: 14px;
+}
+
+.stressScenarioRelevanceHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: rgba(244, 241, 234, 0.56);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stressScenarioRelevanceTrack {
+  margin-top: 8px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.stressScenarioRelevanceFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--stress-accent), rgba(255, 255, 255, 0.92));
+}
+
+.stressCanvasGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.92fr);
+  gap: 18px;
+}
+
+.stressSecondaryGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.9fr);
+  gap: 18px;
+}
+
+.stressSecondaryColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.stressBreakdownGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(320px, 0.82fr);
+  gap: 18px;
+}
+
+.stressPlotCard,
+.stressDetailCard {
+  overflow: hidden;
+}
+
+.stressPanelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.stressPanelTitle {
+  color: rgba(244, 241, 234, 0.96);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.stressPanelSub {
+  margin-top: 4px;
+  color: rgba(244, 241, 234, 0.56);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.stressChartWrap {
+  height: 340px;
+}
+
+.stressChartWrap--medium {
+  height: 274px;
+}
+
+.stressChartWrap--small {
+  height: 220px;
+}
+
+.stressChartWrap--tiny {
+  height: 198px;
+}
+
+.stressWorkbenchCard {
+  position: sticky;
+  top: 94px;
+}
+
+.stressWorkbenchActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.stressLiveNote {
+  margin-bottom: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(125, 167, 255, 0.16);
+  background: rgba(125, 167, 255, 0.06);
+  padding: 12px 14px;
+  color: rgba(244, 241, 234, 0.7);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.stressWorkbenchStats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.stressWorkbenchStat {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.025);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stressWorkbenchStat span,
+.stressWorkbenchStat small {
+  color: rgba(244, 241, 234, 0.5);
+}
+
+.stressWorkbenchStat span {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.stressWorkbenchStat strong {
+  color: rgba(244, 241, 234, 0.96);
+  font-size: 19px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.stressWorkbenchStat small {
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.stressSelectionList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+  max-height: 246px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.stressSelectionItem {
+  text-align: left;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.022);
+  padding: 12px 13px;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.stressSelectionItem:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.stressSelectionItem--active {
+  border-color: var(--stress-accent);
+  background: rgba(125, 167, 255, 0.08);
+}
+
+.stressSelectionItemHead,
+.stressSelectionItemMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.stressSelectionItemHead strong {
+  color: rgba(244, 241, 234, 0.96);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.stressSelectionItemTag,
+.stressSelectionItemMeta {
+  color: rgba(244, 241, 234, 0.56);
+  font-size: 11px;
+}
+
+.stressSelectionItemTag {
+  color: var(--stress-accent);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.stressDetailCard {
+  --stress-accent: #7da7ff;
+}
+
+.stressDetailTop {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stressDetailLead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.stressDetailEyebrow {
+  color: var(--stress-accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.stressDetailTitle {
+  margin-top: 8px;
+  font-size: clamp(24px, 2.4vw, 30px);
+  line-height: 0.98;
+  letter-spacing: -0.05em;
+  font-weight: 900;
+  color: rgba(244, 241, 234, 0.98);
+}
+
+.stressDetailDesc {
+  margin-top: 10px;
+  color: rgba(244, 241, 234, 0.62);
+  font-size: 13px;
+  line-height: 1.62;
+}
+
+.stressImpactMetaGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stressImpactMetaCard,
+.stressShiftCell {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.025);
+  padding: 12px 12px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.stressImpactMetaCard span,
+.stressShiftCell span {
+  color: rgba(244, 241, 234, 0.5);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.stressImpactMetaCard strong,
+.stressShiftCell strong {
+  font-size: 15px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: rgba(244, 241, 234, 0.95);
+}
+
+.stressShiftGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stressFactorList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stressFactorRow {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.stressFactorHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: rgba(244, 241, 234, 0.8);
+}
+
+.stressFactorValueGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.stressImpactValue {
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.stressImpactValue--negative {
+  color: #ff8f8f;
+}
+
+.stressImpactValue--positive {
+  color: #6eff8e;
+}
+
+.stressImpactValue--neutral {
+  color: rgba(244, 241, 234, 0.72);
+}
+
+.stressFactorMeta {
+  color: rgba(244, 241, 234, 0.48);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stressImpactTrack {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.stressImpactFill {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.stressImpactFill--positive {
+  background: linear-gradient(90deg, rgba(110, 255, 142, 0.96), rgba(110, 255, 142, 0.72));
+}
+
+.stressImpactFill--neutral {
+  background: linear-gradient(90deg, rgba(125, 167, 255, 0.96), rgba(125, 167, 255, 0.72));
+}
+
+.stressImpactFill--negative {
+  background: linear-gradient(90deg, rgba(255, 143, 143, 0.96), rgba(255, 143, 143, 0.72));
+}
+
+.stressScenarioMiniList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stressScenarioMiniItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.022);
+  padding: 10px 12px;
+}
+
+.stressScenarioMiniLabel {
+  color: rgba(244, 241, 234, 0.84);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.stressScenarioMiniValue {
+  color: rgba(244, 241, 234, 0.74);
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stressDonutRow {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 184px;
+}
+
+.stressDonutStack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.stressDonutChart {
+  height: 170px;
+}
+
+.stressDonutMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stressDonutValue {
+  font-size: clamp(30px, 2.2vw, 36px);
+  line-height: 0.92;
+  letter-spacing: -0.05em;
+  font-weight: 900;
+  color: rgba(244, 241, 234, 0.98);
+  font-variant-numeric: tabular-nums;
+}
+
+.stressDonutLabel {
+  color: rgba(244, 241, 234, 0.58);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.stressBreachStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stressBreachStat {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.022);
+  padding: 10px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stressBreachStat span {
+  color: rgba(244, 241, 234, 0.5);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.stressBreachStat strong {
+  color: rgba(244, 241, 234, 0.96);
+  font-size: 16px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.stressDonutLegend {
+  display: grid;
+  gap: 8px;
+}
+
+.stressDonutLegendItem,
+.stressRadarLegendItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(244, 241, 234, 0.72);
+  font-size: 12px;
+}
+
+.stressDonutLegendItem strong {
+  margin-left: auto;
+  color: rgba(244, 241, 234, 0.96);
+  font-variant-numeric: tabular-nums;
+}
+
+.stressDonutLegendDot,
+.stressRadarLegendDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.stressRadarLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.stressDeckCard {
+  overflow: hidden;
+}
+
+.stressDeckHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.stressDeckNav {
+  display: flex;
+  gap: 8px;
+}
+
+.stressDeckTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  margin-bottom: 18px;
+}
+
+.stressDeckTab {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.022);
+  color: rgba(244, 241, 234, 0.72);
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.stressDeckTab:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.stressDeckTab--active {
+  background: rgba(125, 167, 255, 0.12);
+  border-color: rgba(125, 167, 255, 0.42);
+  color: rgba(244, 241, 234, 0.96);
+}
+
+.stressChartRail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(420px, calc(100% - 220px));
+  gap: 18px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  padding-bottom: 6px;
+}
+
+.stressChartRail::-webkit-scrollbar {
+  height: 8px;
+}
+
+.stressChartRail::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.stressChartSlide {
+  scroll-snap-align: start;
+  min-width: 0;
+  min-height: 432px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.012)),
+    rgba(255, 255, 255, 0.01);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+}
+
+.stressTableWrap {
+  overflow-x: auto;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.stressResultsTable {
+  min-width: 700px;
+}
+
+.stressResultsTableRow {
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+
+.stressResultsTableRow:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.stressResultsTableRow--active td {
+  background: rgba(125, 167, 255, 0.08);
+}
+
+.stressResultsMain {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.stressResultsMain strong {
+  color: rgba(244, 241, 234, 0.96);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.stressResultsMain span {
+  color: rgba(244, 241, 234, 0.54);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.stressTableMetric {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.stressTableMetric--neg {
+  color: #ff8f8f;
+}
+
+.stressTableMetric--pos {
+  color: #6eff8e;
+}
+
+.stressEmptyState {
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  color: rgba(244, 241, 234, 0.6);
+  font-size: 13px;
+  line-height: 1.7;
+  border-radius: 16px;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.stressEmptyState--compact {
+  min-height: 120px;
+}
+
+.stressTooltip {
+  min-width: 180px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(12, 14, 18, 0.97);
+  padding: 10px 12px;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+}
+
+.stressTooltipLabel {
+  color: rgba(244, 241, 234, 0.58);
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+
+.stressTooltipRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(244, 241, 234, 0.88);
+  font-size: 12px;
+}
+
+.stressTooltipRow + .stressTooltipRow {
+  margin-top: 6px;
+}
+
+.stressTooltipRow strong {
+  margin-left: auto;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.stressTooltipDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
 .runActionRow {
   display: flex;
   gap: 12px;
@@ -4352,25 +5429,20 @@ a:hover {
   position: relative;
   overflow: hidden;
   padding: 22px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)),
-    rgba(9,9,11,0.72);
-  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
   min-width: 0;
 }
 
 .glassPanel:hover {
-  border-color: rgba(125,167,255,0.16);
-  box-shadow: 0 20px 46px rgba(7, 8, 14, 0.24);
+  border-color: rgba(125, 167, 255, 0.24);
+  box-shadow: none;
 }
 
 .glassPanel::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(125,167,255,0.12), transparent 34%, rgba(110,255,142,0.09));
-  pointer-events: none;
+  display: none;
 }
 
 .glassPanelHeader {
@@ -4392,7 +5464,8 @@ a:hover {
 .glassPanelDivider {
   margin-top: 14px !important;
   margin-bottom: 0 !important;
-  opacity: 0.14;
+  display: block;
+  opacity: 0.12;
 }
 
 .dashboardDivider {
@@ -4511,7 +5584,8 @@ a:hover {
 
 .sparklineWrap,
 .trendChartWrap,
-.barChartWrap {
+.barChartWrap,
+.radarChartWrap {
   width: 100%;
   min-width: 0;
 }
@@ -4816,11 +5890,66 @@ a:hover {
   .visualSplitPanel {
     grid-template-columns: 1fr;
   }
+
+  .stressTopGrid,
+  .stressCanvasGrid,
+  .stressSecondaryGrid,
+  .stressBreakdownGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .stressSecondaryColumn {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .stressWorkbenchCard {
+    position: static;
+  }
+
+  .stressChartRail {
+    grid-auto-columns: minmax(360px, calc(100% - 120px));
+  }
 }
 
 @media (max-width: 980px) {
   .heroInlineStats {
     grid-template-columns: 1fr;
+  }
+
+  .stressHeroRow {
+    flex-direction: column;
+  }
+
+  .stressHeaderSide {
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .stressHeaderPills {
+    justify-content: flex-start;
+  }
+
+  .stressKpiGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stressCatalogGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .stressScenarioMetricGrid,
+  .stressImpactMetaGrid,
+  .stressShiftGrid,
+  .stressSecondaryColumn,
+  .stressDonutRow,
+  .stressBreachStats,
+  .stressWorkbenchStats {
+    grid-template-columns: 1fr;
+  }
+
+  .stressChartRail {
+    grid-auto-columns: minmax(300px, 92%);
   }
 
   .portfolioMiniOverview,
@@ -4831,6 +5960,24 @@ a:hover {
   .portfolioMiniRowHead {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .stressKpiGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .stressDeckHead {
+    flex-direction: column;
+  }
+
+  .stressChartRail {
+    grid-auto-columns: 100%;
+  }
+
+  .stressResultsTable {
+    min-width: 580px;
   }
 }
 
@@ -4942,6 +6089,32 @@ a:hover {
 
 .dashboardPage--revamp .metricHero--dashboardKeyMetric {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 188px;
+  border-color: rgba(255, 255, 255, 0.06);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.014)),
+    rgba(20, 20, 22, 0.9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.dashboardPage--revamp .metricHero--portfolioKey {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.014)),
+    rgba(20, 20, 22, 0.9);
+}
+
+.dashboardPage--revamp .metricHero--riskKey {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.014)),
+    rgba(20, 20, 22, 0.9);
+}
+
+.dashboardPage--revamp .metricHero--stressKey {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.014)),
+    rgba(20, 20, 22, 0.9);
 }
 
 .dashboardPage--revamp .metricHero--dashboardKeyMetric .metricHeroHead {
@@ -4952,9 +6125,10 @@ a:hover {
 
 .dashboardPage--revamp .metricHero--dashboardKeyMetric .metricHeroHead span {
   min-width: 0;
-  font-size: 10.5px;
+  color: rgba(244, 241, 234, 0.64);
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.1em;
 }
 
 .dashboardPage--revamp .metricHero--dashboardKeyMetric .metricHeroChip {
@@ -4978,9 +6152,13 @@ a:hover {
 
 .dashboardPage--revamp .metricHero--dashboardKeyMetric .metricHeroValue {
   margin-top: 12px;
-  font-size: clamp(28px, 2.75vw, 38px);
-  line-height: 0.9;
-  letter-spacing: -0.055em;
+  font-size: clamp(28px, 2.35vw, 36px);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.dashboardPage--revamp .metricHero--portfolioKey .metricHeroValue {
+  color: rgba(244, 241, 234, 0.98);
 }
 
 .dashboardPage--revamp .metricHeroChart {
@@ -4992,21 +6170,23 @@ a:hover {
 }
 
 .dashboardPage--revamp .metricHero--riskCompact .metricHeroValue {
-  font-size: clamp(28px, 2.75vw, 38px);
-  white-space: nowrap;
-  overflow-wrap: normal;
+  color: rgba(244, 241, 234, 0.98);
 }
 
 .dashboardPage--revamp .heroInlineStats--riskCompact {
   gap: 8px;
+  margin-top: 12px;
 }
 
 .dashboardPage--revamp .metricHero--dashboardKeyMetric .heroInlineStats--riskCompact {
   gap: 7px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .dashboardPage--revamp .heroInlineStat--riskCompact {
   padding: 10px 11px;
+  border-color: rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .dashboardPage--revamp .metricHero--dashboardKeyMetric .heroInlineStat--riskCompact span {
@@ -5015,10 +6195,9 @@ a:hover {
 }
 
 .dashboardPage--revamp .heroInlineStat--riskCompact strong {
-  font-size: clamp(13px, 1.05vw, 15px);
-  line-height: 1.08;
-  white-space: nowrap;
-  overflow-wrap: normal;
+  font-size: clamp(12px, 0.96vw, 14px);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
 }
 
 .dashboardPage--revamp .glassPanel {
@@ -5214,35 +6393,128 @@ a:hover {
   justify-content: flex-start;
 }
 
-.dashboardPulseRow {
+.dashboardKpiGrid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
 }
 
-.dashboardPulseCard {
-  padding: 11px 12px;
-  border-radius: 16px;
+.dashboardKpiCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  min-height: 148px;
+  padding: 16px 18px;
+  border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02)),
-    rgba(10, 10, 12, 0.5);
+  background: rgba(255, 255, 255, 0.02);
 }
 
-.dashboardPulseCard span {
-  display: block;
-  color: rgba(244, 241, 234, 0.54);
+.dashboardKpiCard--status {
+  background:
+    radial-gradient(circle at top right, rgba(125, 167, 255, 0.1), transparent 58%),
+    rgba(255, 255, 255, 0.02);
+}
+
+.dashboardKpiCard--success {
+  background:
+    radial-gradient(circle at top right, rgba(110, 255, 142, 0.08), transparent 58%),
+    rgba(255, 255, 255, 0.02);
+}
+
+.dashboardKpiCard--warning {
+  background:
+    radial-gradient(circle at top right, rgba(255, 184, 106, 0.09), transparent 58%),
+    rgba(255, 255, 255, 0.02);
+}
+
+.dashboardKpiCard--danger {
+  background:
+    radial-gradient(circle at top right, rgba(255, 119, 119, 0.08), transparent 58%),
+    rgba(255, 255, 255, 0.02);
+}
+
+.dashboardKpiLabel {
+  color: rgba(244, 241, 234, 0.56);
   font-size: 10px;
-  letter-spacing: 0.14em;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
-.dashboardPulseCard strong {
-  display: block;
-  margin-top: 8px;
-  font-size: 20px;
-  line-height: 1;
-  letter-spacing: -0.03em;
+.dashboardKpiValue {
+  margin-top: auto;
+  color: rgba(244, 241, 234, 0.96);
+  font-size: clamp(28px, 2.4vw, 36px);
+  line-height: 0.96;
+  letter-spacing: -0.04em;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.dashboardKpiMeta {
+  color: rgba(244, 241, 234, 0.62);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.dashboardKpiProgress {
+  position: relative;
+  overflow: hidden;
+  height: 6px;
+  margin-top: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dashboardKpiProgress span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: rgba(125, 167, 255, 0.9);
+}
+
+.dashboardKpiCard--success .dashboardKpiProgress span {
+  background: rgba(110, 255, 142, 0.9);
+}
+
+.dashboardKpiCard--warning .dashboardKpiProgress span {
+  background: rgba(255, 184, 106, 0.92);
+}
+
+.dashboardKpiCard--danger .dashboardKpiProgress span {
+  background: rgba(255, 119, 119, 0.94);
+}
+
+.dashboardMicroStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dashboardMicroStat {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(244, 241, 234, 0.62);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dashboardCoreGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.dashboardCompactPanel--workspace {
+  border-radius: 18px;
 }
 
 .dashboardFlowGrid {
@@ -5273,6 +6545,128 @@ a:hover {
 .dashboardCardGrid--two,
 .dashboardDetailGrid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboardDetailGrid.dashboardDetailGrid--single {
+  grid-template-columns: 1fr;
+}
+
+.dashboardStressSplit {
+  display: grid;
+  grid-template-columns: minmax(0, 1.75fr) minmax(440px, 1fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.dashboardStressChart,
+.dashboardStressTableWrap {
+  min-width: 0;
+}
+
+.dashboardCompactPanel--stressPlain {
+  padding: 14px !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 20px;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.dashboardCompactPanel--stressPlain::before {
+  display: none !important;
+}
+
+.dashboardCompactPanel--stressPlain .glassPanelDivider {
+  display: block !important;
+  opacity: 0.1;
+}
+
+.dashboardCompactPanel--stressPlain .glassPanelBody {
+  margin-top: 12px;
+}
+
+.dashboardStressChart .chart-box--interactive {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  overflow: hidden;
+}
+
+.dashboardStressTable {
+  height: 100%;
+}
+
+.dashboardStressTableWrap .heroui-table {
+  min-height: 100%;
+  width: 100%;
+}
+
+.dashboardStressTableWrap [data-slot="base"],
+.dashboardStressTableWrap [data-slot="wrapper"] {
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 16px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.dashboardStressTableWrap [data-slot="table-column"] {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14) !important;
+  color: rgba(244, 241, 234, 0.62) !important;
+  font-size: 14px !important;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+}
+
+.dashboardStressTableWrap [data-slot="table-cell"] {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  font-size: 16px !important;
+  line-height: 1.2 !important;
+  white-space: nowrap;
+}
+
+.dashboardStressTableWrap [data-slot="table-body"] [data-slot="table-cell"] {
+  padding-top: 18px !important;
+  padding-bottom: 18px !important;
+}
+
+.dashboardStressTableContent {
+  min-width: 320px;
+}
+
+.dashboardContributorToolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.dashboardContributorModeGroup {
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 12px !important;
+  padding: 2px !important;
+}
+
+.dashboardContributorModeBtn {
+  min-height: 30px !important;
+  padding: 0 11px !important;
+  background: transparent !important;
+  color: rgba(244, 241, 234, 0.62) !important;
+  border: 0 !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+.dashboardContributorModeBtn:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: rgba(244, 241, 234, 0.9) !important;
+}
+
+.dashboardContributorModeBtn--active {
+  background: rgba(125, 167, 255, 0.2) !important;
+  color: rgba(236, 242, 252, 0.98) !important;
 }
 
 .dashboardCardGrid--three {
@@ -5320,6 +6714,69 @@ a:hover {
   letter-spacing: -0.04em;
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
+}
+
+.dashboardPanelHint {
+  margin-top: 2px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  color: rgba(244, 241, 234, 0.74);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.dashboardPanelHint strong {
+  color: rgba(236, 242, 252, 0.96);
+}
+
+.dashboardKeyMetricGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dashboardKeyMetricCard {
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.dashboardKeyMetricCard span {
+  display: block;
+  color: rgba(244, 241, 234, 0.54);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dashboardKeyMetricCard strong {
+  display: block;
+  margin-top: 8px;
+  color: rgba(236, 242, 252, 0.98);
+  font-size: clamp(20px, 2vw, 24px);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboardKeyMetricCard small {
+  display: block;
+  margin-top: 8px;
+  color: rgba(244, 241, 234, 0.62);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.dashboardKeyMetricCard--danger strong {
+  color: #ff9b9b;
+}
+
+.dashboardKeyMetricCard--warning strong {
+  color: #ffce7b;
 }
 
 .dashboardValuePositive {
@@ -5604,8 +7061,12 @@ a:hover {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .dashboardPulseRow {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .dashboardKpiGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .dashboardCoreGrid {
+    grid-template-columns: 1fr;
   }
 
   .dashboardFlowGrid,
@@ -5614,6 +7075,10 @@ a:hover {
   .dashboardCardGrid--three,
   .dashboardFactorBlock,
   .dashboardDetailGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboardStressSplit {
     grid-template-columns: 1fr;
   }
 
@@ -5643,11 +7108,27 @@ a:hover {
     font-size: 32px;
   }
 
+  .dashboardKpiGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboardKpiCard {
+    min-height: 132px;
+  }
+
+  .dashboardKpiValue {
+    font-size: 26px;
+  }
+
   .dashboardGaugeRow {
     grid-template-columns: 1fr;
   }
 
   .dashboardMiniStatGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboardKeyMetricGrid {
     grid-template-columns: 1fr;
   }
 
@@ -5661,6 +7142,12 @@ a:hover {
 
   .dashboardUtilizationWrap {
     justify-content: stretch;
+  }
+}
+
+@media (max-width: 560px) {
+  .dashboardKpiGrid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -6656,21 +8143,34 @@ a:hover {
    ================================================================ */
 
 .marketUploadSplit {
-  grid-template-columns: minmax(0, 1fr) 220px minmax(0, 1fr);
   align-items: stretch;
+  transition: grid-template-columns 320ms cubic-bezier(0.22, 1, 0.36, 1), gap 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Left pane: dropzone + datasets button */
+.marketUploadSplit.is-api-mode {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.marketUploadSplit.is-manual-mode {
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+}
+
+/* Left pane: dropzone */
+.marketDropPaneMotion {
+  min-width: 0;
+  overflow: hidden;
+}
+
 .marketDropPane {
   display: flex;
   flex-direction: column;
   gap: 0;
-  min-height: 210px;
+  min-height: 280px;
 }
 
 .marketDropPane .dropzone {
   border-radius: 14px;
-  min-height: 210px;
+  min-height: 280px;
   height: 100%;
 }
 
@@ -6680,33 +8180,152 @@ a:hover {
 }
 
 .marketApiStubCol {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid rgba(125, 167, 255, 0.25);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at top right, rgba(125, 167, 255, 0.12), transparent 52%),
+    rgba(255, 255, 255, 0.02);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 16px;
+  padding: 22px;
+  min-height: 280px;
+}
+
+.marketApiStubHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.marketApiStubTitle {
+  font-size: 22px;
+  font-weight: 800;
+  color: rgba(244, 241, 234, 0.96);
+  line-height: 1.2;
+}
+
+.marketApiStubSub {
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgba(244, 241, 234, 0.66);
+}
+
+.marketModeSwitch {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
-  padding: 12px;
-  min-height: 210px;
+}
+
+.marketModeButton {
+  min-height: 56px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(244, 241, 234, 0.78);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: all 160ms ease;
+}
+
+.marketModeButton:hover {
+  border-color: rgba(169, 197, 255, 0.45);
+  background: rgba(125, 167, 255, 0.13);
+}
+
+.marketModeButton.is-active {
+  border-color: rgba(125, 167, 255, 0.6);
+  background: rgba(125, 167, 255, 0.26);
+  color: rgba(244, 241, 234, 0.98);
 }
 
 .marketApiStubButton {
   width: 100%;
-  min-height: 44px;
+  min-height: 48px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(244, 241, 234, 0.52);
-  font-size: 13px;
+  border: 1px solid rgba(125, 167, 255, 0.42);
+  background: rgba(125, 167, 255, 0.18);
+  color: rgba(237, 243, 255, 0.95);
+  font-size: 14px;
   font-weight: 700;
+  cursor: pointer;
+  transition: all 160ms ease;
+}
+
+.marketApiStubButton:hover:not(:disabled) {
+  border-color: rgba(169, 197, 255, 0.6);
+  background: rgba(125, 167, 255, 0.28);
+}
+
+.marketApiStubButton--large {
+  min-height: 54px;
+  font-size: 15px;
+}
+
+.marketApiStubButton:disabled {
+  color: rgba(244, 241, 234, 0.52);
   cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .marketApiStubHint {
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(244, 241, 234, 0.56);
+}
+
+.marketDatasetsAssist {
+  margin-top: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 18px 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 20px;
+  align-items: center;
+}
+
+.marketDatasetsInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.marketDatasetsTitle {
+  font-size: 16px;
+  font-weight: 800;
+  color: rgba(244, 241, 234, 0.95);
+}
+
+.marketDatasetsText {
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(244, 241, 234, 0.66);
+}
+
+.marketDatasetsPath {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(125, 167, 255, 0.4);
+  background: rgba(125, 167, 255, 0.16);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 12px;
-  color: rgba(244, 241, 234, 0.42);
+  color: rgba(231, 240, 255, 0.94);
+}
+
+.marketDatasetsAction {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 /* Right tile: bundle status */
@@ -6796,6 +8415,10 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.marketBundleRequirementList--board {
+  margin-top: 0;
 }
 
 .marketBundleRequirementItem {
@@ -6907,6 +8530,15 @@ a:hover {
   color: rgba(244, 241, 234, 0.52);
 }
 
+.marketBoardMeta {
+  margin-top: auto;
+  font-size: 12px;
+  color: rgba(244, 241, 234, 0.5);
+  line-height: 1.4;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .marketFileList,
 .marketIssueList {
   display: flex;
@@ -7012,7 +8644,9 @@ a:hover {
 }
 
 @media (max-width: 768px) {
-  .marketUploadSplit {
+  .marketUploadSplit,
+  .marketUploadSplit.is-api-mode,
+  .marketUploadSplit.is-manual-mode {
     grid-template-columns: 1fr;
   }
 
@@ -7023,6 +8657,19 @@ a:hover {
   .marketApiStubCol,
   .marketBundleTile {
     min-height: auto;
+  }
+
+  .marketDropPane,
+  .marketDropPane .dropzone {
+    min-height: 230px;
+  }
+
+  .marketDatasetsAssist {
+    grid-template-columns: 1fr;
+  }
+
+  .marketDatasetsAction {
+    justify-content: stretch;
   }
 }
 

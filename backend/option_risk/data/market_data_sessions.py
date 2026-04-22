@@ -6,10 +6,12 @@ import shutil
 import tempfile
 import uuid
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Literal
 
 from .market_data import MarketDataBundle, load_market_data_bundle_from_directory
+from .live_market_data import sync_live_market_data_to_directory
 from .validation import ValidationMessage
 
 MarketDataFileKind = Literal["curve_discount", "curve_forward", "fixing", "calibration", "fx_history"]
@@ -66,6 +68,10 @@ def _default_datasets_dir() -> Path:
 
 def _session_dir(session_id: str) -> Path:
     return _sessions_root() / session_id
+
+
+def get_market_data_session_dir(session_id: str) -> Path:
+    return _session_dir(session_id)
 
 
 def create_market_data_session() -> str:
@@ -191,6 +197,35 @@ def create_session_from_default_datasets() -> MarketDataSessionSummary:
     return populate_market_data_session_from_directory(session_id, _default_datasets_dir())
 
 
+def populate_market_data_session_from_live_sources(
+    session_id: str,
+    *,
+    as_of_date: date | None = None,
+    lookback_days: int = 180,
+) -> MarketDataSessionSummary:
+    session_dir = _session_dir(session_id)
+    session_dir.mkdir(parents=True, exist_ok=True)
+    sync_live_market_data_to_directory(
+        session_dir,
+        as_of_date=as_of_date,
+        lookback_days=lookback_days,
+    )
+    return summarize_market_data_session(session_id)
+
+
+def create_session_from_live_sources(
+    *,
+    as_of_date: date | None = None,
+    lookback_days: int = 180,
+) -> MarketDataSessionSummary:
+    session_id = create_market_data_session()
+    return populate_market_data_session_from_live_sources(
+        session_id,
+        as_of_date=as_of_date,
+        lookback_days=lookback_days,
+    )
+
+
 def load_market_data_bundle_for_session(session_id: str) -> tuple[MarketDataBundle, MarketDataSessionSummary]:
     summary = summarize_market_data_session(session_id)
     if summary.blocking_errors > 0 or summary.missing_required_files:
@@ -201,6 +236,23 @@ def load_market_data_bundle_for_session(session_id: str) -> tuple[MarketDataBund
         )
     bundle = load_market_data_bundle_from_directory(_session_dir(session_id), strict=False)
     return bundle, summary
+
+
+def find_latest_ready_market_data_session() -> MarketDataSessionSummary | None:
+    root = _sessions_root()
+    if not root.exists():
+        return None
+
+    ordered = sorted(
+        [path for path in root.iterdir() if path.is_dir()],
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    for path in ordered:
+        summary = summarize_market_data_session(path.name)
+        if summary.ready:
+            return summary
+    return None
 
 
 def _empty_frame():
@@ -216,7 +268,11 @@ __all__ = [
     "clear_market_data_session",
     "create_market_data_session",
     "create_session_from_default_datasets",
+    "create_session_from_live_sources",
+    "find_latest_ready_market_data_session",
+    "get_market_data_session_dir",
     "load_market_data_bundle_for_session",
+    "populate_market_data_session_from_live_sources",
     "populate_market_data_session_from_directory",
     "store_market_data_file",
     "summarize_market_data_session",

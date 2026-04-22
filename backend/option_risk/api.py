@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import math
 import logging
+import os
 import uuid
+import datetime as dt
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 
@@ -19,6 +21,9 @@ from .data.market_data_sessions import (
     classify_market_data_filename,
     create_market_data_session,
     create_session_from_default_datasets,
+    create_session_from_live_sources,
+    find_latest_ready_market_data_session,
+    get_market_data_session_dir,
     load_market_data_bundle_for_session,
     store_market_data_file,
     summarize_market_data_session,
@@ -44,6 +49,22 @@ class PortfolioRequest(BaseModel):
     calc_margin_capital: bool = True
     calc_correlations: bool = True
     market_data_session_id: str | None = None
+    auto_market_data: bool = False
+
+
+class LiveMarketDataSyncRequest(BaseModel):
+    as_of_date: dt.date | None = None
+    lookback_days: int = 180
+
+
+class MarketDataHealthResponse(BaseModel):
+    ok: bool
+    reason: str
+    now: dt.date
+    latest_session_id: str | None = None
+    latest_session_mtime: dt.datetime | None = None
+    age_days: int | None = None
+    max_age_days: int = 1
 
 
 app = FastAPI(title="Option Risk API", version="0.1.0")
@@ -126,6 +147,31 @@ async def unhandled_error_handler(request: Request, exc: Exception):
 @app.post("/metrics")
 def compute_metrics(req: PortfolioRequest):
     try:
+        market_session_id = req.market_data_session_id
+        auto_market_data = bool(req.auto_market_data)
+        auto_market_data_env = os.environ.get("OPTION_RISK_AUTO_MARKET_DATA", "0") == "1"
+        use_latest_ready_env = os.environ.get("OPTION_RISK_USE_LATEST_MARKET_DATA", "1") == "1"
+        lookback_days_env = int(os.environ.get("OPTION_RISK_AUTO_MARKET_LOOKBACK_DAYS", "180"))
+
+        # В auto-режиме не блокируемся на неготовой/битой вручную выбранной сессии:
+        # если session_id есть, но bundle не ready, переходим к авто-подбору ready/live.
+        if req.mode == "api" and market_session_id and auto_market_data:
+            try:
+                explicit_summary = summarize_market_data_session(market_session_id)
+            except Exception:
+                explicit_summary = None
+            if explicit_summary is None or not explicit_summary.ready:
+                market_session_id = None
+
+        if req.mode == "api" and not market_session_id and use_latest_ready_env:
+            latest = find_latest_ready_market_data_session()
+            if latest is not None:
+                market_session_id = latest.session_id
+
+        if req.mode == "api" and not market_session_id and (auto_market_data or auto_market_data_env):
+            live_summary = create_session_from_live_sources(lookback_days=lookback_days_env)
+            market_session_id = live_summary.session_id
+
         portfolio = Portfolio(positions=req.positions)
         cfg = CalculationConfig(
             calc_sensitivities=req.calc_sensitivities,
@@ -143,8 +189,8 @@ def compute_metrics(req: PortfolioRequest):
         )
         market_context = None
         extra_validation_log = []
-        if req.market_data_session_id:
-            bundle, bundle_summary = load_market_data_bundle_for_session(req.market_data_session_id)
+        if market_session_id:
+            bundle, bundle_summary = load_market_data_bundle_for_session(market_session_id)
             bootstrapped_market_data = build_bootstrapped_market_data(bundle, base_currency=req.base_currency)
             market_context = bootstrapped_market_data.market_context
             extra_validation_log = bundle_summary.validation_log + bootstrapped_market_data.validation_log
@@ -201,6 +247,50 @@ def load_default_market_datasets():
         return _json_safe(asdict(summary))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/market-data/sync-live")
+def sync_live_market_data(req: LiveMarketDataSyncRequest):
+    try:
+        summary = create_session_from_live_sources(
+            as_of_date=req.as_of_date,
+            lookback_days=req.lookback_days,
+        )
+        return _json_safe(asdict(summary))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.get("/market-data/health")
+def market_data_health(max_age_days: int = 1):
+    threshold = max(int(max_age_days), 0)
+    latest = find_latest_ready_market_data_session()
+    now = dt.datetime.now(dt.timezone.utc)
+
+    if latest is None:
+        return MarketDataHealthResponse(
+            ok=False,
+            reason="no_ready_sessions",
+            now=now.date(),
+            max_age_days=threshold,
+        ).dict()
+
+    session_dir = get_market_data_session_dir(latest.session_id)
+    mtime = dt.datetime.fromtimestamp(session_dir.stat().st_mtime, tz=dt.timezone.utc) if session_dir.exists() else None
+    age_days = (now.date() - mtime.date()).days if mtime is not None else None
+    is_fresh = age_days is not None and age_days <= threshold
+
+    return MarketDataHealthResponse(
+        ok=bool(is_fresh),
+        reason="ok" if is_fresh else "stale_market_data",
+        now=now.date(),
+        latest_session_id=latest.session_id,
+        latest_session_mtime=mtime,
+        age_days=age_days,
+        max_age_days=threshold,
+    ).dict()
 
 
 @app.get("/scenarios")

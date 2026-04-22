@@ -122,8 +122,19 @@ export default function ValidatePage() {
 
   const canContinue = critical === 0 && (warnings === 0 || wf.validation.acknowledged);
   const isClean = critical === 0 && warnings === 0;
+  const shouldAutoSkipValidate = hasImportAttempt && totalPositions > 0 && isClean;
   const statusColor = critical > 0 ? "danger" : warnings > 0 ? "warning" : totalPositions > 0 ? "success" : "default";
   const statusText = critical > 0 ? `${critical} ошибок` : warnings > 0 ? `${warnings} предупр.` : totalPositions > 0 ? "Данные чистые" : "Нет данных";
+
+  useEffect(() => {
+    if (!shouldAutoSkipValidate) return;
+    flushSync(() => {
+      if (!wf.completedSteps.includes(WorkflowStep.Validate)) {
+        dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Validate });
+      }
+    });
+    nav("/market", { replace: true });
+  }, [dispatch, nav, shouldAutoSkipValidate, wf.completedSteps]);
 
   const handleContinue = () => {
     flushSync(() => {
@@ -148,16 +159,17 @@ export default function ValidatePage() {
         </div>
 
         <div className="validateHeroRight">
-          <button
-            type="button"
-            className="importHeroNextLink validateHeroNavLink"
-            disabled={!canContinue}
-            onClick={handleContinue}
-            aria-label="К рыночным данным"
-          >
-            <span className="importHeroNextLinkText pageTitle">К рыночным данным</span>
-            <span className="importHeroNextLinkArrow pageTitle" aria-hidden>→</span>
-          </button>
+          {canContinue ? (
+            <button
+              type="button"
+              className="importHeroNextLink validateHeroNavLink"
+              onClick={handleContinue}
+              aria-label="К рыночным данным"
+            >
+              <span className="importHeroNextLinkText pageTitle">К рыночным данным</span>
+              <span className="importHeroNextLinkArrow pageTitle" aria-hidden>→</span>
+            </button>
+          ) : null}
           <button
             type="button"
             className="importHeroNextLink validateHeroNavLink validateHeroBackLink"

@@ -1,10 +1,12 @@
-import { useEffect, useMemo } from "react";
-import { Chip } from "@heroui/react";
+import { useEffect, useMemo, useState } from "react";
+import type { EChartsOption } from "echarts";
+import { Chip, Table, Button as HeroButton, ButtonGroup } from "@heroui/react";
 import { useNavigate } from "react-router-dom";
 import AppTabs from "../components/AppTabs";
 import AppTable from "../components/AppTable";
 import Button from "../components/Button";
 import Checklist from "../components/Checklist";
+import InteractiveRiskChart from "../components/InteractiveRiskChart";
 import Card from "../ui/Card";
 import { useAppData } from "../state/appDataStore";
 import { useWorkflow } from "../workflow/workflowStore";
@@ -14,30 +16,18 @@ import { PositionDTO } from "../api/types";
 import { CorrelationMatrix } from "../components/monolith/visuals";
 import {
   MetricCompositionChart,
-  PortfolioCompositionDonut,
   RiskConnectionMap,
 } from "../components/rich/DashboardInsightCharts";
 import {
   AreaTrendChart,
-  CompareBarsChart,
-  DonutGauge,
   GlassPanel,
-  LineTrendChart,
-  MetricHero,
   Reveal,
-  Sparkline,
-  StaggerGroup,
-  StaggerItem,
 } from "../components/rich/RichVisuals";
 import { ChartInsights } from "../components/rich/ChartInsights";
 import {
   buildCompositionInsights,
-  buildContributorInsights,
-  buildLimitOverviewInsights,
-  buildLiquidityInsights,
   buildMetricCompositionInsights,
   buildRiskConnectionInsights,
-  buildStressInsights,
 } from "../lib/chartInsights";
 
 type StressRow = {
@@ -45,14 +35,6 @@ type StressRow = {
   pnl: number;
   limit?: number | null;
   breached: boolean;
-};
-
-type ContributorRow = {
-  metric?: string;
-  position_id: string;
-  scenario_id?: string;
-  pnl_contribution: number;
-  abs_pnl_contribution: number;
 };
 
 function formatComputedAt(iso?: string) {
@@ -81,6 +63,7 @@ const CONTRIBUTOR_PALETTE = ["#7da7ff", "#6eff8e", "#ffb86a", "#ff8f8f"];
 const DASHBOARD_CHART_HEIGHT = 220;
 const DASHBOARD_INSIGHT_HEIGHT = 260;
 const DASHBOARD_NETWORK_HEIGHT = 280;
+const DASHBOARD_STRESS_TAB_HEIGHT = 400;
 
 function formatMetricLabel(metric?: string) {
   if (!metric) return "Метрика";
@@ -105,6 +88,7 @@ export default function DashboardPage() {
   const { state: dataState } = useAppData();
   const { state: wf, dispatch } = useWorkflow();
   const metrics = dataState.results.metrics;
+  const [contributorViewMode, setContributorViewMode] = useState<"absolute" | "share">("absolute");
 
   useEffect(() => {
     if (metrics) dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Results });
@@ -115,23 +99,44 @@ export default function DashboardPage() {
   ).toUpperCase();
 
   const stressRows = useMemo<StressRow[]>(() => metrics?.stress ?? [], [metrics?.stress]);
-  const topContributors = useMemo<ContributorRow[]>(() => {
-    const raw = metrics?.top_contributors;
-    if (!raw) return [];
-    return Object.values(raw)
-      .flat()
-      .sort((a, b) => b.abs_pnl_contribution - a.abs_pnl_contribution)
-      .slice(0, 6);
-  }, [metrics?.top_contributors]);
+  const contributorItems = useMemo(() => {
+    const source = metrics?.top_contributors ?? {};
+    const aggregate = new Map<string, {
+      key: string;
+      metric: string;
+      positionId: string;
+      label: string;
+      abs: number;
+      net: number;
+    }>();
 
-  const contributorBars = useMemo(() => {
-    const maxAbs = Math.max(...topContributors.map((row) => row.abs_pnl_contribution), 1);
-    return topContributors.map((row) => ({
-      label: row.metric ? `${formatMetricLabel(row.metric)} · ${row.position_id}` : row.position_id,
-      value: (row.abs_pnl_contribution / maxAbs) * 100,
-      tone: row.pnl_contribution < 0 ? "negative" as const : "positive" as const,
+    for (const [metricKey, rows] of Object.entries(source)) {
+      for (const row of rows ?? []) {
+        const key = `${metricKey}::${row.position_id}`;
+        const current = aggregate.get(key) ?? {
+          key,
+          metric: metricKey,
+          positionId: row.position_id,
+          label: `${formatMetricLabel(metricKey)} · ${row.position_id}`,
+          abs: 0,
+          net: 0,
+        };
+        current.abs += Math.abs(Number(row.abs_pnl_contribution ?? 0));
+        current.net += Number(row.pnl_contribution ?? 0);
+        aggregate.set(key, current);
+      }
+    }
+
+    const ranked = Array.from(aggregate.values())
+      .sort((a, b) => b.abs - a.abs)
+      .slice(0, 16);
+    const totalAbs = ranked.reduce((sum, row) => sum + row.abs, 0) || 1;
+
+    return ranked.map((row) => ({
+      ...row,
+      share: (row.abs / totalAbs) * 100,
     }));
-  }, [topContributors]);
+  }, [metrics?.top_contributors]);
 
   const correlations = metrics?.correlations ?? [];
   const utilization = useMemo(() => {
@@ -148,18 +153,6 @@ export default function DashboardPage() {
   const worstStress = stressRows.length ? Math.min(...stressRows.map((row) => row.pnl)) : undefined;
   const breachedCount = stressRows.filter((row) => row.breached).length;
 
-  const distributionData = useMemo(
-    () =>
-      (metrics?.pnl_distribution?.length
-        ? metrics.pnl_distribution
-        : [0.18, 0.34, 0.28, 0.52, 0.4, 0.58, 0.46]
-      ).map((value, index) => ({
-        label: `${index + 1}`,
-        value: Number(value),
-      })),
-    [metrics?.pnl_distribution]
-  );
-
   const stressTrendData = useMemo(
     () =>
       (stressRows.length ? stressRows : [{ scenario_id: "base", pnl: 0, limit: 0, breached: false }]).map((row) => ({
@@ -169,33 +162,60 @@ export default function DashboardPage() {
       })),
     [stressRows]
   );
-
-  const limitBars = useMemo(() => {
-    const source = metrics?.limits?.length
-      ? metrics.limits
-      : ([["lc_var", metrics?.lc_var ?? 0, metrics?.base_value ?? 1, false]] as const);
-
-    return source.map(([metric, value, limit, breached]) => ({
-      label: String(metric),
-      value: Math.min(100, limit ? Math.abs((value / limit) * 100) : 0),
-      tone: breached ? "negative" as const : "positive" as const,
-    }));
-  }, [metrics?.base_value, metrics?.lc_var, metrics?.limits]);
-
-  const liquidityBars = useMemo(() => {
-    const base = Math.max(Math.abs(metrics?.base_value ?? 0), 1);
-    return [
-      { label: "Капитал", value: Math.min(100, (Math.abs(metrics?.capital ?? 0) / base) * 100), tone: "positive" as const },
-      { label: "Начальная маржа", value: Math.min(100, (Math.abs(metrics?.initial_margin ?? 0) / base) * 100), tone: "neutral" as const },
-      { label: "Вариационная маржа", value: Math.min(100, (Math.abs(metrics?.variation_margin ?? 0) / base) * 100), tone: "negative" as const },
-    ];
-  }, [metrics?.base_value, metrics?.capital, metrics?.initial_margin, metrics?.variation_margin]);
-
-  const breachShare = stressRows.length ? (breachedCount / stressRows.length) * 100 : 0;
-  const scenarioSpark = useMemo(
-    () => stressTrendData.map((item, idx) => ({ label: `${idx + 1}`, value: Math.abs(item.value) })),
-    [stressTrendData]
+  const stressScenarioData = useMemo(
+    () =>
+      (stressRows.length ? stressRows : [{ scenario_id: "base", pnl: 0, limit: 0, breached: false }]).map((row, index) => {
+        const pnl = Number(row.pnl ?? 0);
+        const rawLimit = Number(row.limit);
+        const limit = Number.isFinite(rawLimit) ? rawLimit : null;
+        const profit = pnl > 0 ? Number(pnl.toFixed(2)) : 0;
+        const expenses = pnl < 0 ? Number(pnl.toFixed(2)) : 0;
+        const income = limit !== null && limit > 0 ? Number(limit.toFixed(2)) : 0;
+        return {
+          key: `${row.scenario_id}-${index}`,
+          label: row.scenario_id || `S${index + 1}`,
+          pnl,
+          limit,
+          profit,
+          expenses,
+          income,
+          breached: Boolean(row.breached),
+        };
+      }),
+    [stressRows]
   );
+  const hasStressLoss = worstStress !== undefined && worstStress < 0;
+  const varValue = metrics.var_hist ?? metrics.var_param ?? 0;
+  const esValue = metrics.es_hist ?? metrics.es_param ?? 0;
+
+  const limitOverviewRows = useMemo(
+    () =>
+      (metrics?.limits ?? [])
+        .map(([metric, value, limit, breached]) => {
+          const utilizationPct = limit ? Math.abs(value / limit) * 100 : 0;
+          return {
+            metric: String(metric),
+            value: Number(value),
+            limit: Number(limit),
+            breached: Boolean(breached),
+            utilizationPct,
+          };
+        })
+        .sort((a, b) => b.utilizationPct - a.utilizationPct),
+    [metrics?.limits]
+  );
+  const breachedLimitsCount = limitOverviewRows.filter((row) => row.breached).length;
+  const closestLimitRow = limitOverviewRows[0];
+  const lcVarValue = metrics.lc_var ?? 0;
+  const capitalValue = metrics.capital ?? 0;
+  const initialMarginValue = metrics.initial_margin ?? 0;
+  const baseValueAbs = Math.max(Math.abs(metrics.base_value ?? 0), 1);
+  const varSharePct = (Math.abs(varValue) / baseValueAbs) * 100;
+  const esSharePct = (Math.abs(esValue) / baseValueAbs) * 100;
+  const lcVarSharePct = (Math.abs(lcVarValue) / baseValueAbs) * 100;
+  const capitalCoveragePct = Math.abs(varValue) > 0 ? (capitalValue / Math.abs(varValue)) * 100 : 0;
+  const marginLoadPct = (Math.abs(initialMarginValue) / baseValueAbs) * 100;
+
   const correlationLabels = useMemo(
     () => dataState.portfolio.positions.map((position) => position.position_id),
     [dataState.portfolio.positions]
@@ -207,7 +227,6 @@ export default function DashboardPage() {
   const confidenceLabel = metrics?.confidence_level ? `${Math.round(metrics.confidence_level * 100)}% confidence` : null;
   const horizonLabel = metrics?.horizon_days ? `${metrics.horizon_days} дн. горизонт` : null;
   const modeLabel = metrics?.mode ? `режим ${metrics.mode}` : null;
-  const liquidityModelLabel = metrics?.liquidity_model ? `ликвидность ${metrics.liquidity_model}` : null;
 
   const positionsById = useMemo(
     () => new Map(dataState.portfolio.positions.map((position) => [position.position_id, position])),
@@ -366,38 +385,295 @@ export default function DashboardPage() {
     return { metrics: metricNodes, positions: positionNodes, links };
   }, [contributorMetricKeys, focusPositionIds, metrics?.top_contributors, positionsById]);
 
-  const stressInsights = useMemo(
-    () => buildStressInsights({ stressRows, scenarioCount: dataState.scenarios.length, baseCurrency }),
-    [baseCurrency, dataState.scenarios.length, stressRows]
-  );
-
-  const limitInsights = useMemo(
-    () => buildLimitOverviewInsights({ limits: metrics?.limits ?? [], overallUtilization: utilization }),
-    [metrics?.limits, utilization]
-  );
-
-  const contributorInsights = useMemo(
-    () => buildContributorInsights({ contributors: topContributors }),
-    [topContributors]
-  );
-
-  const liquidityInsights = useMemo(
-    () =>
-      buildLiquidityInsights({
-        baseVar: metrics.var_hist ?? metrics.var_param ?? 0,
-        lcVar: metrics.lc_var,
-        capital: metrics.capital,
-        initialMargin: metrics.initial_margin,
-        variationMargin: metrics.variation_margin,
-        baseCurrency,
-      }),
-    [baseCurrency, metrics.capital, metrics.initial_margin, metrics.lc_var, metrics.var_hist, metrics.var_param, metrics.variation_margin]
-  );
-
   const compositionInsights = useMemo(
     () => buildCompositionInsights({ slices: portfolioComposition }),
     [portfolioComposition]
   );
+  const stressScenarioOption = useMemo<EChartsOption | null>(() => {
+    if (!stressScenarioData.length) return null;
+
+    return {
+      tooltip: {
+        trigger: "axis",
+        axisPointer: {
+          type: "shadow",
+        },
+      },
+      legend: {
+        data: ["Profit", "Expenses"],
+        top: 0,
+        textStyle: {
+          color: "rgba(244,241,234,0.7)",
+        },
+      },
+      grid: {
+        left: 10,
+        right: 16,
+        top: 36,
+        bottom: 12,
+        containLabel: true,
+      },
+      xAxis: [
+        {
+          type: "value",
+          axisLabel: {
+            color: "rgba(244,241,234,0.58)",
+            formatter: (value: number) => formatNumber(value, 0),
+          },
+          splitLine: {
+            lineStyle: { color: "rgba(255,255,255,0.08)" },
+          },
+        },
+      ],
+      yAxis: [
+        {
+          type: "category",
+          axisTick: {
+            show: false,
+          },
+          axisLabel: {
+            color: "rgba(244,241,234,0.64)",
+          },
+          data: stressScenarioData.map((row) => row.label),
+        },
+      ],
+      series: [
+        {
+          name: "Profit",
+          type: "bar",
+          label: {
+            show: true,
+            position: "inside",
+            color: "rgba(244,241,234,0.86)",
+            fontSize: 11,
+            formatter: ({ value }: { value?: number }) => (value ? formatNumber(value, 0) : ""),
+          },
+          itemStyle: {
+            color: "#6eff8e",
+            borderRadius: [0, 6, 6, 0],
+          },
+          emphasis: {
+            focus: "series",
+          },
+          data: stressScenarioData.map((row) => row.profit),
+        },
+        {
+          name: "Income",
+          type: "bar",
+          stack: "Total",
+          label: {
+            show: true,
+            position: "inside",
+            color: "rgba(244,241,234,0.82)",
+            fontSize: 11,
+            formatter: ({ value }: { value?: number }) => (value ? formatNumber(value, 0) : ""),
+          },
+          itemStyle: {
+            color: "#7da7ff",
+            borderRadius: [0, 6, 6, 0],
+          },
+          emphasis: {
+            focus: "series",
+          },
+          data: stressScenarioData.map((row) => row.income),
+        },
+        {
+          name: "Expenses",
+          type: "bar",
+          stack: "Total",
+          label: {
+            show: true,
+            position: "inside",
+            color: "rgba(244,241,234,0.82)",
+            fontSize: 11,
+            formatter: ({ value }: { value?: number }) => (value ? formatNumber(value, 0) : ""),
+          },
+          itemStyle: {
+            color: "#ff8f8f",
+            borderRadius: [6, 0, 0, 6],
+          },
+          emphasis: {
+            focus: "series",
+          },
+          data: stressScenarioData.map((row) => row.expenses),
+        },
+      ],
+    };
+  }, [stressScenarioData]);
+  const contributorTreemapOption = useMemo<EChartsOption | null>(() => {
+    if (!contributorItems.length) return null;
+
+    const isAbsolute = contributorViewMode === "absolute";
+    const data = contributorItems.map((item) => ({
+      name: item.label,
+      value: isAbsolute ? Number(item.abs.toFixed(2)) : Number(item.share.toFixed(4)),
+      rawAbs: item.abs,
+      rawShare: item.share,
+      rawNet: item.net,
+      itemStyle: {
+        color: item.net < 0 ? "rgba(255,143,143,0.72)" : "rgba(110,255,142,0.76)",
+      },
+    }));
+
+    return {
+      tooltip: {
+        trigger: "item",
+        backgroundColor: "rgba(10,12,17,0.96)",
+        borderColor: "rgba(255,255,255,0.12)",
+        borderWidth: 1,
+        textStyle: { color: "rgba(244,241,234,0.9)" },
+        formatter: (params: any) => {
+          const abs = Number(params?.data?.rawAbs ?? 0);
+          const share = Number(params?.data?.rawShare ?? 0);
+          const net = Number(params?.data?.rawNet ?? 0);
+          return [
+            `<div style="font-weight:700;margin-bottom:4px">${params?.name ?? "—"}</div>`,
+            `Вклад: ${formatNumber(abs, 2)} ${baseCurrency}`,
+            `Доля: ${share.toFixed(2)}%`,
+            `Направление: ${net < 0 ? "убыток" : "прибыль"}`,
+          ].join("<br/>");
+        },
+      },
+      series: [
+        {
+          type: "treemap",
+          roam: false,
+          nodeClick: false,
+          breadcrumb: { show: false },
+          top: 8,
+          left: 4,
+          right: 4,
+          bottom: 4,
+          data,
+          label: {
+            show: true,
+            position: "insideTopLeft",
+            color: "rgba(244,241,234,0.94)",
+            lineHeight: 16,
+            fontSize: 12,
+            overflow: "truncate",
+            formatter: (params: any) => {
+              const tail = String(params?.name ?? "").split(" · ").slice(-1)[0];
+              const main = isAbsolute
+                ? `${formatNumber(Number(params?.data?.rawAbs ?? 0), 0)} ${baseCurrency}`
+                : `${Number(params?.data?.rawShare ?? 0).toFixed(1)}%`;
+              return `{name|${tail}}\n{value|${main}}`;
+            },
+            rich: {
+              name: {
+                fontSize: 12,
+                fontWeight: 700,
+                color: "rgba(244,241,234,0.96)",
+              },
+              value: {
+                fontSize: 13,
+                fontWeight: 800,
+                color: "rgba(244,241,234,0.88)",
+              },
+            },
+          },
+          upperLabel: { show: false },
+          itemStyle: {
+            borderColor: "rgba(6,8,12,0.74)",
+            borderWidth: 2,
+            gapWidth: 2,
+            borderRadius: 8,
+          },
+          levels: [
+            {
+              itemStyle: {
+                borderColor: "rgba(6,8,12,0.74)",
+                borderWidth: 2,
+                gapWidth: 3,
+                borderRadius: 8,
+              },
+            },
+          ],
+        },
+      ],
+    };
+  }, [baseCurrency, contributorItems, contributorViewMode]);
+  const portfolioRoseOption = useMemo<EChartsOption | null>(() => {
+    if (!portfolioComposition.length) return null;
+
+    const roseData = portfolioComposition.map((slice) => ({
+      value: Number(slice.value.toFixed(2)),
+      name: slice.label,
+      itemStyle: {
+        color: slice.color,
+        borderRadius: 5,
+      },
+    }));
+
+    return {
+      title: {
+        text: "Nightingale Chart",
+        subtext: `Portfolio · ${baseCurrency}`,
+        left: "center",
+        top: 0,
+        textStyle: { color: "rgba(244,241,234,0.9)", fontSize: 13, fontWeight: 700 },
+        subtextStyle: { color: "rgba(244,241,234,0.52)", fontSize: 11 },
+      },
+      tooltip: {
+        trigger: "item",
+        formatter: "{a} <br/>{b}: {c} ({d}%)",
+      },
+      legend: {
+        left: "center",
+        top: "bottom",
+        itemWidth: 10,
+        itemHeight: 10,
+        textStyle: {
+          color: "rgba(244,241,234,0.62)",
+          fontSize: 11,
+        },
+        data: portfolioComposition.map((slice) => slice.label),
+      },
+      toolbox: {
+        show: true,
+        right: 0,
+        top: 4,
+        iconStyle: { borderColor: "rgba(244,241,234,0.62)" },
+        feature: {
+          mark: { show: true },
+          dataView: {
+            show: true,
+            readOnly: false,
+            optionToContent: () =>
+              `<div style="padding:8px 10px;color:#d9d4c8;background:#101317;border-radius:8px">${portfolioComposition
+                .map((slice) => `${slice.label}: ${formatNumber(slice.value, 2)}`)
+                .join("<br/>")}</div>`,
+          },
+          restore: { show: true },
+          saveAsImage: { show: true },
+        },
+      },
+      series: [
+        {
+          name: "Radius Mode",
+          type: "pie",
+          radius: [20, 110],
+          center: ["25%", "52%"],
+          roseType: "radius",
+          itemStyle: { borderRadius: 5 },
+          label: { show: false },
+          emphasis: { label: { show: true, color: "rgba(244,241,234,0.9)" } },
+          data: roseData,
+        },
+        {
+          name: "Area Mode",
+          type: "pie",
+          radius: [20, 110],
+          center: ["75%", "52%"],
+          roseType: "area",
+          itemStyle: { borderRadius: 5 },
+          label: { show: false },
+          emphasis: { label: { show: true, color: "rgba(244,241,234,0.9)" } },
+          data: roseData,
+        },
+      ],
+    };
+  }, [baseCurrency, portfolioComposition]);
 
   const metricCompositionInsights = useMemo(
     () => buildMetricCompositionInsights({ rows: contributorMetricComposition.rows, series: contributorMetricComposition.series }),
@@ -447,13 +723,22 @@ export default function DashboardPage() {
     );
   }
 
+  const scenarioCount = stressRows.length || dataState.scenarios.length;
+  const utilizationRounded = Math.round(utilization);
+  const utilizationTone = utilization >= 100 ? "danger" : utilization >= 75 ? "warning" : "success";
+  const utilizationHint = utilization >= 100 ? "Лимит превышен" : utilization >= 75 ? "Зона контроля" : "В пределах лимита";
+  const utilizationProgress = Math.max(0, Math.min(utilization, 100));
+  const utilizationDeltaLabel = utilization >= 100
+    ? `+${Math.round(utilization - 100)}% сверх лимита`
+    : `${Math.round(100 - utilization)}% до лимита`;
+
   return (
     <div className="importPagePlain dashboardPage dashboardPage--revamp">
       <div className="importHeroRow">
         <div>
           <h1 className="pageTitle">Панель риска</h1>
           <div className="importHeroMeta">
-            <Chip color={utilization >= 100 ? "danger" : utilization >= 75 ? "warning" : "success"} variant="soft" size="sm">
+            <Chip color={utilizationTone} variant="soft" size="sm">
               {utilization >= 100 ? "Есть превышения" : utilization >= 75 ? "Требуется контроль" : "Риск в норме"}
             </Chip>
             <span className="importFileTag">Обновлено: {formatComputedAt(dataState.results.computedAt)}</span>
@@ -480,71 +765,43 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="dashboardSectionBody">
-          <div className="dashboardPulseRow">
-            <div className="dashboardPulseCard">
-              <span>Позиции</span>
-              <strong>{dataState.portfolio.positions.length}</strong>
+          <div className="dashboardKpiGrid">
+            <div className="dashboardKpiCard">
+              <span className="dashboardKpiLabel">Стоимость портфеля</span>
+              <strong className="dashboardKpiValue">{formatNumber(metrics.base_value ?? 0, 0)}</strong>
+              <span className="dashboardKpiMeta">{baseCurrency}</span>
             </div>
-            <div className="dashboardPulseCard">
-              <span>Сценарии</span>
-              <strong>{stressRows.length || dataState.scenarios.length}</strong>
+            <div className="dashboardKpiCard">
+              <span className="dashboardKpiLabel">VaR</span>
+              <strong className="dashboardKpiValue">{formatNumber(varValue, 0)}</strong>
+              <span className="dashboardKpiMeta">пороговый убыток</span>
             </div>
-            <div className="dashboardPulseCard">
-              <span>Превышения</span>
-              <strong>{breachedCount}</strong>
+            <div className="dashboardKpiCard">
+              <span className="dashboardKpiLabel">ES</span>
+              <strong className="dashboardKpiValue">{formatNumber(esValue, 0)}</strong>
+              <span className="dashboardKpiMeta">средний хвост</span>
             </div>
-            <div className="dashboardPulseCard">
-              <span>Использование лимитов</span>
-              <strong>{Math.round(utilization)}%</strong>
+            <div className={`dashboardKpiCard ${hasStressLoss ? "dashboardKpiCard--danger" : ""}`}>
+              <span className="dashboardKpiLabel">Худший стресс</span>
+              <strong className="dashboardKpiValue">{formatNumber(worstStress ?? 0, 0)}</strong>
+              <span className="dashboardKpiMeta">{hasStressLoss ? "негативный сценарий" : "без критики"}</span>
+            </div>
+            <div className={`dashboardKpiCard dashboardKpiCard--status dashboardKpiCard--${utilizationTone}`}>
+              <span className="dashboardKpiLabel">Использование лимитов</span>
+              <strong className="dashboardKpiValue">{utilizationRounded}%</strong>
+              <span className="dashboardKpiMeta">{utilizationHint}</span>
+              <div className="dashboardKpiProgress" aria-label="Утилизация лимитов">
+                <span style={{ width: `${utilizationProgress}%` }} />
+              </div>
             </div>
           </div>
-
-          <StaggerGroup className="dashboardHeroGrid">
-            <StaggerItem>
-              <MetricHero
-                className="metricHero--dashboardKeyMetric"
-                label="Стоимость портфеля"
-                value={metrics.base_value ?? 0}
-                hint={baseCurrency}
-                chart={<Sparkline data={distributionData.slice(-10)} />}
-              />
-            </StaggerItem>
-            <StaggerItem>
-              <MetricHero
-                className="metricHero--dashboardKeyMetric metricHero--riskCompact"
-                label="VaR / ES"
-                value={metrics.var_hist ?? metrics.var_param ?? 0}
-                tone={utilization >= 100 ? "danger" : "success"}
-                hint={baseCurrency}
-                chart={
-                  <div className="heroInlineStats heroInlineStats--riskCompact">
-                    <div className="heroInlineStat heroInlineStat--riskCompact">
-                      <span>VaR</span>
-                      <strong>{formatNumber(metrics.var_hist ?? metrics.var_param ?? 0, 2)}</strong>
-                    </div>
-                    <div className="heroInlineStat heroInlineStat--riskCompact">
-                      <span>ES</span>
-                      <strong>{formatNumber(metrics.es_hist ?? metrics.es_param ?? 0, 2)}</strong>
-                    </div>
-                    <div className="heroInlineStat heroInlineStat--riskCompact">
-                      <span>LC VaR</span>
-                      <strong>{formatNumber(metrics.lc_var ?? 0, 2)}</strong>
-                    </div>
-                  </div>
-                }
-              />
-            </StaggerItem>
-            <StaggerItem>
-              <MetricHero
-                className="metricHero--dashboardKeyMetric"
-                label="Худший стресс"
-                value={worstStress ?? 0}
-                tone={worstStress !== undefined && worstStress < 0 ? "danger" : "success"}
-                hint={baseCurrency}
-                chart={<Sparkline data={scenarioSpark} color={worstStress !== undefined && worstStress < 0 ? "#ff7777" : "#6eff8e"} />}
-              />
-            </StaggerItem>
-          </StaggerGroup>
+          <div className="dashboardMicroStats">
+            <span className="dashboardMicroStat">Позиции: {dataState.portfolio.positions.length}</span>
+            <span className="dashboardMicroStat">Сценарии: {scenarioCount}</span>
+            <span className="dashboardMicroStat">Превышения: {breachedCount}</span>
+            <span className="dashboardMicroStat">{modeLabel ?? "режим api"}</span>
+            <span className="dashboardMicroStat">{utilizationDeltaLabel}</span>
+          </div>
         </div>
       </section>
 
@@ -552,18 +809,18 @@ export default function DashboardPage() {
         <div className="dashboardSectionHead">
           <div className="dashboardSectionIntro">
             <div className="dashboardSectionEyebrow">Мониторинг</div>
-            <h2 className="dashboardSectionTitle">Текущий риск-контур</h2>
+            <h2 className="dashboardSectionTitle">Рабочий экран риска</h2>
           </div>
           <div className="dashboardSectionMeta">
             <span className="dashboardSectionTag">{stressTrendData.length} сценариев</span>
-            <span className="dashboardSectionTag">{breachedCount} превышений</span>
+            <span className="dashboardSectionTag">{contributorItems.length || 0} вкладчиков</span>
           </div>
         </div>
         <div className="dashboardSectionBody">
-          <div className="dashboardCardGrid dashboardCardGrid--two">
+          <div className="dashboardCoreGrid">
             <Reveal>
               <GlassPanel
-                className="dashboardCompactPanel"
+                className="dashboardCompactPanel dashboardCompactPanel--workspace"
                 title="Профиль stress P&L"
                 badge={<Chip color={worstStress !== undefined && worstStress < 0 ? "danger" : "success"} variant="flat" radius="sm">{stressTrendData.length} сцен.</Chip>}
               >
@@ -574,120 +831,133 @@ export default function DashboardPage() {
                     <strong>{formatNumber(worstStress ?? 0, 2)}</strong>
                   </div>
                   <div className="dashboardMiniStat">
+                    <span>Сценарии</span>
+                    <strong>{scenarioCount}</strong>
+                  </div>
+                  <div className="dashboardMiniStat">
                     <span>Превышения</span>
                     <strong>{breachedCount}</strong>
                   </div>
-                  <div className="dashboardMiniStat">
-                    <span>Сценарии</span>
-                    <strong>{stressRows.length || dataState.scenarios.length}</strong>
-                  </div>
                 </div>
-                <ChartInsights items={stressInsights} />
               </GlassPanel>
             </Reveal>
             <Reveal delay={0.05}>
               <GlassPanel
-                className="dashboardCompactPanel"
-                title="Лимиты"
-                badge={<Chip color={utilization >= 100 ? "danger" : utilization >= 75 ? "warning" : "success"} variant="flat" radius="sm">{Math.round(utilization)}%</Chip>}
+                className="dashboardCompactPanel dashboardCompactPanel--workspace"
+                title="Крупнейшие вкладчики"
+                badge={<Chip color="primary" variant="flat" radius="sm">{contributorItems.length || 0} строк</Chip>}
               >
-                <div className="dashboardGaugeRow dashboardGaugeRow--compact">
-                  <DonutGauge value={utilization} label="лимиты" />
-                  <DonutGauge value={breachShare} label="breach" color="#ff7777" />
+                <div className="dashboardContributorToolbar">
+                  <ButtonGroup variant="secondary" className="dashboardContributorModeGroup">
+                    <HeroButton
+                      onPress={() => setContributorViewMode("absolute")}
+                      className={`dashboardContributorModeBtn ${contributorViewMode === "absolute" ? "dashboardContributorModeBtn--active" : ""}`}
+                    >
+                      RUB
+                    </HeroButton>
+                    <HeroButton
+                      onPress={() => setContributorViewMode("share")}
+                      className={`dashboardContributorModeBtn ${contributorViewMode === "share" ? "dashboardContributorModeBtn--active" : ""}`}
+                    >
+                      %
+                    </HeroButton>
+                  </ButtonGroup>
                 </div>
-                <CompareBarsChart data={limitBars} height={DASHBOARD_CHART_HEIGHT} />
-                <ChartInsights items={limitInsights} />
+                <InteractiveRiskChart
+                  option={contributorTreemapOption}
+                  emptyText="Недостаточно данных по вкладчикам."
+                  chartId={`dashboard-contributors-treemap-${contributorViewMode}`}
+                  height={DASHBOARD_CHART_HEIGHT + 82}
+                />
               </GlassPanel>
             </Reveal>
             <Reveal delay={0.1}>
               <GlassPanel
-                className="dashboardCompactPanel"
-                title="Крупнейшие вкладчики"
-                badge={<Chip color="primary" variant="flat" radius="sm">{contributorBars.length || 0} строк</Chip>}
+                className="dashboardCompactPanel dashboardCompactPanel--workspace"
+                title="Лимиты и алерты"
+                badge={<Chip color={utilizationTone} variant="flat" radius="sm">{utilizationRounded}%</Chip>}
               >
-                <CompareBarsChart data={contributorBars} height={DASHBOARD_CHART_HEIGHT} />
-                <ChartInsights items={contributorInsights} />
+                {limitOverviewRows.length ? (
+                  <>
+                    <div className="dashboardMiniStatGrid dashboardMiniStatGrid--limits">
+                      <div className="dashboardMiniStat">
+                        <span>Нарушения</span>
+                        <strong className={breachedLimitsCount > 0 ? "dashboardValueNegative" : ""}>{breachedLimitsCount}</strong>
+                      </div>
+                      <div className="dashboardMiniStat">
+                        <span>Худшая загрузка</span>
+                        <strong>{formatNumber(closestLimitRow?.utilizationPct ?? 0, 1)}%</strong>
+                      </div>
+                      <div className="dashboardMiniStat">
+                        <span>Критичный лимит</span>
+                        <strong>{closestLimitRow ? formatMetricLabel(closestLimitRow.metric) : "—"}</strong>
+                      </div>
+                    </div>
+                    <AppTable
+                      ariaLabel="Приоритет лимитов"
+                      headers={["Метрика", "Факт", "Лимит", "Загрузка"]}
+                      rows={limitOverviewRows.slice(0, 5).map((row) => ({
+                        key: row.metric,
+                        cells: [
+                          formatMetricLabel(row.metric),
+                          <span key={`${row.metric}-fact`} className={row.breached ? "dashboardValueNegative" : ""}>
+                            {formatNumber(row.value, 2)}
+                          </span>,
+                          formatNumber(row.limit, 2),
+                          <span key={`${row.metric}-util`} className={row.breached ? "dashboardValueNegative" : ""}>
+                            {formatNumber(row.utilizationPct, 1)}%
+                          </span>,
+                        ],
+                      }))}
+                    />
+                  </>
+                ) : (
+                  <div className="dashboardPanelHint">
+                    Лимиты не переданы в расчёт. Для этого портфеля доступна только общая загрузка: <strong>{utilizationRounded}%</strong>.
+                  </div>
+                )}
               </GlassPanel>
             </Reveal>
             <Reveal delay={0.15}>
               <GlassPanel
-                className="dashboardCompactPanel"
-                title="Ликвидность и обеспечение"
+                className="dashboardCompactPanel dashboardCompactPanel--workspace"
+                title="Ключевые показатели"
               >
-                <CompareBarsChart data={liquidityBars} height={DASHBOARD_CHART_HEIGHT} />
-                <div className="dashboardMiniStatGrid">
-                  <div className="dashboardMiniStat">
+                <div className="dashboardKeyMetricGrid">
+                  <div className="dashboardKeyMetricCard dashboardKeyMetricCard--danger">
+                    <span>VaR</span>
+                    <strong>{formatNumber(varValue, 0)}</strong>
+                    <small>{formatNumber(varSharePct, 1)}% от портфеля</small>
+                  </div>
+                  <div className="dashboardKeyMetricCard dashboardKeyMetricCard--warning">
+                    <span>ES</span>
+                    <strong>{formatNumber(esValue, 0)}</strong>
+                    <small>{formatNumber(esSharePct, 1)}% от портфеля</small>
+                  </div>
+                  <div className="dashboardKeyMetricCard">
                     <span>LC VaR</span>
-                    <strong>{formatNumber(metrics.lc_var ?? 0, 2)}</strong>
+                    <strong>{formatNumber(lcVarValue, 0)}</strong>
+                    <small>{formatNumber(lcVarSharePct, 1)}% от портфеля</small>
                   </div>
-                  <div className="dashboardMiniStat">
-                    <span>Capital</span>
-                    <strong>{formatNumber(metrics.capital ?? 0, 2)}</strong>
+                  <div className="dashboardKeyMetricCard">
+                    <span>Покрытие капиталом</span>
+                    <strong>{formatNumber(capitalCoveragePct, 1)}%</strong>
+                    <small>{formatNumber(capitalValue, 0)} к {formatNumber(varValue, 0)}</small>
                   </div>
-                  <div className="dashboardMiniStat">
-                    <span>Initial margin</span>
-                    <strong>{formatNumber(metrics.initial_margin ?? 0, 2)}</strong>
+                  <div className="dashboardKeyMetricCard">
+                    <span>Начальная маржа</span>
+                    <strong>{formatNumber(initialMarginValue, 0)}</strong>
+                    <small>{formatNumber(marginLoadPct, 1)}% от портфеля</small>
+                  </div>
+                  <div className={`dashboardKeyMetricCard ${hasStressLoss ? "dashboardKeyMetricCard--danger" : ""}`}>
+                    <span>Худший стресс</span>
+                    <strong>{formatNumber(worstStress ?? 0, 0)}</strong>
+                    <small>{hasStressLoss ? "негативный сценарий" : "без критики"}</small>
                   </div>
                 </div>
-                <ChartInsights items={liquidityInsights} />
               </GlassPanel>
             </Reveal>
           </div>
-        </div>
-      </section>
-
-      <section className="dashboardSection">
-        <div className="dashboardSectionHead">
-          <div className="dashboardSectionIntro">
-            <div className="dashboardSectionEyebrow">Структура</div>
-            <h2 className="dashboardSectionTitle">Драйверы и связи риска</h2>
-          </div>
-          <div className="dashboardSectionMeta">
-            <span className="dashboardSectionTag">{portfolioComposition.length || 1} сегм.</span>
-            {liquidityModelLabel ? <span className="dashboardSectionTag">{liquidityModelLabel}</span> : null}
-          </div>
-        </div>
-        <div className="dashboardSectionBody">
-          <StaggerGroup className="dashboardCardGrid dashboardCardGrid--three">
-            <StaggerItem>
-              <GlassPanel
-                className="dashboardCompactPanel dashboardCompactPanel--portfolio"
-                title="Структура портфеля"
-                badge={<Chip color="primary" variant="flat" radius="sm">{portfolioComposition.length || 1} сегм.</Chip>}
-              >
-                <PortfolioCompositionDonut data={portfolioComposition} unit={baseCurrency} height={DASHBOARD_INSIGHT_HEIGHT} />
-                <ChartInsights items={compositionInsights} />
-              </GlassPanel>
-            </StaggerItem>
-            <StaggerItem>
-              <GlassPanel
-                className="dashboardCompactPanel"
-                title="Композиция риска по метрикам"
-                badge={<Chip color="default" variant="flat" radius="sm">{contributorMetricComposition.rows.length || 0} метр.</Chip>}
-              >
-                <MetricCompositionChart
-                  data={contributorMetricComposition.rows}
-                  series={contributorMetricComposition.series}
-                  height={DASHBOARD_INSIGHT_HEIGHT}
-                />
-                <ChartInsights items={metricCompositionInsights} />
-              </GlassPanel>
-            </StaggerItem>
-            <StaggerItem>
-              <GlassPanel
-                className="dashboardCompactPanel"
-                title="Карта связей риска"
-              >
-                <RiskConnectionMap
-                  metrics={riskConnectionData.metrics}
-                  positions={riskConnectionData.positions}
-                  links={riskConnectionData.links}
-                  height={DASHBOARD_NETWORK_HEIGHT}
-                />
-                <ChartInsights items={riskConnectionInsights} />
-              </GlassPanel>
-            </StaggerItem>
-          </StaggerGroup>
         </div>
       </section>
 
@@ -705,93 +975,88 @@ export default function DashboardPage() {
         <div className="dashboardSectionBody">
           <AppTabs
             ariaLabel="Вкладки результатов риска"
+            tabStyle="ghostGroup"
             tabs={[
-          {
-            id: "overview",
-            label: "Обзор",
-            content: (
-              <div className="dashboardDetailGrid">
-                <GlassPanel className="dashboardCompactPanel" title="Ключевые показатели">
-                  <AppTable
-                    ariaLabel="Ключевые показатели риска"
-                    headers={["Метрика", "Значение", "Комментарий"]}
-                    rows={[
-                      { key: "var", cells: ["VaR", formatNumber(metrics.var_hist ?? metrics.var_param ?? 0, 2), "Пороговый убыток"] },
-                      { key: "es", cells: ["ES", formatNumber(metrics.es_hist ?? metrics.es_param ?? 0, 2), "Средний убыток хвоста"] },
-                      { key: "lcvar", cells: ["LC VaR", formatNumber(metrics.lc_var ?? 0, 2), "С поправкой на ликвидность"] },
-                      { key: "capital", cells: ["Capital", formatNumber(metrics.capital ?? 0, 2), "Требуемый капитал"] },
-                      { key: "im", cells: ["Initial margin", formatNumber(metrics.initial_margin ?? 0, 2), "Начальная маржа"] },
-                    ]}
-                  />
-                </GlassPanel>
-                <GlassPanel className="dashboardCompactPanel" title="Вкладчики риска">
-                  <CompareBarsChart data={contributorBars} height={DASHBOARD_CHART_HEIGHT} />
-                </GlassPanel>
-              </div>
-            ),
-          },
           {
             id: "stress",
             label: "Стрессы",
             content: (
-              <div className="dashboardDetailGrid">
-                <GlassPanel className="dashboardCompactPanel" title="Stress P&L по сценариям">
-                  <AppTable
-                    ariaLabel="Стресс-сценарии"
-                    headers={["Сценарий", "P&L", "Лимит", "Статус"]}
-                    rows={stressRows.map((row) => ({
-                      key: row.scenario_id,
-                      cells: [
-                        row.scenario_id,
-                        formatNumber(row.pnl, 2),
-                        row.limit ?? "—",
-                        <Chip key={`${row.scenario_id}-status`} color={row.breached ? "danger" : "success"} variant="flat" radius="sm">
-                          {row.breached ? "Превышен" : "Ок"}
-                        </Chip>,
-                      ],
-                    }))}
-                    emptyContent="Стресс-сценарии не рассчитывались."
-                    />
-                </GlassPanel>
-                <GlassPanel className="dashboardCompactPanel" title="Форма stress-профиля">
-                  <LineTrendChart
-                    data={stressTrendData}
-                    color="#ff7777"
-                    secondaryColor="#7da7ff"
-                    showSecondary
-                    height={DASHBOARD_CHART_HEIGHT}
-                    primaryLabel="Stress P&L"
-                    secondaryLabel="Лимит"
-                  />
+              <div className="dashboardDetailGrid dashboardDetailGrid--single">
+                <GlassPanel className="dashboardCompactPanel dashboardCompactPanel--stressPlain" title="Stress P&L по сценариям">
+                  <div className="dashboardStressSplit">
+                    <div className="dashboardStressChart">
+                      <InteractiveRiskChart
+                        option={stressScenarioOption}
+                        emptyText="Стресс-сценарии не рассчитывались."
+                        chartId="dashboard-stress-scenarios-bars"
+                        height={DASHBOARD_STRESS_TAB_HEIGHT}
+                      />
+                    </div>
+                    <div className="dashboardStressTableWrap">
+                      <Table variant="secondary" className="dashboardStressTable">
+                        <Table.ScrollContainer>
+                          <Table.Content aria-label="Стресс-сценарии" className="dashboardStressTableContent">
+                            <Table.Header>
+                              <Table.Column isRowHeader>Сценарий</Table.Column>
+                              <Table.Column>P&L</Table.Column>
+                            </Table.Header>
+                            <Table.Body>
+                              {stressScenarioData.map((row) => (
+                                <Table.Row key={row.key}>
+                                  <Table.Cell>{row.label}</Table.Cell>
+                                  <Table.Cell className={row.pnl < 0 ? "dashboardValueNegative" : "dashboardValuePositive"}>
+                                    {formatNumber(row.pnl, 2)}
+                                  </Table.Cell>
+                                </Table.Row>
+                              ))}
+                            </Table.Body>
+                          </Table.Content>
+                        </Table.ScrollContainer>
+                      </Table>
+                    </div>
+                  </div>
                 </GlassPanel>
               </div>
             ),
           },
           {
-            id: "limits",
-            label: "Лимиты",
+            id: "structure",
+            label: "Структура",
             content: (
-              <div className="dashboardDetailGrid">
-                <GlassPanel className="dashboardCompactPanel" title="Использование по метрикам">
-                  <CompareBarsChart data={limitBars} height={DASHBOARD_CHART_HEIGHT} />
-                </GlassPanel>
-                <GlassPanel className="dashboardCompactPanel" title="Факт / лимит">
-                  <AppTable
-                    ariaLabel="Лимиты по метрикам"
-                    headers={["Метрика", "Факт", "Лимит", "Статус"]}
-                    rows={(metrics.limits ?? []).map(([metric, value, limit, breached]) => ({
-                      key: metric,
-                      cells: [
-                        metric,
-                        formatNumber(value, 2),
-                        formatNumber(limit, 2),
-                        <Chip key={`${metric}-status`} color={breached ? "danger" : "success"} variant="flat" radius="sm">
-                          {breached ? "Превышен" : "Ок"}
-                        </Chip>,
-                      ],
-                    }))}
-                    emptyContent="Лимиты не переданы в расчёт."
+              <div className="dashboardCardGrid dashboardCardGrid--three">
+                <GlassPanel
+                  className="dashboardCompactPanel dashboardCompactPanel--portfolio"
+                  title="Структура портфеля"
+                  badge={<Chip color="primary" variant="flat" radius="sm">{portfolioComposition.length || 1} сегм.</Chip>}
+                >
+                  <InteractiveRiskChart
+                    option={portfolioRoseOption}
+                    emptyText="Структура портфеля недоступна."
+                    chartId="dashboard-portfolio-rose"
+                    height={DASHBOARD_INSIGHT_HEIGHT + 70}
                   />
+                  <ChartInsights items={compositionInsights} />
+                </GlassPanel>
+                <GlassPanel
+                  className="dashboardCompactPanel"
+                  title="Композиция риска по метрикам"
+                  badge={<Chip color="default" variant="flat" radius="sm">{contributorMetricComposition.rows.length || 0} метр.</Chip>}
+                >
+                  <MetricCompositionChart
+                    data={contributorMetricComposition.rows}
+                    series={contributorMetricComposition.series}
+                    height={DASHBOARD_INSIGHT_HEIGHT}
+                  />
+                  <ChartInsights items={metricCompositionInsights} />
+                </GlassPanel>
+                <GlassPanel className="dashboardCompactPanel" title="Карта связей риска">
+                  <RiskConnectionMap
+                    metrics={riskConnectionData.metrics}
+                    positions={riskConnectionData.positions}
+                    links={riskConnectionData.links}
+                    height={DASHBOARD_NETWORK_HEIGHT}
+                  />
+                  <ChartInsights items={riskConnectionInsights} />
                 </GlassPanel>
               </div>
             ),

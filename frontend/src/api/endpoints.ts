@@ -25,6 +25,7 @@ export async function fetchMetrics(payload: {
   calc_margin_capital?: boolean;
   calc_correlations?: boolean;
   market_data_session_id?: string;
+  auto_market_data?: boolean;
 }) {
   const { data } = await client.post("/metrics", payload);
   return metricsSchema.parse(data);
