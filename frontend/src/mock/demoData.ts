@@ -92,6 +92,21 @@ export const demoMetrics: MetricsResponse = {
     ],
   },
   limits: [["var_hist", 10000, 9000, true]],
+  correlations: [
+    [1, 0.34],
+    [0.34, 1],
+  ],
+  pnl_matrix: [
+    [1, 0.34],
+    [0.34, 1],
+  ],
+  validation_log: [
+    {
+      severity: "WARNING",
+      message: "Для части сценариев P&L построен с пониженной детализацией.",
+      field: "pnl_matrix",
+    },
+  ],
   buckets: { RUB: { notional: 100000, quantity: 13, delta: 12.3 } },
   base_currency: "RUB",
   confidence_level: 0.99,
@@ -102,4 +117,18 @@ export const demoMetrics: MetricsResponse = {
   capital: 12000,
   initial_margin: 10500,
   variation_margin: -500,
+  calculation_status: "complete",
+  data_quality: {
+    market_data_completeness: "complete",
+    missing_curves: [],
+    missing_fx: [],
+    affected_positions: [],
+    partial_positions_count: 0,
+    warnings: [],
+  },
+  market_data_completeness: "complete",
+  market_data_source: "demo_default",
+  methodology_status: "preliminary",
+  valuation_label: "Net PV / MtM",
+  var_method: "scenario_quantile",
 };

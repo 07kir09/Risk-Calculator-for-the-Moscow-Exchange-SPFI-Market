@@ -17,7 +17,7 @@ def _excel_bytes(df: pd.DataFrame) -> bytes:
     return buf.getvalue()
 
 
-def test_scenarios_endpoint_returns_symmetric_default_catalog():
+def test_scenarios_endpoint_returns_rates_and_fx_default_catalog():
     client = TestClient(app)
 
     resp = client.get("/scenarios")
@@ -25,9 +25,26 @@ def test_scenarios_endpoint_returns_symmetric_default_catalog():
     assert resp.status_code == 200
     payload = resp.json()
     assert len(payload) == 7
-    assert payload[0]["underlying_shift"] < 0
-    assert payload[-1]["underlying_shift"] > 0
-    assert any(item["underlying_shift"] == 0 for item in payload)
+    assert any(item["scenario_id"] == "base" for item in payload)
+    assert any(item["rate_shift"] > 0 for item in payload)
+    assert any(item["rate_shift"] < 0 for item in payload)
+    assert any((item.get("fx_spot_shifts") or {}).get("USD", 0) > 0 for item in payload)
+    assert any((item.get("fx_spot_shifts") or {}).get("EUR", 0) < 0 for item in payload)
+    assert all(not item["scenario_id"].startswith("shock_") for item in payload)
+
+
+def test_limits_endpoint_returns_default_limits_catalog():
+    client = TestClient(app)
+
+    resp = client.get("/limits")
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["var_hist"] > 0
+    assert payload["es_hist"] > payload["var_hist"]
+    assert payload["lc_var"] > 0
+    assert isinstance(payload["stress"], dict)
+    assert payload["stress"]
 
 
 def test_market_data_load_default_uses_configured_datasets_dir(monkeypatch, tmp_path):
@@ -83,3 +100,16 @@ def test_market_data_load_default_uses_configured_datasets_dir(monkeypatch, tmp_
     assert payload["counts"]["discount_curves"] == 1
     assert payload["counts"]["forward_curves"] == 1
     assert payload["counts"]["fixings"] == 1
+
+
+def test_market_data_load_default_accepts_trusted_bundled_datasets(monkeypatch, tmp_path):
+    monkeypatch.setenv("OPTION_RISK_MARKET_SESSION_ROOT", str(tmp_path / "sessions"))
+
+    client = TestClient(app)
+    resp = client.post("/market-data/load-default")
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["ready"] is True
+    assert payload["blocking_errors"] == 0
+    assert payload["counts"]["discount_curves"] > 5000

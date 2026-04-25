@@ -19,7 +19,8 @@ export async function runRiskCalculation(params: {
   forceAutoMarketData?: boolean;
 }): Promise<MetricsResponse> {
   const viteEnv = ((import.meta as any).env ?? {}) as Record<string, any>;
-  const demoMode = (viteEnv.VITE_DEMO_MODE ?? "1") === "1";
+  const defaultDemoMode = (globalThis as any).process?.env?.NODE_ENV === "test" ? "1" : "0";
+  const demoMode = (viteEnv.VITE_DEMO_MODE ?? defaultDemoMode) === "1";
   if (demoMode) {
     const tailModel = params.parametricTailModel ?? "cornish_fisher";
     const metrics = await mockFetchMetrics();
@@ -49,6 +50,7 @@ export async function runRiskCalculation(params: {
     positions: params.positions,
     scenarios: params.scenarios,
     limits: params.limits,
+    include: needsCorrelations ? ["correlations"] : undefined,
     alpha: params.alpha,
     horizon_days: params.horizonDays,
     parametric_tail_model: params.parametricTailModel ?? "cornish_fisher",
@@ -60,7 +62,6 @@ export async function runRiskCalculation(params: {
     calc_var_es: needsVarEs,
     calc_stress: needsStress,
     calc_margin_capital: needsMargin,
-    calc_correlations: needsCorrelations,
     market_data_session_id: params.marketDataSessionId,
     auto_market_data: autoMarketData,
   });

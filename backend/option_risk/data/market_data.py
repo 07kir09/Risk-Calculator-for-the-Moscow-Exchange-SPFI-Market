@@ -17,7 +17,11 @@ _FX_LABEL_TO_CODE = {
     "ДОЛЛАР США": "USD",
     "КИТАЙСКИЙ ЮАНЬ": "CNY",
     "ЮАНЬ": "CNY",
+    "ФУНТ СТЕРЛИНГОВ": "GBP",
+    "АНГЛИЙСКИЙ ФУНТ": "GBP",
 }
+
+_KNOWN_FX_CURRENCIES = {"RUB", "USD", "EUR", "GBP", "CNY"}
 
 
 @dataclass
@@ -270,21 +274,120 @@ def _load_calibration_files(base_dir: Path, messages: List[ValidationMessage]) -
     return pd.concat(frames, ignore_index=True).sort_values(["as_of_date", "product", "tenor_label"]).reset_index(drop=True)
 
 
+def _normalize_fx_code(value: str | None) -> str | None:
+    if value is None:
+        return None
+    upper = str(value).strip().upper()
+    if not upper:
+        return None
+    mapped = _FX_LABEL_TO_CODE.get(upper)
+    if mapped:
+        return mapped
+    compact = re.sub(r"[^A-Z]", "", upper)
+    if len(compact) == 3 and compact in _KNOWN_FX_CURRENCIES:
+        return compact
+    if len(compact) == 6:
+        left, right = compact[:3], compact[3:]
+        if left in _KNOWN_FX_CURRENCIES and right in _KNOWN_FX_CURRENCIES and left != right:
+            return f"{left}/{right}"
+    return None
+
+
+def _fx_codes_equivalent(left: str | None, right: str | None) -> bool:
+    if not left or not right:
+        return False
+    if left == right:
+        return True
+    if "/" not in left and right == f"{left}/RUB":
+        return True
+    if "/" not in right and left == f"{right}/RUB":
+        return True
+    return False
+
+
 def _currency_from_filename(path: Path) -> str | None:
-    match = re.search(r"\b([A-Z]{3})\.xlsx$", path.name)
-    return match.group(1) if match else None
+    stem = path.stem.upper()
+    if stem.startswith("RC_"):
+        stem = stem[3:]
+    tokens = [token for token in re.split(r"[^A-Z]+", stem) if token]
+    if not tokens:
+        return None
+    last = _normalize_fx_code(tokens[-1])
+    if last and "/" in last:
+        return last
+    if len(tokens) >= 2:
+        left = _normalize_fx_code(tokens[-2])
+        right = _normalize_fx_code(tokens[-1])
+        if left in _KNOWN_FX_CURRENCIES and right in _KNOWN_FX_CURRENCIES and left != right:
+            return f"{left}/{right}"
+    if last:
+        return last
+    compact = re.sub(r"[^A-Z]", "", stem)
+    for start in range(max(len(compact) - 6, 0), len(compact)):
+        code = _normalize_fx_code(compact[start:])
+        if code:
+            return code
+    return None
+
+
+def _load_generic_fx_history_file(path: Path, messages: List[ValidationMessage]) -> pd.DataFrame | None:
+    df = _read_excel(path)
+    by_lower = {str(column).strip().lower(): column for column in df.columns}
+    pair_col = by_lower.get("pair") or by_lower.get("currency_pair") or by_lower.get("currency_code")
+    rate_col = by_lower.get("rate") or by_lower.get("curs")
+    if pair_col is None or rate_col is None:
+        return None
+
+    date_col = by_lower.get("date") or by_lower.get("data") or by_lower.get("obs_date")
+    nominal_col = by_lower.get("nominal")
+    codes: list[str] = []
+    for row_idx, raw_value in enumerate(df[pair_col].tolist(), start=2):
+        code = _normalize_fx_code(str(raw_value))
+        if code is None:
+            _add_message(messages, "ERROR", f"{path.name}: не удалось распознать FX pair/code: {raw_value}.", row=row_idx, field=str(pair_col))
+            code = "UNK"
+        codes.append(code)
+
+    return pd.DataFrame(
+        {
+            "currency_code": codes,
+            "currency_label": df[pair_col].astype(str).str.strip(),
+            "nominal": (
+                _parse_numeric(df[nominal_col], messages=messages, file_name=path.name, field_name=str(nominal_col))
+                if nominal_col is not None
+                else 1.0
+            ),
+            "obs_date": (
+                _parse_dates(df[date_col], messages=messages, file_name=path.name, field_name=str(date_col))
+                if date_col is not None
+                else pd.Timestamp("1970-01-01")
+            ),
+            "rate": _parse_numeric(df[rate_col], messages=messages, file_name=path.name, field_name=str(rate_col)),
+            "source_file": path.name,
+        }
+    ).sort_values(["currency_code", "obs_date"]).reset_index(drop=True)
 
 
 def _load_fx_history_files(base_dir: Path, messages: List[ValidationMessage], *, strict: bool = True) -> pd.DataFrame:
-    files = sorted([*base_dir.glob("RC_*.xlsx"), *base_dir.glob("RC_*.xls")])
+    files = sorted([
+        *base_dir.glob("RC_*.xlsx"),
+        *base_dir.glob("RC_*.xls"),
+        *base_dir.glob("market_data_*.xlsx"),
+        *base_dir.glob("market_data_*.xls"),
+    ])
     frames: list[pd.DataFrame] = []
     fingerprints: dict[str, str] = {}
     if not files:
-        _add_message(messages, "WARNING", f"{base_dir.name}: не найдено ни одного RC_*.xlsx.")
+        _add_message(messages, "WARNING", f"{base_dir.name}: не найдено ни одного RC_*.xlsx или market_data_*.xlsx.")
         return pd.DataFrame(columns=["currency_code", "currency_label", "nominal", "obs_date", "rate", "source_file"])
 
     for path in files:
         df = _read_excel(path)
+        generic = _load_generic_fx_history_file(path, messages)
+        if generic is not None:
+            frames.append(generic)
+            continue
+
         required = ["nominal", "data", "curs", "cdx"]
         if not _require_columns(df, required, messages=messages, file_name=path.name):
             continue
@@ -293,8 +396,8 @@ def _load_fx_history_files(base_dir: Path, messages: List[ValidationMessage], *,
         currency_code = currency_code_from_filename
         labels = sorted({str(value).strip() for value in df["cdx"].dropna().unique() if str(value).strip()})
         if len(labels) == 1:
-            inferred = _FX_LABEL_TO_CODE.get(labels[0].upper())
-            if inferred and inferred != currency_code_from_filename:
+            inferred = _normalize_fx_code(labels[0])
+            if inferred and not _fx_codes_equivalent(inferred, currency_code_from_filename):
                 _add_message(
                     messages,
                     "ERROR" if strict else "WARNING",
@@ -307,6 +410,8 @@ def _load_fx_history_files(base_dir: Path, messages: List[ValidationMessage], *,
                 )
                 if not strict:
                     currency_code = inferred
+            elif inferred and currency_code_from_filename == "UNK":
+                currency_code = inferred
 
         out = pd.DataFrame(
             {

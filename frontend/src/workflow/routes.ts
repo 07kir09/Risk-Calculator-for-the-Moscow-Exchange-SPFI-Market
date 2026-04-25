@@ -9,7 +9,7 @@ export const stepToRoute: Record<WorkflowStep, string> = {
   [WorkflowStep.Results]: "/dashboard",
   [WorkflowStep.Stress]: "/stress",
   [WorkflowStep.Limits]: "/limits",
-  [WorkflowStep.Margin]: "/margin",
+  [WorkflowStep.Margin]: "/export",
   [WorkflowStep.Export]: "/export",
-  [WorkflowStep.PostActions]: "/actions",
+  [WorkflowStep.PostActions]: "/dashboard",
 };

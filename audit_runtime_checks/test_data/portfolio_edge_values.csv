@@ -1,0 +1,4 @@
+instrument_type,position_id,quantity,notional,underlying_symbol,currency,underlying_price,strike,volatility,maturity_date,valuation_date,risk_free_rate,option_type,style,dividend_yield,liquidity_haircut,model
+option,very_long_instrument_name_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,-123456789,1,SBER,RUB,123.123456789012345,100.000000000000001,,2026-12-31,2026-04-25,0.13,call,european,0.02,,black_scholes
+option,zero_price_edge,-1,1,GAZP,RUB,0,150,0.28,2026-10-30,2026-04-25,0.13,put,european,0.03,0.02,black_scholes
+forward,large_position_edge,10000000,100000,IMOEX,RUB,3400,3350,0,2026-09-30,2026-04-25,0.12,call,european,0,0.01,forward

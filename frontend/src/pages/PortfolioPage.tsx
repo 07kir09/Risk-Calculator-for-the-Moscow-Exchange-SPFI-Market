@@ -4,6 +4,19 @@ import Button from "../components/Button";
 import { useAppData } from "../state/appDataStore";
 import { formatNumber } from "../utils/format";
 
+function formatPortfolioSourceLabel(source: string) {
+  switch (source) {
+    case "csv":
+      return "CSV";
+    case "xlsx":
+      return "XLSX";
+    case "paste":
+      return "Paste";
+    default:
+      return source.toUpperCase();
+  }
+}
+
 export default function PortfolioPage() {
   const nav = useNavigate();
   const { state } = useAppData();
@@ -11,7 +24,7 @@ export default function PortfolioPage() {
   const notionals = positions.reduce((sum, position) => sum + (Number(position.notional) || 0), 0);
   const instruments = new Set(positions.map((position) => position.instrument_type)).size;
   const filename = state.portfolio.filename;
-  const sourceLabel = positions.length === 0 && !filename ? "Новая сессия" : state.portfolio.source.toUpperCase();
+  const sourceLabel = positions.length === 0 && !filename ? "Новая сессия" : formatPortfolioSourceLabel(state.portfolio.source);
 
   return (
     <div className="importPagePlain">

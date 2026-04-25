@@ -30,6 +30,13 @@ def _normalize_name(value: str | None) -> str:
     return re.sub(r"[^A-Z0-9]+", " ", str(value or "").upper()).strip()
 
 
+def _positive_fx_spot(label: str, value: float) -> float:
+    spot = float(value)
+    if not math.isfinite(spot) or spot <= 0.0:
+        raise ValueError(f"FX spot for {label} must be a positive finite number")
+    return spot
+
+
 def _canonical_fixing_key(value: str | None, *, for_projection_curve: bool = False) -> str | None:
     upper = _normalize_name(value)
     if not upper:
@@ -338,19 +345,19 @@ class MarketDataContext:
 
         direct = self.fx_spots.get(f"{src}/{dst}")
         if direct is not None:
-            return float(direct)
+            return _positive_fx_spot(f"{src}/{dst}", direct)
         inverse = self.fx_spots.get(f"{dst}/{src}")
-        if inverse is not None and inverse != 0.0:
-            return 1.0 / float(inverse)
+        if inverse is not None:
+            return 1.0 / _positive_fx_spot(f"{dst}/{src}", inverse)
 
         src_to_base = self.fx_spots.get(src)
         dst_to_base = self.fx_spots.get(dst)
         if src == self.base_currency and dst_to_base is not None:
-            return 1.0 / float(dst_to_base)
+            return 1.0 / _positive_fx_spot(dst, dst_to_base)
         if dst == self.base_currency and src_to_base is not None:
-            return float(src_to_base)
+            return _positive_fx_spot(src, src_to_base)
         if src_to_base is not None and dst_to_base is not None:
-            return float(src_to_base) / float(dst_to_base)
+            return _positive_fx_spot(src, src_to_base) / _positive_fx_spot(dst, dst_to_base)
         raise ValueError(f"Нет FX spot для конвертации {src}->{dst}")
 
     def fx_forward_rate(
@@ -431,9 +438,24 @@ class MarketDataContext:
 
         fx_spots = dict(self.fx_spots)
         for key, shift in fx_spot_shifts.items():
-            clean_key = str(key).strip().upper()
-            if clean_key in fx_spots:
-                fx_spots[clean_key] = float(fx_spots[clean_key]) * (1.0 + float(shift))
+            clean_key = str(key).strip().upper().replace("-", "/")
+            multiplier = 1.0 + float(shift)
+            if multiplier <= 0.0:
+                continue
+            for spot_key in list(fx_spots.keys()):
+                normalized_spot_key = str(spot_key).strip().upper().replace("-", "/")
+                compact_spot_key = normalized_spot_key.replace("/", "")
+                if clean_key == normalized_spot_key or clean_key == compact_spot_key:
+                    fx_spots[spot_key] = float(fx_spots[spot_key]) * multiplier
+                    continue
+                if "/" in normalized_spot_key:
+                    left, right = normalized_spot_key.split("/", 1)
+                    if clean_key == left and right == self.base_currency:
+                        fx_spots[spot_key] = float(fx_spots[spot_key]) * multiplier
+                    elif clean_key == right and left == self.base_currency:
+                        fx_spots[spot_key] = float(fx_spots[spot_key]) / multiplier
+                elif clean_key == normalized_spot_key:
+                    fx_spots[spot_key] = float(fx_spots[spot_key]) * multiplier
 
         return MarketDataContext(
             discount_curves=discount_curves,
@@ -490,7 +512,8 @@ def build_market_data_context_from_bundle(
         for code, group in grouped:
             latest_row = group.sort_values("obs_date").iloc[-1]
             nominal = float(latest_row["nominal"]) if float(latest_row["nominal"]) != 0.0 else 1.0
-            fx_spots[str(code).upper()] = float(latest_row["rate"]) / nominal
+            spot = float(latest_row["rate"]) / nominal
+            fx_spots[str(code).upper()] = _positive_fx_spot(str(code).upper(), spot)
 
     fixing_series: Dict[str, FixingSeries] = {}
     if not bundle.fixings.empty and "index_name" in bundle.fixings.columns:

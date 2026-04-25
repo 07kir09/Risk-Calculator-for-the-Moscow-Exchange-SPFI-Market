@@ -1,14 +1,19 @@
 import datetime as dt
+import math
+from pathlib import Path
 
 import numpy as np
 import pytest
+from openpyxl import load_workbook
 
 from option_risk.data.models import MarketScenario, OptionPosition, OptionStyle, OptionType, Portfolio
 from option_risk.risk.limits import check_limits
 from option_risk.risk.pipeline import CalculationConfig, run_calculation
 from option_risk.risk.correlations import correlation_matrix
+from option_risk.risk.portfolio import scenario_pnl
 from option_risk.risk.var_es import historical_var
 from option_risk.pricing import mc_price
+from option_risk.pricing.market import MarketDataContext
 
 
 def make_position(**kwargs) -> OptionPosition:
@@ -31,6 +36,24 @@ def make_position(**kwargs) -> OptionPosition:
     )
     base.update(kwargs)
     return OptionPosition(**base)
+
+
+def _load_workbook_positions(row_numbers: list[int]) -> list[OptionPosition]:
+    workbook_path = Path(__file__).resolve().parents[2] / "Datasets" / "portfolio_large_1000.xlsx"
+    wb = load_workbook(workbook_path, read_only=True, data_only=True)
+    ws = wb[wb.sheetnames[0]]
+    headers = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1))]
+    positions: list[OptionPosition] = []
+    for row_number in row_numbers:
+        raw_row = next(ws.iter_rows(min_row=row_number, max_row=row_number, values_only=True))
+        positions.append(OptionPosition(**dict(zip(headers, raw_row))))
+    return positions
+
+
+def _manual_forward_value(position: OptionPosition, fx_rate: float) -> float:
+    tenor_years = (position.maturity_date - position.valuation_date).days / 365.0
+    discounted = math.exp(-position.risk_free_rate * tenor_years)
+    return position.quantity * position.notional * (position.underlying_price - position.strike) * discounted * fx_rate
 
 
 def test_check_limits_var_breaches_when_above_limit():
@@ -79,6 +102,21 @@ def test_run_calculation_respects_flags():
     assert result.es_hist is None
     assert result.stress is None
     assert result.capital is None
+
+
+def test_run_calculation_does_not_report_zero_limits_for_skipped_var_metrics():
+    portfolio = Portfolio(positions=[make_position()])
+    scenarios = [MarketScenario(scenario_id="s1", underlying_shift=0.0, volatility_shift=0.0, rate_shift=0.0)]
+    limits_cfg = {"var_hist": 1.0, "es_hist": 1.0, "lc_var": 1.0, "stress": {"s1": 1.0}}
+    cfg = CalculationConfig(calc_sensitivities=False, calc_var_es=False, calc_stress=True, calc_margin_capital=False)
+
+    result = run_calculation(portfolio, scenarios, limits_cfg=limits_cfg, config=cfg)
+
+    assert result.var_hist is None
+    assert result.es_hist is None
+    assert result.lc_var is None
+    assert result.limits == []
+    assert result.stress is not None
 
 
 def test_correlation_matrix_requires_two_scenarios():
@@ -269,3 +307,157 @@ def test_run_calculation_uses_weighted_historical_var_when_probabilities_provide
     unweighted_var = historical_var(result.pnl_distribution, alpha=0.95)
     assert result.var_hist is not None
     assert result.var_hist < unweighted_var
+
+
+def test_run_calculation_requires_fx_for_foreign_currency_positions():
+    positions = _load_workbook_positions([704, 705, 706, 707, 708])
+    portfolio = Portfolio(positions=positions)
+    cfg = CalculationConfig(
+        base_currency="RUB",
+        fx_rates={},
+        calc_sensitivities=False,
+        calc_var_es=False,
+        calc_stress=False,
+        calc_margin_capital=False,
+        calc_correlations=False,
+    )
+
+    with pytest.raises(ValueError, match=r"USD.*USD/RUB"):
+        run_calculation(portfolio, [], limits_cfg=None, config=cfg)
+
+
+def test_variation_margin_prefers_named_base_scenario():
+    portfolio = Portfolio(
+        positions=[
+            make_position(
+                position_id="vm_fwd",
+                instrument_type="forward",
+                underlying_price=100.0,
+                strike=90.0,
+                volatility=0.0,
+                quantity=1.0,
+                notional=1.0,
+                risk_free_rate=0.05,
+            )
+        ]
+    )
+    scenarios = [
+        MarketScenario(scenario_id="stress_up", underlying_shift=0.15, volatility_shift=0.0, rate_shift=0.0),
+        MarketScenario(scenario_id="base", underlying_shift=0.0, volatility_shift=0.0, rate_shift=0.0),
+        MarketScenario(scenario_id="stress_down", underlying_shift=-0.10, volatility_shift=0.0, rate_shift=0.0),
+    ]
+    reordered = [scenarios[2], scenarios[0], scenarios[1]]
+    cfg = CalculationConfig(
+        calc_sensitivities=False,
+        calc_var_es=True,
+        calc_stress=False,
+        calc_margin_capital=True,
+        calc_correlations=False,
+    )
+
+    result_a = run_calculation(portfolio, scenarios, limits_cfg=None, config=cfg)
+    result_b = run_calculation(portfolio, reordered, limits_cfg=None, config=cfg)
+
+    reference = next(item for item in scenarios if item.scenario_id == "base")
+    expected = scenario_pnl(portfolio, reference)
+
+    assert result_a.variation_margin is not None
+    assert result_b.variation_margin is not None
+    assert result_a.variation_margin == pytest.approx(result_b.variation_margin)
+    assert result_a.variation_margin == pytest.approx(expected)
+
+
+def test_variation_margin_falls_back_to_last_scenario_name():
+    portfolio = Portfolio(
+        positions=[
+            make_position(
+                position_id="vm_fwd_last",
+                instrument_type="forward",
+                underlying_price=100.0,
+                strike=90.0,
+                volatility=0.0,
+                quantity=1.0,
+                notional=1.0,
+                risk_free_rate=0.05,
+            )
+        ]
+    )
+    scenarios = [
+        MarketScenario(scenario_id="stress_down", underlying_shift=-0.10, volatility_shift=0.0, rate_shift=0.0),
+        MarketScenario(scenario_id="last_scenario", underlying_shift=0.25, volatility_shift=0.0, rate_shift=0.0),
+        MarketScenario(scenario_id="stress_up", underlying_shift=0.15, volatility_shift=0.0, rate_shift=0.0),
+    ]
+    reordered = [scenarios[2], scenarios[0], scenarios[1]]
+    cfg = CalculationConfig(
+        calc_sensitivities=False,
+        calc_var_es=True,
+        calc_stress=False,
+        calc_margin_capital=True,
+        calc_correlations=False,
+    )
+
+    result_a = run_calculation(portfolio, scenarios, limits_cfg=None, config=cfg)
+    result_b = run_calculation(portfolio, reordered, limits_cfg=None, config=cfg)
+
+    reference = next(item for item in scenarios if item.scenario_id == "last_scenario")
+    expected = scenario_pnl(portfolio, reference)
+
+    assert result_a.variation_margin is not None
+    assert result_b.variation_margin is not None
+    assert result_a.variation_margin == pytest.approx(result_b.variation_margin)
+    assert result_a.variation_margin == pytest.approx(expected)
+
+
+def test_run_calculation_with_full_fx_matches_manual_five_row_check():
+    positions = _load_workbook_positions([704, 705, 706, 707, 708])
+    portfolio = Portfolio(positions=positions)
+    cfg = CalculationConfig(
+        base_currency="RUB",
+        fx_rates={"USD": 90.0},
+        calc_sensitivities=False,
+        calc_var_es=False,
+        calc_stress=False,
+        calc_margin_capital=False,
+        calc_correlations=False,
+    )
+
+    result = run_calculation(portfolio, [], limits_cfg=None, config=cfg)
+    expected = sum(_manual_forward_value(position, 90.0 if position.currency == "USD" else 1.0) for position in positions)
+
+    assert result.base_value == pytest.approx(expected, rel=1e-12, abs=1e-9)
+    assert result.fx_warning is None
+
+
+def test_run_calculation_uses_market_context_fx_when_request_fx_missing():
+    position = make_position(
+        position_id="usd_forward",
+        instrument_type="forward",
+        currency="USD",
+        underlying_price=100.0,
+        strike=90.0,
+        volatility=0.0,
+        quantity=1.0,
+        notional=1.0,
+        risk_free_rate=0.05,
+    )
+    portfolio = Portfolio(positions=[position])
+    market = MarketDataContext(
+        discount_curves={},
+        forward_curves={},
+        fx_spots={"USD": 90.0},
+        base_currency="RUB",
+    )
+    cfg = CalculationConfig(
+        base_currency="RUB",
+        fx_rates=None,
+        calc_sensitivities=False,
+        calc_var_es=False,
+        calc_stress=False,
+        calc_margin_capital=False,
+        calc_correlations=False,
+    )
+
+    result = run_calculation(portfolio, [], limits_cfg=None, config=cfg, market=market)
+
+    assert result.base_value == pytest.approx(_manual_forward_value(position, 90.0), rel=1e-12, abs=1e-9)
+    assert result.fx_warning is None

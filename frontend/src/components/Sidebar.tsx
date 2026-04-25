@@ -11,7 +11,6 @@ const navItems = [
   { to: "/limits", label: "Лимиты", step: WorkflowStep.Limits },
   { to: "/reports", label: "Отчёты", step: WorkflowStep.Export },
   { to: "/hedge", label: "Хедж", step: WorkflowStep.PostActions },
-  { to: "/what-if", label: "Что если", step: WorkflowStep.PostActions },
   { to: "/plan-b", label: "План B", step: WorkflowStep.PostActions },
   { to: "/help", label: "Справка", step: WorkflowStep.Import },
   { to: "/portfolio", label: "Портфель", step: WorkflowStep.Import },

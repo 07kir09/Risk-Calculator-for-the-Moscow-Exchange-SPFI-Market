@@ -13,7 +13,7 @@ def initial_margin(lc_var: float) -> float:
 
 
 def variation_margin(pnl: float) -> float:
-    """Вариационная маржа = текущий PnL."""
+    """Вариационная маржа = PnL выбранного референсного сценария."""
     return pnl
 
 

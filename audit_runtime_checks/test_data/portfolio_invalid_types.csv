@@ -1,0 +1,2 @@
+instrument_type,position_id,quantity,notional,underlying_symbol,currency,underlying_price,strike,volatility,maturity_date,valuation_date,risk_free_rate,option_type,style,dividend_yield,liquidity_haircut,model
+option,audit_option_call_1,not-a-number,1,SBER,RUB,abc,xyz,0.24,2026-12-31,2026-04-25,0.13,call,european,0.02,0.02,black_scholes

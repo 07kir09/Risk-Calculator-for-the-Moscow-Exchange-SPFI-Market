@@ -158,9 +158,17 @@ def test_stress_volatility_is_clamped_and_rate_shift_is_absolute():
     assert bumped.risk_free_rate == pytest.approx(0.06)
 
 
-def test_multi_currency_without_fx_logs_warning():
+def test_multi_currency_without_fx_raises_by_default():
     portfolio, scenarios, cfg, _ = _load_golden_case("golden_case_two_currency_fx.json")
     cfg.fx_rates = {}  # намеренно убираем FX
+    with pytest.raises(ValueError, match=r"USD.*USD/RUB"):
+        run_calculation(portfolio, scenarios, limits_cfg=None, config=cfg)
+
+
+def test_multi_currency_without_fx_can_opt_in_to_fallback():
+    portfolio, scenarios, cfg, _ = _load_golden_case("golden_case_two_currency_fx.json")
+    cfg.fx_rates = {}  # намеренно убираем FX
+    cfg.allow_fx_fallback = True
     result = run_calculation(portfolio, scenarios, limits_cfg=None, config=cfg)
-    assert result.var_hist == pytest.approx(15.0)  # fallback 1.0 + 1.0 для валют
-    assert any("FX" in msg.message for msg in result.validation_log)
+    assert result.var_hist == pytest.approx(15.0)  # legacy fallback mode
+    assert any("fallback 1.0" in msg.message for msg in result.validation_log)

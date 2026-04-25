@@ -1,4 +1,4 @@
-import { Key, useEffect, useMemo, useState } from "react";
+import { Key, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Accordion,
   Chip,
@@ -20,13 +20,15 @@ import { useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 import Card from "../ui/Card";
 import { Reveal } from "../components/rich/RichVisuals";
-import { fetchScenarioCatalog } from "../api/endpoints";
+import { fetchScenarioCatalog, syncLiveMarketData } from "../api/endpoints";
 import { useAppData } from "../state/appDataStore";
 import { demoScenarios } from "../mock/demoData";
 import { useWorkflow } from "../workflow/workflowStore";
 import { WorkflowStep } from "../workflow/workflowTypes";
 import { runRiskCalculation } from "../api/services/risk";
 import { ScenarioDTO } from "../api/contracts/metrics";
+import { applyAutoLimits, isDemoDefaultLimits } from "../lib/autoLimits";
+import { attachMethodologyMetadata } from "../lib/methodology";
 
 type MetricKey =
   | "var_hist"
@@ -36,8 +38,7 @@ type MetricKey =
   | "lc_var"
   | "greeks"
   | "stress"
-  | "correlations"
-  | "margin_capital";
+  | "correlations";
 
 type MetricCard = {
   key: MetricKey;
@@ -54,13 +55,13 @@ type MetricCard = {
 const metricCards: MetricCard[] = [
   {
     key: "var_hist",
-    title: "VaR (сценарный)",
-    summary: "Базовый исторический VaR для оценки хвостового убытка по сценариям.",
+    title: "Scenario VaR",
+    summary: "VaR по доступному набору сценариев для оценки хвостового убытка.",
     tags: ["сценарный", "квантиль"],
     tooltip: {
-      what: "Метрика показывает пороговый убыток, который портфель может превысить только в редких исторических или сценарных случаях.",
+      what: "Метрика показывает пороговый убыток по доступному набору сценариев; это не полная историческая выборка рынка.",
       purpose: "Нужна для базовой оценки рыночного риска и для разговора с пользователем в формате «сколько можно потерять при обычном стрессовом дне».",
-      calculates: "Считает квантиль распределения PnL по историческим/сценарным наблюдениям на выбранном уровне доверия и горизонте.",
+      calculates: "Считает квантиль распределения PnL по сценарным наблюдениям на выбранном уровне доверия.",
     },
   },
   {
@@ -122,7 +123,7 @@ const metricCards: MetricCard[] = [
     key: "stress",
     title: "Стресс-сценарии",
     summary: "Итоговый PnL при заранее заданных сильных шоках рынка.",
-    tags: ["сценарии", "what-if"],
+    tags: ["сценарии", "шоки"],
     tooltip: {
       what: "Метрика показывает, как портфель ведёт себя не в «обычном хвосте», а в заранее заданных резких движениях рынка.",
       purpose: "Нужна для понятного пользовательского ответа на вопрос «что будет, если рынок резко сдвинется вот так».",
@@ -140,38 +141,73 @@ const metricCards: MetricCard[] = [
       calculates: "Считает матрицу корреляций между факторами риска или сериями изменений, используемыми в модели.",
     },
   },
-  {
-    key: "margin_capital",
-    title: "Маржа и капитал",
-    summary: "Требуемое обеспечение, вариационная маржа и капитал под риск.",
-    tags: ["обеспечение", "капитал"],
-    tooltip: {
-      what: "Это блок не про хвостовое распределение, а про ресурс, который нужен для обслуживания и покрытия риска портфеля.",
-      purpose: "Нужен, когда пользователь должен понимать не только риск убытка, но и операционную нагрузку на лимиты, залоги и капитал.",
-      calculates: "Считает initial margin, variation margin, капитал и связанные показатели обеспечения по текущему портфелю.",
-    },
-  },
 ];
 
-const recommendedSet: MetricKey[] = ["var_hist", "es_hist", "lc_var", "greeks", "stress"];
+const baseMetricSet: MetricKey[] = ["var_hist", "es_hist", "lc_var", "greeks", "stress"];
+const allowedMetricKeys = new Set<MetricKey>(metricCards.map((metric) => metric.key));
 
 const viteEnv = ((import.meta as any).env ?? {}) as Record<string, any>;
-const demoMode = (viteEnv.VITE_DEMO_MODE ?? "1") === "1";
+const defaultDemoMode = (globalThis as any).process?.env?.NODE_ENV === "test" ? "1" : "0";
+const demoMode = (viteEnv.VITE_DEMO_MODE ?? defaultDemoMode) === "1";
 
 const apiScenarioFallback: ScenarioDTO[] = [
-  { scenario_id: "shock_0", underlying_shift: -0.1, volatility_shift: -0.05, rate_shift: 0.0 },
-  { scenario_id: "shock_1", underlying_shift: -0.05, volatility_shift: -0.025, rate_shift: 0.0 },
-  { scenario_id: "shock_2", underlying_shift: -0.02, volatility_shift: -0.01, rate_shift: 0.0 },
-  { scenario_id: "shock_3", underlying_shift: 0.0, volatility_shift: 0.0, rate_shift: 0.0 },
-  { scenario_id: "shock_4", underlying_shift: 0.02, volatility_shift: 0.01, rate_shift: 0.0 },
-  { scenario_id: "shock_5", underlying_shift: 0.05, volatility_shift: 0.025, rate_shift: 0.0 },
-  { scenario_id: "shock_6", underlying_shift: 0.1, volatility_shift: 0.05, rate_shift: 0.0 },
+  { scenario_id: "base", underlying_shift: 0.0, volatility_shift: 0.0, rate_shift: 0.0, fx_spot_shifts: { USD: 0.0, EUR: 0.0, CNY: 0.0 } },
+  { scenario_id: "rates_parallel_up", underlying_shift: -0.02, volatility_shift: 0.02, rate_shift: 0.01, fx_spot_shifts: { USD: 0.0, EUR: 0.0, CNY: 0.0 } },
+  { scenario_id: "rates_parallel_down", underlying_shift: 0.02, volatility_shift: -0.01, rate_shift: -0.01, fx_spot_shifts: { USD: 0.0, EUR: 0.0, CNY: 0.0 } },
+  { scenario_id: "rub_selloff_fx_up", underlying_shift: -0.04, volatility_shift: 0.06, rate_shift: 0.0025, fx_spot_shifts: { USD: 0.08, EUR: 0.08, CNY: 0.06 } },
+  { scenario_id: "rub_rally_fx_down", underlying_shift: 0.03, volatility_shift: -0.03, rate_shift: -0.0025, fx_spot_shifts: { USD: -0.05, EUR: -0.05, CNY: -0.04 } },
+  { scenario_id: "combined_risk_off", underlying_shift: -0.08, volatility_shift: 0.12, rate_shift: 0.015, fx_spot_shifts: { USD: 0.12, EUR: 0.12, CNY: 0.09 } },
+  { scenario_id: "mild_risk_off", underlying_shift: -0.03, volatility_shift: 0.05, rate_shift: 0.005, fx_spot_shifts: { USD: 0.04, EUR: 0.04, CNY: 0.03 } },
 ];
 
 function isLegacyDemoScenarioSet(scenarios: ScenarioDTO[]) {
-  if (scenarios.length !== demoScenarios.length) return false;
-  const legacyIds = new Set(demoScenarios.map((scenario) => scenario.scenario_id));
+  const legacyIds = new Set([
+    ...demoScenarios.map((scenario) => scenario.scenario_id),
+    "shock_0",
+    "shock_1",
+    "shock_2",
+    "shock_3",
+    "shock_4",
+    "shock_5",
+    "shock_6",
+  ]);
   return scenarios.every((scenario) => legacyIds.has(scenario.scenario_id));
+}
+
+function hasRatesOrFxScenarios(scenarios: ScenarioDTO[]) {
+  return scenarios.some((scenario) =>
+    Number(scenario.rate_shift ?? 0) !== 0 ||
+      Object.keys(scenario.curve_shifts ?? {}).length > 0 ||
+      Object.entries(scenario.fx_spot_shifts ?? {}).some(([, value]) => Number(value) !== 0)
+  );
+}
+
+function shouldRefreshApiScenarios(scenarios: ScenarioDTO[]) {
+  return !scenarios.length || isLegacyDemoScenarioSet(scenarios) || !hasRatesOrFxScenarios(scenarios);
+}
+
+function normalizeFxPair(value: string) {
+  const clean = String(value ?? "").trim().toUpperCase().replace(/[-_]/g, "/");
+  const compact = clean.replace(/[^A-Z]/g, "");
+  if (/^[A-Z]{3}\/[A-Z]{3}$/.test(clean)) return clean;
+  if (/^[A-Z]{6}$/.test(compact)) return `${compact.slice(0, 3)}/${compact.slice(3)}`;
+  return clean;
+}
+
+function hasFxPair(availablePairs: Set<string>, fromCurrency: string, toCurrency: string) {
+  const direct = `${fromCurrency}/${toCurrency}`;
+  const inverse = `${toCurrency}/${fromCurrency}`;
+  return availablePairs.has(direct) || availablePairs.has(inverse);
+}
+
+function extractFxPairsFromError(message: string) {
+  const pairs = new Set<string>();
+  for (const match of message.matchAll(/\b([A-Z]{3})\/([A-Z]{3})\b/g)) {
+    const left = match[1]?.toUpperCase();
+    const right = match[2]?.toUpperCase();
+    if (left && right) pairs.add(`${left}/${right}`);
+  }
+  return Array.from(pairs).sort();
 }
 
 const metricGlyphByKey: Record<MetricKey, string> = {
@@ -183,7 +219,6 @@ const metricGlyphByKey: Record<MetricKey, string> = {
   greeks: "GR",
   stress: "ST",
   correlations: "CR",
-  margin_capital: "MC",
 };
 
 function ParamInfo({ text, title }: { text: string; title: string }) {
@@ -214,7 +249,8 @@ export default function ConfigurePage() {
 
   const [selected, setSelected] = useState<MetricKey[]>(() => {
     const current = (wf.calcConfig.selectedMetrics as MetricKey[]) ?? [];
-    return current.length ? current : recommendedSet;
+    const filtered = current.filter((metric): metric is MetricKey => allowedMetricKeys.has(metric));
+    return filtered.length ? filtered : baseMetricSet;
   });
   const [alpha, setAlpha] = useState<number>(() => Number(wf.calcConfig.params?.alpha ?? 0.99));
   const [horizonDays, setHorizonDays] = useState<number>(() => Number(wf.calcConfig.params?.horizonDays ?? 10));
@@ -224,6 +260,8 @@ export default function ConfigurePage() {
   const [liquidityModel, setLiquidityModel] = useState<string>(() => String(wf.calcConfig.params?.liquidityModel ?? "fraction_of_position_value"));
   const [alphaBand, setAlphaBand] = useState<[number, number]>(() => [95, 99]);
   const [isRunning, setIsRunning] = useState(false);
+  const [liveSyncLoading, setLiveSyncLoading] = useState(false);
+  const liveSyncAttemptedRef = useRef(false);
   const [fxRatesText, setFxRatesText] = useState<string>(() => {
     const raw = wf.calcConfig.params?.fxRates;
     if (!raw || typeof raw !== "object") return "{}";
@@ -240,7 +278,7 @@ export default function ConfigurePage() {
       return () => { cancelled = true; };
     }
 
-    if (dataState.scenarios.length > 0 && !isLegacyDemoScenarioSet(dataState.scenarios)) {
+    if (!shouldRefreshApiScenarios(dataState.scenarios)) {
       return () => { cancelled = true; };
     }
 
@@ -279,19 +317,76 @@ export default function ConfigurePage() {
     }
   }, [fxRatesText]);
 
+  const marketMode = dataState.marketDataMode ?? "api_auto";
+  const apiAutoMode = marketMode === "api_auto";
+  const liveMarketReady = Boolean(
+    apiAutoMode &&
+      dataState.marketDataSummary?.ready &&
+      dataState.marketDataSummary.blocking_errors === 0 &&
+      dataState.marketDataSummary.missing_required_files.length === 0 &&
+      dataState.marketDataSummary.session_id
+  );
+
+  const missingFxCurrencies = useMemo(() => {
+    const base = baseCurrency.toUpperCase();
+    const provided = fxRatesResult.value ?? {};
+    const marketFxPairs = new Set((dataState.marketDataSummary?.available_fx_pairs ?? []).map(normalizeFxPair));
+    return Array.from(
+      new Set(
+        dataState.portfolio.positions
+          .map((position) => String(position.currency ?? "").toUpperCase())
+          .filter((currency) =>
+            currency &&
+            currency !== base &&
+            !Number.isFinite(Number(provided[currency])) &&
+            !hasFxPair(marketFxPairs, currency, base)
+          )
+      )
+    ).sort();
+  }, [baseCurrency, dataState.marketDataSummary?.available_fx_pairs, dataState.portfolio.positions, fxRatesResult.value]);
+  const missingFxRequiresManualInput = missingFxCurrencies.length > 0;
+
+  const handleSyncLiveMarketData = useCallback(async (options?: { silent?: boolean }) => {
+    if (liveSyncLoading || dataState.portfolio.positions.length === 0) return;
+
+    setLiveSyncLoading(true);
+    try {
+      const summary = await syncLiveMarketData({ lookbackDays: 180 });
+      dataDispatch({ type: "SET_MARKET_DATA_SUMMARY", summary });
+      dataDispatch({ type: "SET_MARKET_DATA_MODE", mode: "api_auto" });
+      dataDispatch({ type: "RESET_RESULTS" });
+      dispatch({
+        type: "SET_MARKET_STATUS",
+        status: summary.ready ? "ready" : "idle",
+        missingFactors: summary.blocking_errors,
+      });
+      if (summary.ready) dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.MarketData });
+      if (!options?.silent) {
+        toast.success("Live market-data подтянуты", {
+          description: `ЦБ/MOEX session: ${summary.session_id}`,
+        });
+      }
+    } catch (error: any) {
+      toast.danger("Не удалось подтянуть live market-data", {
+        description: String(error?.message ?? "Проверьте доступность backend и источников ЦБ/MOEX."),
+      });
+    } finally {
+      setLiveSyncLoading(false);
+    }
+  }, [dataDispatch, dataState.portfolio.positions.length, dispatch, liveSyncLoading]);
+
   const readiness = useMemo(() => {
     const hasPortfolio = dataState.portfolio.positions.length > 0;
     const noCritical = wf.validation.criticalErrors === 0;
-    const marketMode = dataState.marketDataMode ?? "api_auto";
     const marketOk =
       marketMode === "api_auto"
-        ? true
+        ? liveMarketReady
         : wf.marketData.status === "ready" && wf.marketData.missingFactors === 0;
     const hasMetrics = selected.length > 0;
     const alphaOk = alpha > 0.5 && alpha < 0.9999;
     const tailModelOk = ["normal", "cornish_fisher"].includes(parametricTailModel);
     const baseCurrencyOk = /^[A-Z]{3}$/.test(baseCurrency);
-    const fxOk = fxRatesResult.error === "";
+    const fxOk = fxRatesResult.error === "" && !missingFxRequiresManualInput;
     return {
       hasPortfolio,
       noCritical,
@@ -308,12 +403,27 @@ export default function ConfigurePage() {
     baseCurrency,
     dataState.portfolio.positions.length,
     fxRatesResult.error,
+    marketMode,
+    liveMarketReady,
+    missingFxRequiresManualInput,
     parametricTailModel,
     selected.length,
     wf.marketData.missingFactors,
     wf.marketData.status,
-    dataState.marketDataMode,
     wf.validation.criticalErrors,
+  ]);
+
+  useEffect(() => {
+    if (!apiAutoMode || liveMarketReady || liveSyncLoading || dataState.portfolio.positions.length === 0) return;
+    if (liveSyncAttemptedRef.current) return;
+    liveSyncAttemptedRef.current = true;
+    void handleSyncLiveMarketData({ silent: true });
+  }, [
+    apiAutoMode,
+    dataState.portfolio.positions.length,
+    handleSyncLiveMarketData,
+    liveMarketReady,
+    liveSyncLoading,
   ]);
 
   const alphaPercent = Math.min(99.9, Math.max(90, Number((alpha * 100).toFixed(1))));
@@ -340,7 +450,7 @@ export default function ConfigurePage() {
           fxRates: fxRatesResult.value,
           liquidityModel,
         },
-        marginEnabled: selected.includes("margin_capital"),
+        marginEnabled: true,
       });
       dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Configure });
       dispatch({ type: "SET_CALC_RUN", calcRunId, status: "running", startedAt });
@@ -348,10 +458,27 @@ export default function ConfigurePage() {
 
     try {
       const useAutoMarketData = (dataState.marketDataMode ?? "api_auto") === "api_auto";
+      const marketDataSessionId = dataState.marketDataSummary?.session_id;
+      let scenariosForRun = dataState.scenarios;
+      if (!demoMode && shouldRefreshApiScenarios(scenariosForRun)) {
+        scenariosForRun = await fetchScenarioCatalog()
+          .then((scenarios) => scenarios.length ? scenarios : apiScenarioFallback)
+          .catch(() => apiScenarioFallback);
+        dataDispatch({ type: "SET_SCENARIOS", scenarios: scenariosForRun });
+      }
+      if (demoMode && !scenariosForRun.length) {
+        scenariosForRun = demoScenarios;
+        dataDispatch({ type: "SET_SCENARIOS", scenarios: scenariosForRun });
+      }
+
+      const limitsForRun = dataState.limits && !isDemoDefaultLimits(dataState.limits)
+        ? dataState.limits
+        : undefined;
+
       const metrics = await runRiskCalculation({
         positions: dataState.portfolio.positions,
-        scenarios: dataState.scenarios,
-        limits: dataState.limits ?? undefined,
+        scenarios: scenariosForRun,
+        limits: limitsForRun,
         alpha,
         horizonDays,
         parametricTailModel,
@@ -359,13 +486,16 @@ export default function ConfigurePage() {
         fxRates: fxRatesResult.value,
         liquidityModel,
         selectedMetrics: selected,
-        marginEnabled: selected.includes("margin_capital"),
-        marketDataSessionId: useAutoMarketData ? undefined : dataState.marketDataSummary?.session_id,
-        forceAutoMarketData: useAutoMarketData,
+        marginEnabled: true,
+        marketDataSessionId,
+        forceAutoMarketData: useAutoMarketData && !marketDataSessionId,
       });
+      const limitSource = limitsForRun ? dataState.limitSource : "draft_auto";
+      const finalMetrics = attachMethodologyMetadata(limitsForRun ? metrics : applyAutoLimits(metrics), limitSource);
 
       flushSync(() => {
-        dataDispatch({ type: "SET_RESULTS", metrics });
+        dataDispatch({ type: "SET_LIMITS", limits: limitsForRun ?? null, limitSource });
+        dataDispatch({ type: "SET_RESULTS", metrics: finalMetrics });
         dispatch({ type: "SET_CALC_RUN", calcRunId, status: "success", startedAt, finishedAt: new Date().toISOString() });
         dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.CalcRun });
         dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Results });
@@ -374,16 +504,39 @@ export default function ConfigurePage() {
       nav("/dashboard");
     } catch (error: any) {
       dispatch({ type: "SET_CALC_RUN", calcRunId, status: "error", startedAt, finishedAt: new Date().toISOString() });
-      toast.danger("Не удалось выполнить расчёт", {
-        description: error?.message ?? "Проверьте параметры и доступность API.",
-      });
+      const errorMessage = String(error?.message ?? "");
+      const missingCurves = Array.isArray(error?.details?.missing_curves) ? error.details.missing_curves : [];
+      const affectedPositions = Array.isArray(error?.details?.affected_positions) ? error.details.affected_positions : [];
+      const backendFxPairs = extractFxPairsFromError(errorMessage);
+      const localFxPairs = missingFxCurrencies.map((currency) => `${currency}/${baseCurrency}`);
+      const missingPairs = backendFxPairs.length ? backendFxPairs : localFxPairs;
+      const looksLikeFxError = error?.status === 400 && /FX|FX-кур|не хватает FX|Нужны FX/i.test(errorMessage);
+      if (error?.status === 422 && missingCurves.length > 0) {
+        toast.danger("Недостаточно market-data для полного расчёта", {
+          description: `Missing curves: ${missingCurves.join(", ")}${affectedPositions.length ? `. Affected positions: ${affectedPositions.slice(0, 8).join(", ")}` : ""}.`,
+        });
+      } else if (looksLikeFxError && missingPairs.length > 0) {
+        toast.danger(`Не найдены FX: ${missingPairs.join(", ")}`, {
+          description: "Загрузите market-data bundle с нужными RC_*.xlsx на странице рыночных данных или введите FX вручную в настройках.",
+        });
+      } else {
+        toast.danger("Не удалось выполнить расчёт", {
+          description: errorMessage || "Проверьте параметры и доступность API.",
+        });
+      }
     } finally {
       setIsRunning(false);
     }
   };
 
   const statusColor = readiness.ready ? "success" : "warning";
-  const statusText  = readiness.ready ? "Готово к запуску" : "Не всё готово";
+  const statusText  = readiness.ready
+    ? "Готово к запуску"
+    : liveSyncLoading
+      ? "Подтягиваем live market-data"
+    : apiAutoMode && !liveMarketReady
+      ? "Нужно подтянуть live market-data"
+    : "Не всё готово";
 
   return (
     <div className="importPagePlain">
@@ -392,9 +545,35 @@ export default function ConfigurePage() {
       <div className="importHeroRow">
         <div>
           <h1 className="pageTitle">Настройка расчёта</h1>
-          <div className="importHeroMeta">
+          <div className="importHeroMeta configureHeroMeta">
             <Chip color={statusColor} variant="soft" size="sm">{statusText}</Chip>
             <span className="importFileTag">{selected.length} метрик · α={alpha} · {horizonDays}д</span>
+            {missingFxRequiresManualInput && !liveSyncLoading && (
+              <Chip color="danger" variant="soft" size="sm">
+                Нужны FX: {missingFxCurrencies.map((currency) => `${currency}/${baseCurrency}`).join(", ")}
+              </Chip>
+            )}
+            {apiAutoMode && !liveMarketReady && !liveSyncLoading && (
+              <Chip color="warning" variant="soft" size="sm">
+                Нет готовой live session ЦБ/MOEX
+              </Chip>
+            )}
+            {apiAutoMode && !liveMarketReady && (
+              <Button
+                type="button"
+                variant="secondary"
+                loading={liveSyncLoading}
+                isDisabled={dataState.portfolio.positions.length === 0}
+                onClick={() => void handleSyncLiveMarketData()}
+              >
+                Подтянуть из ЦБ/MOEX
+              </Button>
+            )}
+            {apiAutoMode && liveMarketReady && dataState.marketDataSummary?.session_id && (
+              <Chip color="success" variant="soft" size="sm">
+                Live session: {dataState.marketDataSummary.session_id}
+              </Chip>
+            )}
           </div>
         </div>
 
@@ -431,7 +610,9 @@ export default function ConfigurePage() {
                   name="calc-metrics"
                   className="configureMetricGroup"
                   value={selected}
-                  onChange={(values) => setSelected(values as MetricKey[])}
+                  onChange={(values) =>
+                    setSelected((values as string[]).filter((metric): metric is MetricKey => allowedMetricKeys.has(metric as MetricKey)))
+                  }
                 >
                   <div className="configureMetricHeaderRow">
                     <div className="configureMetricHeaderCopy">
@@ -440,8 +621,8 @@ export default function ConfigurePage() {
                         Выберите метрики, которые нужно включить в расчёт.
                       </Description>
                     </div>
-                    <Button variant="secondary" onClick={() => setSelected(recommendedSet)}>
-                      Рекомендуемые
+                    <Button variant="secondary" onClick={() => setSelected(baseMetricSet)}>
+                      Базовый набор
                     </Button>
                   </div>
                   <div className="configureMetricList configureMetricList--compact">
@@ -666,7 +847,13 @@ export default function ConfigurePage() {
                             <span>FX rates и продвинутые настройки</span>
                           </div>
                           <div className="cardSubtitle">
-                            Откройте только если расчёт мультивалютный или нужен ручной override.
+                            {missingFxRequiresManualInput
+                              ? apiAutoMode
+                                ? `В live market-data нет подтверждённых ${missingFxCurrencies.map((currency) => `${currency}/${baseCurrency}`).join(", ")}. Обновите данные из ЦБ/MOEX или задайте FX вручную.`
+                                : `Для текущего портфеля нужно задать ${missingFxCurrencies.map((currency) => `${currency}/${baseCurrency}`).join(", ")}.`
+                              : apiAutoMode && !liveMarketReady
+                                ? "Сначала подтяните live market-data из ЦБ/MOEX на предыдущем шаге."
+                              : "FX берутся из загруженного market-data bundle или из ручного JSON ниже."}
                           </div>
                         </div>
                         <Accordion.Indicator />
@@ -675,7 +862,8 @@ export default function ConfigurePage() {
                     <Accordion.Panel className="validateAccordionContent">
                       <Accordion.Body>
                         <TextArea
-                          label="FX rates (JSON, опционально)"
+                          label="FX rates (JSON, требуется для валют не в базовой валюте)"
+                          aria-label="FX rates (JSON, требуется для валют не в базовой валюте)"
                           rows={5}
                           value={fxRatesText}
                           onChange={(event) => setFxRatesText(event.target.value)}
@@ -684,6 +872,23 @@ export default function ConfigurePage() {
                         {fxRatesResult.error && (
                           <Chip color="danger" variant="soft" className="importIssueChip">
                             {fxRatesResult.error}
+                          </Chip>
+                        )}
+                        {missingFxRequiresManualInput && !fxRatesResult.error && (
+                          <Chip color="warning" variant="soft" className="importIssueChip">
+                            {apiAutoMode
+                              ? `Обновите live market-data из ЦБ/MOEX или добавьте курс вручную в формате {${missingFxCurrencies.map((currency) => `"${currency}": 92`).join(", ")}}.`
+                              : `Добавьте курс вручную в формате {${missingFxCurrencies.map((currency) => `"${currency}": 92`).join(", ")}} или загрузите RC_*.xlsx с нужными FX на странице рыночных данных.`}
+                          </Chip>
+                        )}
+                        {apiAutoMode && !liveMarketReady && !fxRatesResult.error && (
+                          <Chip color="warning" variant="soft" className="importIssueChip">
+                            Расчёт заблокирован до готовой live market-data session. Вернитесь на страницу рыночных данных и нажмите «Обновить из ЦБ/MOEX».
+                          </Chip>
+                        )}
+                        {missingFxCurrencies.length === 0 && (dataState.marketDataSummary?.available_fx_pairs?.length ?? 0) > 0 && (
+                          <Chip color="success" variant="soft" className="importIssueChip">
+                            Доступные FX из market-data: {dataState.marketDataSummary?.available_fx_pairs.join(", ")}.
                           </Chip>
                         )}
                       </Accordion.Body>

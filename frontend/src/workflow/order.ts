@@ -8,7 +8,5 @@ export const orderedSteps: WorkflowStep[] = [
   WorkflowStep.Results,
   WorkflowStep.Stress,
   WorkflowStep.Limits,
-  WorkflowStep.Margin,
   WorkflowStep.Export,
-  WorkflowStep.PostActions,
 ];

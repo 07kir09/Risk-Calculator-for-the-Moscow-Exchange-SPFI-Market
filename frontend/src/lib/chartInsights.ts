@@ -52,8 +52,8 @@ export type RiskConnectionLink = {
 
 const METRIC_LABELS: Record<string, string> = {
   stress: "Stress",
-  var_hist: "Hist VaR",
-  es_hist: "Hist ES",
+  var_hist: "Scenario VaR",
+  es_hist: "Scenario ES",
   var_param: "Param VaR",
   es_param: "Param ES",
   lc_var: "LC VaR",
@@ -108,10 +108,10 @@ export function buildStressInsights(params: {
       tone: worst.pnl < 0 ? "danger" : "success",
     },
     {
-      label: "Лимиты",
+      label: "Пороги",
       text: breachedCount
-        ? `Лимит нарушен в ${breachedCount} из ${params.stressRows.length} рассчитанных сценариев.`
-        : `Превышений лимита нет в ${params.stressRows.length} рассчитанных сценариях.`,
+        ? `Текущий порог превышен в ${breachedCount} из ${params.stressRows.length} рассчитанных сценариев.`
+        : `Превышений текущего порога нет в ${params.stressRows.length} рассчитанных сценариях.`,
       tone: breachedCount ? (breachedCount === params.stressRows.length ? "danger" : "warning") : "success",
     },
     {
@@ -315,10 +315,10 @@ export function buildLiquidityInsights(params: {
       label: "Поток",
       text:
         variationMargin < 0
-          ? `Вариационная маржа показывает отток ${formatNumber(Math.abs(variationMargin), 2)} ${params.baseCurrency}.`
+          ? `Reference scenario P&L показывает отток ${formatNumber(Math.abs(variationMargin), 2)} ${params.baseCurrency}.`
           : variationMargin > 0
-            ? `Вариационная маржа показывает приток ${formatNumber(variationMargin, 2)} ${params.baseCurrency}.`
-            : `На текущем шаге вариационная маржа находится около нуля.`,
+            ? `Reference scenario P&L показывает приток ${formatNumber(variationMargin, 2)} ${params.baseCurrency}.`
+            : `На текущем шаге reference scenario P&L находится около нуля.`,
       tone: variationMargin < 0 ? "danger" : variationMargin > 0 ? "success" : "default",
     },
   ];

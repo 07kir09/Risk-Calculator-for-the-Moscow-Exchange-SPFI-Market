@@ -56,8 +56,8 @@ export default function MarginPage() {
             <div className="kpiValue kpiValue--sm kpiValue--mono">{m.initial_margin ?? "—"}</div>
           </Card>
           <Card>
-            <div className="cardTitle">Variation Margin</div>
-            <div className="cardSubtitle">Переоценка (MtM): прибыль/убыток деньгами.</div>
+            <div className="cardTitle">Reference scenario P&amp;L</div>
+            <div className="cardSubtitle">Оценка P&amp;L по reference scenario, не клиринговая variation margin.</div>
             <div className="kpiValue kpiValue--sm kpiValue--mono">{m.variation_margin ?? "—"}</div>
           </Card>
           <Card>

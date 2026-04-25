@@ -6,12 +6,14 @@ import { mockFetchMarketDataSession, mockFetchScenarios, mockUploadMarketDataBun
 import { z } from "zod";
 
 const viteEnv = ((import.meta as any).env ?? {}) as Record<string, any>;
-const demoMode = (viteEnv.VITE_DEMO_MODE ?? "1") === "1";
+const defaultDemoMode = (globalThis as any).process?.env?.NODE_ENV === "test" ? "1" : "0";
+const demoMode = (viteEnv.VITE_DEMO_MODE ?? defaultDemoMode) === "1";
 
 export async function fetchMetrics(payload: {
   positions: PositionDTO[];
   scenarios: z.infer<typeof scenarioSchema>[];
   limits?: Record<string, unknown>;
+  include?: Array<"correlations">;
   alpha?: number;
   horizon_days?: number;
   parametric_tail_model?: string;
@@ -55,6 +57,17 @@ export async function loadDefaultMarketDataBundle() {
     return mockFetchMarketDataSession();
   }
   const { data } = await client.post("/market-data/load-default");
+  return marketDataSessionSummarySchema.parse(data);
+}
+
+export async function syncLiveMarketData(params?: { asOfDate?: string; lookbackDays?: number }) {
+  if (demoMode) {
+    return mockFetchMarketDataSession();
+  }
+  const { data } = await client.post("/market-data/sync-live", {
+    as_of_date: params?.asOfDate,
+    lookback_days: params?.lookbackDays ?? 180,
+  });
   return marketDataSessionSummarySchema.parse(data);
 }
 

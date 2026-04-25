@@ -22,6 +22,7 @@ export const marketDataSessionSummarySchema = z.object({
   ready: z.boolean(),
   validation_log: z.array(marketDataValidationSchema),
   counts: z.record(z.number().int().nonnegative()),
+  available_fx_pairs: z.array(z.string()).default([]),
 });
 
 export type MarketDataSessionSummary = z.infer<typeof marketDataSessionSummarySchema>;

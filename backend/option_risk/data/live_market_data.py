@@ -9,13 +9,16 @@ Builds files compatible with the existing market-data bundle loader:
 from __future__ import annotations
 
 import datetime as dt
+import csv
 import json
 import math
 import ssl
+import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
+from io import StringIO
 from pathlib import Path
 from typing import Dict, Iterable
 
@@ -25,6 +28,9 @@ import pandas as pd
 _CBR_DYNAMIC_XML = "http://www.cbr.ru/scripts/XML_dynamic.asp"
 _CBR_DWS_URL = "http://www.cbr.ru/DailyInfoWebServ/DailyInfo.asmx"
 _MOEX_HISTORY_URL = "http://iss.moex.com/iss/history/engines/currency/markets/selt/securities/{secid}.json"
+_MOEX_INDEX_HISTORY_URL = "http://iss.moex.com/iss/history/engines/stock/markets/index/securities/{secid}.json"
+_NYFED_SOFR_URL = "https://markets.newyorkfed.org/read"
+_ECB_ESTR_URL = "https://data-api.ecb.europa.eu/service/data/EST/B.EU000A2X2A25.WT"
 
 _CBR_VALUTE_ID_BY_CODE: dict[str, str] = {
     "USD": "R01235",
@@ -35,6 +41,12 @@ _CBR_VALUTE_ID_BY_CODE: dict[str, str] = {
 _MOEX_SECID_BY_CODE: dict[str, str] = {
     "USD": "USD000UTSTOM",
     "CNY": "CNYRUB_TOM",
+}
+
+_EXTERNAL_RATE_CURVES: dict[str, tuple[str, tuple[str, ...], str]] = {
+    "USD": ("USD-DISCOUNT-USD-CSA", ("USD-SOFR", "USD-OISFX"), "SOFR"),
+    "EUR": ("EUR-DISCOUNT-EUR-CSA", ("EUR-ESTR", "EUR-EURIBOR-Act/365-3M"), "EUR ESTR"),
+    "CNY": ("CNY-DISCOUNT-CNY-CSA", ("CNY-RUSFARCNY-OIS-COMPOUND", "CNY-REPO-RATE"), "RUSFARCNY"),
 }
 
 _TENORS: tuple[tuple[str, float], ...] = (
@@ -49,6 +61,9 @@ _TENORS: tuple[tuple[str, float], ...] = (
     ("7Y", 7.00),
     ("10Y", 10.00),
 )
+_MIN_LOOKBACK_DAYS = 14
+_MAX_LOOKBACK_DAYS = 365
+_METADATA_FILENAME = "marketDataMetadata.json"
 
 
 @dataclass
@@ -58,6 +73,12 @@ class LiveMarketSyncStats:
     fx_rows: int
     key_rate_rows: int
     ruonia_rows: int
+    external_rate_rows: int = 0
+    external_curve_currencies: tuple[str, ...] = ()
+
+
+def clamp_lookback_days(lookback_days: int) -> int:
+    return max(min(int(lookback_days), _MAX_LOOKBACK_DAYS), _MIN_LOOKBACK_DAYS)
 
 
 def _http_get_text(url: str, *, timeout: float = 15.0, retries: int = 2) -> str:
@@ -73,6 +94,22 @@ def _http_get_text(url: str, *, timeout: float = 15.0, retries: int = 2) -> str:
                 except UnicodeDecodeError:
                     continue
             return payload.decode("utf-8", errors="replace")
+        except urllib.error.URLError as exc:  # pragma: no cover - network/runtime dependent
+            if isinstance(exc.reason, ssl.SSLCertVerificationError):
+                try:
+                    req = urllib.request.Request(url=url, headers={"User-Agent": "option-risk-live-sync/1.0"})
+                    with urllib.request.urlopen(req, timeout=timeout, context=ssl._create_unverified_context()) as resp:
+                        payload = resp.read()
+                    for encoding in ("utf-8", "windows-1251", "cp1251"):
+                        try:
+                            return payload.decode(encoding)
+                        except UnicodeDecodeError:
+                            continue
+                    return payload.decode("utf-8", errors="replace")
+                except Exception as fallback_exc:
+                    last_error = fallback_exc
+                    continue
+            last_error = exc
         except Exception as exc:  # pragma: no cover - network/runtime dependent
             last_error = exc
     raise RuntimeError(f"GET request failed for {url}: {last_error}") from last_error
@@ -95,6 +132,10 @@ def _http_post_soap(action: str, body_xml: str, *, timeout: float = 20.0, retrie
         except Exception as exc:  # pragma: no cover - network/runtime dependent
             last_error = exc
     raise RuntimeError(f"SOAP request failed for {action}: {last_error}") from last_error
+
+
+def _http_get_json(url: str, *, timeout: float = 15.0, retries: int = 2) -> dict:
+    return json.loads(_http_get_text(url, timeout=timeout, retries=retries))
 
 
 def _to_iso_date(value: str) -> dt.date:
@@ -230,6 +271,100 @@ def _fetch_moex_fx_history(code: str, secid: str, from_date: dt.date, to_date: d
     return pd.DataFrame(rows).drop_duplicates(subset=["obs_date"], keep="last").sort_values("obs_date")
 
 
+def _fetch_moex_index_rate_history(secid: str, from_date: dt.date, to_date: dt.date) -> pd.DataFrame:
+    query = urllib.parse.urlencode(
+        {
+            "from": from_date.isoformat(),
+            "till": to_date.isoformat(),
+            "iss.meta": "off",
+            "iss.only": "history",
+        }
+    )
+    payload = _http_get_json(_MOEX_INDEX_HISTORY_URL.format(secid=secid) + "?" + query)
+    history = payload.get("history", {})
+    columns = history.get("columns", [])
+    data = history.get("data", [])
+    if not columns or not data:
+        return pd.DataFrame(columns=["date", "rate"])
+    index = {name: idx for idx, name in enumerate(columns)}
+    if "TRADEDATE" not in index or "CLOSE" not in index:
+        return pd.DataFrame(columns=["date", "rate"])
+
+    rows: list[dict[str, object]] = []
+    for item in data:
+        close = item[index["CLOSE"]]
+        if close in (None, "", 0, "0"):
+            continue
+        rate = float(close) / 100.0
+        if not math.isfinite(rate):
+            continue
+        rows.append({"date": dt.date.fromisoformat(str(item[index["TRADEDATE"]])), "rate": rate})
+    if not rows:
+        return pd.DataFrame(columns=["date", "rate"])
+    return pd.DataFrame(rows).drop_duplicates(subset=["date"], keep="last").sort_values("date").reset_index(drop=True)
+
+
+def _fetch_nyfed_sofr(from_date: dt.date, to_date: dt.date) -> pd.DataFrame:
+    query = urllib.parse.urlencode(
+        {
+            "productCode": "50",
+            "eventCodes": "520",
+            "startDt": from_date.isoformat(),
+            "endDt": to_date.isoformat(),
+            "format": "json",
+        }
+    )
+    payload = _http_get_json(f"{_NYFED_SOFR_URL}?{query}", timeout=20.0)
+    rows: list[dict[str, object]] = []
+    for item in payload.get("refRates", []):
+        rate = item.get("percentRate")
+        date_text = item.get("effectiveDate")
+        if rate in (None, "") or not date_text:
+            continue
+        rows.append({"date": dt.date.fromisoformat(str(date_text)), "rate": float(rate) / 100.0})
+    if not rows:
+        return pd.DataFrame(columns=["date", "rate"])
+    return pd.DataFrame(rows).drop_duplicates(subset=["date"], keep="last").sort_values("date").reset_index(drop=True)
+
+
+def _fetch_ecb_estr(from_date: dt.date, to_date: dt.date) -> pd.DataFrame:
+    query = urllib.parse.urlencode(
+        {
+            "startPeriod": from_date.isoformat(),
+            "endPeriod": to_date.isoformat(),
+            "format": "csvdata",
+        }
+    )
+    text = _http_get_text(f"{_ECB_ESTR_URL}?{query}", timeout=20.0)
+    rows: list[dict[str, object]] = []
+    for item in csv.DictReader(StringIO(text)):
+        rate = item.get("OBS_VALUE")
+        date_text = item.get("TIME_PERIOD")
+        if rate in (None, "") or not date_text:
+            continue
+        rows.append({"date": dt.date.fromisoformat(str(date_text)), "rate": float(rate) / 100.0})
+    if not rows:
+        return pd.DataFrame(columns=["date", "rate"])
+    return pd.DataFrame(rows).drop_duplicates(subset=["date"], keep="last").sort_values("date").reset_index(drop=True)
+
+
+def _fetch_external_rate_histories(from_date: dt.date, to_date: dt.date) -> dict[str, pd.DataFrame]:
+    out: dict[str, pd.DataFrame] = {}
+    source_fetchers = {
+        "USD": _fetch_nyfed_sofr,
+        "EUR": _fetch_ecb_estr,
+        "CNY": lambda start, end: _fetch_moex_index_rate_history("RUSFARCNY", start, end),
+    }
+    for currency, fetcher in source_fetchers.items():
+        try:
+            frame = fetcher(from_date, to_date)
+        except Exception:
+            continue
+        if not frame.empty:
+            out[currency] = frame
+    return out
+
+
 def _tenor_labels() -> Iterable[tuple[str, float]]:
     return _TENORS
 
@@ -276,7 +411,51 @@ def _build_curve_forward_frame(as_of_date: dt.date, key_rate: float, ruonia: flo
     return pd.DataFrame(rows)
 
 
-def _build_fixings_frame(key_rate_series: pd.DataFrame, ruonia_series: pd.DataFrame) -> pd.DataFrame:
+def _build_external_curve_frames(
+    as_of_date: dt.date,
+    rate_frames: dict[str, pd.DataFrame],
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    discount_rows: list[dict[str, object]] = []
+    forward_rows: list[dict[str, object]] = []
+    for currency, frame in rate_frames.items():
+        spec = _EXTERNAL_RATE_CURVES.get(currency)
+        if spec is None or frame.empty:
+            continue
+        discount_curve, forward_curves, _fixing_name = spec
+        latest_rate = float(frame.sort_values("date").iloc[-1]["rate"])
+        if not math.isfinite(latest_rate):
+            continue
+        for _label, tenor in _tenor_labels():
+            curve_rate = max(latest_rate + 0.00015 * min(tenor, 5.0), -0.01)
+            discount_rows.append(
+                {
+                    "Дата": as_of_date.isoformat(),
+                    "Кривая": discount_curve,
+                    "Тип": "Дисконтная",
+                    "Дисконт фактор": math.exp(-curve_rate * tenor),
+                    "Тенор": tenor,
+                    "Ставка": curve_rate,
+                }
+            )
+            for forward_curve in forward_curves:
+                forward_rows.append(
+                    {
+                        "Дата": as_of_date.isoformat(),
+                        "Кривая": forward_curve,
+                        "Тип": "Форвардная",
+                        "Срок": _label,
+                        "Тенор": tenor,
+                        "Ставка": curve_rate,
+                    }
+                )
+    return pd.DataFrame(discount_rows), pd.DataFrame(forward_rows)
+
+
+def _build_fixings_frame(
+    key_rate_series: pd.DataFrame,
+    ruonia_series: pd.DataFrame,
+    external_rate_frames: dict[str, pd.DataFrame] | None = None,
+) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     for item in key_rate_series.itertuples(index=False):
         rows.append({"Индекс": "RUB KEYRATE", "Фиксинг": float(item.rate), "Дата": item.date.isoformat()})
@@ -285,6 +464,13 @@ def _build_fixings_frame(key_rate_series: pd.DataFrame, ruonia_series: pd.DataFr
         rows.append({"Индекс": "RUONIA", "Фиксинг": ruo, "Дата": item.date.isoformat()})
         rows.append({"Индекс": "RUSFAR RUB O/N", "Фиксинг": ruo + 0.0008, "Дата": item.date.isoformat()})
         rows.append({"Индекс": "RUSFAR RUB 3M", "Фиксинг": ruo + 0.0012, "Дата": item.date.isoformat()})
+    for currency, frame in (external_rate_frames or {}).items():
+        spec = _EXTERNAL_RATE_CURVES.get(currency)
+        if spec is None:
+            continue
+        _discount_curve, _forward_curves, fixing_name = spec
+        for item in frame.itertuples(index=False):
+            rows.append({"Индекс": fixing_name, "Фиксинг": float(item.rate), "Дата": item.date.isoformat()})
     return pd.DataFrame(rows)
 
 
@@ -330,19 +516,25 @@ def sync_live_market_data_to_directory(
     target_dir.mkdir(parents=True, exist_ok=True)
 
     as_of = as_of_date or dt.date.today()
-    lookback = max(int(lookback_days), 14)
+    lookback = clamp_lookback_days(lookback_days)
     from_date = as_of - dt.timedelta(days=lookback)
 
     key_rate_series = _fetch_cbr_key_rate(from_date, as_of)
     ruonia_series = _fetch_cbr_ruonia(from_date, as_of)
     fx_frames = _build_fx_frames(from_date, as_of, currencies)
+    external_rate_frames = _fetch_external_rate_histories(from_date, as_of)
 
     key_rate_last = float(key_rate_series.iloc[-1]["rate"])
     ruonia_last = float(ruonia_series.iloc[-1]["rate"])
 
     curve_discount = _build_curve_discount_frame(as_of, key_rate_last)
     curve_forward = _build_curve_forward_frame(as_of, key_rate_last, ruonia_last)
-    fixings = _build_fixings_frame(key_rate_series, ruonia_series)
+    external_discount, external_forward = _build_external_curve_frames(as_of, external_rate_frames)
+    if not external_discount.empty:
+        curve_discount = pd.concat([curve_discount, external_discount], ignore_index=True)
+    if not external_forward.empty:
+        curve_forward = pd.concat([curve_forward, external_forward], ignore_index=True)
+    fixings = _build_fixings_frame(key_rate_series, ruonia_series, external_rate_frames)
 
     curve_discount.to_excel(target_dir / "curveDiscount.xlsx", index=False)
     curve_forward.to_excel(target_dir / "curveForward.xlsx", index=False)
@@ -361,13 +553,33 @@ def sync_live_market_data_to_directory(
         )
         export.to_excel(target_dir / f"RC_{code}.xlsx", index=False)
 
+    metadata = {
+        "market_data_source": "official_live_rates",
+        "methodology_status": "preliminary",
+        "sources": {
+            "RUB": ["CBR KeyRateXML", "CBR RuoniaXML"],
+            "FX": ["CBR XML_dynamic", "MOEX ISS currency/selt history"],
+            "USD": ["New York Fed SOFR"],
+            "EUR": ["ECB euro short-term rate"],
+            "CNY": ["MOEX ISS RUSFARCNY"],
+        },
+        "curve_methodology": (
+            "Live sync builds flat/interpolated preliminary discount/forward curves from latest official "
+            "overnight/reference rates. Use uploaded calibrationInstrument quotes for production curve bootstrap."
+        ),
+        "external_curve_currencies": sorted(external_rate_frames.keys()),
+    }
+    (target_dir / _METADATA_FILENAME).write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+
     return LiveMarketSyncStats(
         as_of_date=as_of,
         lookback_days=lookback,
         fx_rows=fx_rows,
         key_rate_rows=len(key_rate_series),
         ruonia_rows=len(ruonia_series),
+        external_rate_rows=sum(len(frame) for frame in external_rate_frames.values()),
+        external_curve_currencies=tuple(sorted(external_rate_frames.keys())),
     )
 
 
-__all__ = ["LiveMarketSyncStats", "sync_live_market_data_to_directory"]
+__all__ = ["LiveMarketSyncStats", "clamp_lookback_days", "sync_live_market_data_to_directory"]

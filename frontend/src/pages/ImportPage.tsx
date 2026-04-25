@@ -1,6 +1,4 @@
 import { ReactNode, useEffect, useMemo, useState } from "react";
-import * as XLSX from "xlsx";
-import Papa from "papaparse";
 import {
   Button as HeroButton,
   Chip,
@@ -21,110 +19,11 @@ import FileDropzone from "../components/FileDropzone";
 import { ImportLogEntry, PositionDTO } from "../api/types";
 import { useWorkflow } from "../workflow/workflowStore";
 import { WorkflowStep } from "../workflow/workflowTypes";
-import { useAppData } from "../state/appDataStore";
+import { type DataSource, useAppData } from "../state/appDataStore";
 import { isMarketDataBundleFile } from "../lib/marketDataFiles";
 import { showBlockedNavigationToast } from "../lib/blockedNavigationToast";
 import { demoPositions } from "../mock/demoData";
-import { parsePortfolioCsv } from "../validation/portfolioCsv";
-
-type ParseOutcome = ReturnType<typeof parsePortfolioCsv> & { encoding: string };
-
-function collectLogStats(log: ReturnType<typeof parsePortfolioCsv>["log"]) {
-  return {
-    errors: log.filter((x) => x.severity === "ERROR").length,
-    warnings: log.filter((x) => x.severity === "WARNING").length,
-  };
-}
-
-function compareParseOutcome(a: ParseOutcome, b: ParseOutcome): number {
-  if (a.positions.length !== b.positions.length) return b.positions.length - a.positions.length;
-  const aStats = collectLogStats(a.log);
-  const bStats = collectLogStats(b.log);
-  if (aStats.errors !== bStats.errors) return aStats.errors - bStats.errors;
-  if (aStats.warnings !== bStats.warnings) return aStats.warnings - bStats.warnings;
-  if (a.encoding === "utf-8" && b.encoding !== "utf-8") return -1;
-  if (b.encoding === "utf-8" && a.encoding !== "utf-8") return 1;
-  return 0;
-}
-
-async function parsePortfolioCsvFromFile(file: File) {
-  const readAsText = (encoding?: string) =>
-    new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result ?? ""));
-      reader.onerror = () => reject(reader.error ?? new Error("Не удалось прочитать CSV-файл"));
-      if (encoding) reader.readAsText(file, encoding);
-      else reader.readAsText(file);
-    });
-
-  const encodings = ["utf-8", "windows-1251"];
-  const outcomes: ParseOutcome[] = [];
-  for (const encoding of encodings) {
-    try {
-      const text = await readAsText(encoding);
-      outcomes.push({ ...parsePortfolioCsv(text), encoding });
-    } catch { /* ignore */ }
-  }
-  if (!outcomes.length) {
-    const text = await readAsText();
-    return parsePortfolioCsv(text);
-  }
-  outcomes.sort(compareParseOutcome);
-  const best = outcomes[0];
-  return { positions: best.positions, log: best.log };
-}
-
-async function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
-  if (typeof file.arrayBuffer === "function") return file.arrayBuffer();
-  return new Promise<ArrayBuffer>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (reader.result instanceof ArrayBuffer) { resolve(reader.result); return; }
-      reject(new Error("Не удалось прочитать Excel-файл"));
-    };
-    reader.onerror = () => reject(reader.error ?? new Error("Не удалось прочитать Excel-файл"));
-    reader.readAsArrayBuffer(file);
-  });
-}
-
-function isExcelFile(file: File): boolean {
-  return /\.(xlsx|xls)$/i.test(file.name);
-}
-
-function toCsvTextFromSheet(sheet: XLSX.WorkSheet): string {
-  const rows = XLSX.utils.sheet_to_json<(string | number | Date | null)[]>(sheet, {
-    header: 1, raw: false, defval: "", blankrows: false, dateNF: "yyyy-mm-dd",
-  });
-  if (!rows.length) return "";
-  const width = rows.reduce((max, row) => Math.max(max, row.length), 0);
-  const normalized = rows.map((row) =>
-    Array.from({ length: width }, (_, index) => {
-      const cell = row[index];
-      if (cell instanceof Date) return cell.toISOString().slice(0, 10);
-      return cell == null ? "" : String(cell);
-    })
-  );
-  return Papa.unparse(normalized, { quotes: false, delimiter: ",", newline: "\n", skipEmptyLines: true });
-}
-
-async function parsePortfolioExcelFromFile(file: File) {
-  const buffer = await readFileAsArrayBuffer(file);
-  const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
-  const sheetName = workbook.SheetNames.find((name) => {
-    const sheet = workbook.Sheets[name];
-    return sheet && Object.keys(sheet).length > 0;
-  });
-  if (!sheetName) throw new Error("Excel-файл не содержит листов с данными.");
-  const sheet = workbook.Sheets[sheetName];
-  const text = toCsvTextFromSheet(sheet);
-  if (!text.trim()) throw new Error(`Лист "${sheetName}" не содержит данных.`);
-  return parsePortfolioCsv(text);
-}
-
-async function parsePortfolioFile(file: File) {
-  if (isExcelFile(file)) return parsePortfolioExcelFromFile(file);
-  return parsePortfolioCsvFromFile(file);
-}
+import { detectPortfolioImportSource, parsePortfolioFile, parsePortfolioPaste } from "../lib/portfolioImport";
 
 function positionStats(positions: PositionDTO[]) {
   const byType = new Map<string, number>();
@@ -164,6 +63,17 @@ const REQUIRED_COLS_META: Record<string, string> = {
 
 type ImportTab = "positions" | "structure";
 
+function dataSourceLabel(source: DataSource) {
+  switch (source) {
+    case "demo": return "Demo";
+    case "csv": return "CSV";
+    case "xlsx": return "XLSX";
+    case "api": return "API";
+    case "paste": return "Paste";
+    default: return source;
+  }
+}
+
 export default function ImportPage() {
   const nav = useNavigate();
   const { state: wf, dispatch } = useWorkflow();
@@ -174,6 +84,8 @@ export default function ImportPage() {
   const [search, setSearch] = useState("");
   const [selectedRow, setSelectedRow] = useState<PositionDTO | null>(null);
   const [activeTab, setActiveTab] = useState<ImportTab>("positions");
+  const [pasteText, setPasteText] = useState("");
+  const [pasteLog, setPasteLog] = useState<ImportLogEntry[]>([]);
   const [confirm, setConfirm] = useState<{
     title: string;
     description: ReactNode;
@@ -195,9 +107,10 @@ export default function ImportPage() {
     setLoading(true);
     setMarketDataNotice(null);
     setLastFilename(file.name);
+    const source: DataSource = detectPortfolioImportSource(file.name);
     try {
       const { positions, log } = await parsePortfolioFile(file);
-      dataDispatch({ type: "SET_PORTFOLIO", positions, source: "csv", filename: file.name });
+      dataDispatch({ type: "SET_PORTFOLIO", positions, source, filename: file.name });
       dataDispatch({ type: "SET_VALIDATION_LOG", log });
       dispatch({ type: "RESET_ALL" });
       const critical = log.filter((x) => x.severity === "ERROR").length;
@@ -213,7 +126,7 @@ export default function ImportPage() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Не удалось прочитать файл портфеля.";
       const log: ImportLogEntry[] = [{ severity: "ERROR", field: "file", message }];
-      dataDispatch({ type: "SET_PORTFOLIO", positions: [], source: "csv", filename: file.name });
+      dataDispatch({ type: "SET_PORTFOLIO", positions: [], source, filename: file.name });
       dataDispatch({ type: "SET_VALIDATION_LOG", log });
       dispatch({ type: "RESET_ALL" });
       dispatch({ type: "SET_VALIDATION", criticalErrors: 1, warnings: 0, acknowledged: false });
@@ -224,6 +137,47 @@ export default function ImportPage() {
     }
   };
 
+  const applyPasteImport = (positions: PositionDTO[], log: ImportLogEntry[]) => {
+    dataDispatch({ type: "SET_PORTFOLIO", positions, source: "paste" });
+    dataDispatch({ type: "SET_VALIDATION_LOG", log });
+    dispatch({ type: "RESET_ALL" });
+    const critical = log.filter((x) => x.severity === "ERROR").length;
+    const warnings = log.filter((x) => x.severity === "WARNING").length;
+    dispatch({ type: "SET_VALIDATION", criticalErrors: critical, warnings, acknowledged: false });
+    dispatch({ type: "COMPLETE_STEP", step: WorkflowStep.Import });
+    dispatch({ type: "SET_SNAPSHOT", snapshotId: crypto.randomUUID() });
+    setLastFilename(undefined);
+    setMarketDataNotice(null);
+    setPasteLog(log);
+  };
+
+  const importPaste = async () => {
+    const { positions, log } = await parsePortfolioPaste(pasteText);
+    const critical = log.filter((x) => x.severity === "ERROR").length;
+    const effectiveLog = log.length
+      ? log
+      : [{ severity: "ERROR" as const, field: "paste", message: "Вставка не содержит распознаваемых строк портфеля." }];
+
+    if (critical > 0 || positions.length === 0) {
+      setPasteLog(effectiveLog);
+      return;
+    }
+
+    const go = () => applyPasteImport(positions, log);
+    if (!hasSomethingToLose) return go();
+    setConfirm({
+      title: "Заменить текущий портфель вставкой?",
+      description: (
+        <div className="stack">
+          <div>Вставленные строки заменят текущие данные.</div>
+          <div className="textMuted">Результаты расчёта будут сброшены.</div>
+        </div>
+      ),
+      confirmText: "Импортировать вставку",
+      action: go,
+    });
+  };
+
   const handoffMarketDataFile = async (file: File) => {
     setLoading(true);
     setMarketDataNotice(null);
@@ -231,6 +185,7 @@ export default function ImportPage() {
       dispatch({ type: "SET_MARKET_STATUS", missingFactors: wf.marketData.missingFactors, status: "loading" });
       const summary = await uploadMarketDataBundleFile(file, dataState.marketDataSummary?.session_id);
       dataDispatch({ type: "SET_MARKET_DATA_SUMMARY", summary });
+      dataDispatch({ type: "SET_MARKET_DATA_MODE", mode: "manual_bundle" });
       dataDispatch({ type: "RESET_RESULTS" });
       const missingFactors = summary.blocking_errors;
       dispatch({ type: "SET_MARKET_STATUS", missingFactors, status: summary.ready ? "ready" : "idle" });
@@ -268,7 +223,7 @@ export default function ImportPage() {
   const hasSomethingToLose = positions.length > 0 || Boolean(dataState.results.metrics);
   const criticalErrors = useMemo(() => log.filter((x) => x.severity === "ERROR").length, [log]);
   const warnings = useMemo(() => log.filter((x) => x.severity === "WARNING").length, [log]);
-  const sourceLabel = positions.length === 0 && !dataState.portfolio.filename ? "Новая сессия" : dataState.portfolio.source.toUpperCase();
+  const sourceLabel = positions.length === 0 && !dataState.portfolio.filename ? "Новая сессия" : dataSourceLabel(dataState.portfolio.source);
 
   const filteredPositions = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -462,6 +417,53 @@ export default function ImportPage() {
               <span>2 позиции</span>
             </div>
           </button>
+
+          <div className="importPastePane">
+            <div className="importPasteHeader">
+              <span className="importDemoEyebrow">Paste-flow</span>
+              <span className="importDemoAction">CSV / Excel</span>
+            </div>
+            <label className="importPasteLabel" htmlFor="portfolio-paste">
+              Вставить портфель как текст
+            </label>
+            <textarea
+              id="portfolio-paste"
+              data-testid="portfolio-paste"
+              className="importPasteTextarea"
+              aria-label="Вставить портфель как текст"
+              placeholder="instrument_type,position_id,quantity,...&#10;option,pos_1,1,..."
+              value={pasteText}
+              onChange={(event) => {
+                setPasteText(event.target.value);
+                if (pasteLog.length) setPasteLog([]);
+              }}
+              disabled={isLoading}
+            />
+            <div className="importPasteActions">
+              <Button variant="secondary" onClick={importPaste} isDisabled={isLoading}>
+                Импортировать вставку
+              </Button>
+              <button type="button" className="importRowAction" onClick={() => { setPasteText(""); setPasteLog([]); }}>
+                Очистить
+              </button>
+            </div>
+            {pasteLog.length > 0 ? (
+              <div className="importPasteLog" role="alert" aria-label="Лог вставки портфеля">
+                <div className="importPasteLogTitle">Лог вставки</div>
+                {pasteLog.slice(0, 5).map((entry, index) => (
+                  <div key={`${entry.severity}-${entry.row ?? "all"}-${entry.field ?? "field"}-${index}`} className={`importPasteLogEntry importPasteLogEntry--${entry.severity.toLowerCase()}`}>
+                    <strong>{entry.severity}</strong>
+                    <span>
+                      {entry.row ? `Строка ${entry.row}: ` : ""}
+                      {entry.field ? `${entry.field}: ` : ""}
+                      {entry.message}
+                    </span>
+                  </div>
+                ))}
+                {pasteLog.length > 5 ? <div className="importPasteLogMore">Ещё {pasteLog.length - 5} записей в журнале.</div> : null}
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {!positions.length && !isLoading && (

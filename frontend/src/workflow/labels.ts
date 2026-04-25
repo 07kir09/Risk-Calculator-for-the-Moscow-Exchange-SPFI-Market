@@ -11,7 +11,7 @@ export const stepTitle: Record<WorkflowStep, string> = {
   [WorkflowStep.Limits]: "Шаг 8. Лимиты",
   [WorkflowStep.Margin]: "Шаг 9. Маржа и капитал",
   [WorkflowStep.Export]: "Шаг 10. Отчёты и экспорт",
-  [WorkflowStep.PostActions]: "Шаг 11. Песочница",
+  [WorkflowStep.PostActions]: "Шаг 11. Дополнительные действия",
 };
 
 export const stepShortLabel: Record<WorkflowStep, string> = {
@@ -25,6 +25,5 @@ export const stepShortLabel: Record<WorkflowStep, string> = {
   [WorkflowStep.Limits]: "Лимиты",
   [WorkflowStep.Margin]: "Маржа/капитал",
   [WorkflowStep.Export]: "Экспорт",
-  [WorkflowStep.PostActions]: "Песочница",
+  [WorkflowStep.PostActions]: "Действия",
 };
-

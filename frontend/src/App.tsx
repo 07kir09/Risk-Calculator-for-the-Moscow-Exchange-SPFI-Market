@@ -9,11 +9,8 @@ import DashboardPage from "./pages/DashboardPage";
 import StressPage from "./pages/StressPage";
 import LimitsPage from "./pages/LimitsPage";
 import ExportPage from "./pages/ExportPage";
-import MarginPage from "./pages/MarginPage";
 import HedgePage from "./pages/HedgePage";
-import WhatIfPage from "./pages/WhatIfPage";
 import PlanBPage from "./pages/PlanBPage";
-import ActionsPage from "./pages/ActionsPage";
 import HelpPage from "./pages/HelpPage";
 import PortfolioPage from "./pages/PortfolioPage";
 import UiDemoPage from "./pages/UiDemoPage";
@@ -35,12 +32,11 @@ export default function App() {
           <Route path="/dashboard" element={<GateRoute requiredStep={WorkflowStep.Results}><DashboardPage /></GateRoute>} />
           <Route path="/stress" element={<GateRoute requiredStep={WorkflowStep.Stress}><StressPage /></GateRoute>} />
           <Route path="/limits" element={<GateRoute requiredStep={WorkflowStep.Limits}><LimitsPage /></GateRoute>} />
-          <Route path="/margin" element={<GateRoute requiredStep={WorkflowStep.Margin}><MarginPage /></GateRoute>} />
           <Route path="/export" element={<GateRoute requiredStep={WorkflowStep.Export}><ExportPage /></GateRoute>} />
-          <Route path="/actions" element={<GateRoute requiredStep={WorkflowStep.PostActions}><ActionsPage /></GateRoute>} />
+          <Route path="/actions" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/margin" element={<Navigate to="/limits" replace />} />
 
           <Route path="/hedge" element={<GateRoute requiredStep={WorkflowStep.PostActions}><HedgePage /></GateRoute>} />
-          <Route path="/what-if" element={<GateRoute requiredStep={WorkflowStep.PostActions}><WhatIfPage /></GateRoute>} />
           <Route path="/plan-b" element={<GateRoute requiredStep={WorkflowStep.PostActions}><PlanBPage /></GateRoute>} />
 
           <Route path="/help" element={<HelpPage />} />

@@ -1,10 +1,10 @@
 """Проверка лимитов по метрикам."""
 from __future__ import annotations
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 
-def check_limits(metrics: Dict[str, float], limits: Dict[str, float]) -> List[Tuple[str, float, float, bool]]:
+def check_limits(metrics: Dict[str, Optional[float]], limits: Dict[str, float]) -> List[Tuple[str, float, float, bool]]:
     """
     Возвращает список кортежей (метрика, значение, лимит, превышение).
     Семантика:

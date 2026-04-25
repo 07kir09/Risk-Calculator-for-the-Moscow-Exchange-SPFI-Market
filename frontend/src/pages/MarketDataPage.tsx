@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Chip } from "@heroui/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { flushSync } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { fetchMarketDataSession, loadDefaultMarketDataBundle, uploadMarketDataBundleFile } from "../api/endpoints";
+import { fetchMarketDataSession, loadDefaultMarketDataBundle, syncLiveMarketData, uploadMarketDataBundleFile } from "../api/endpoints";
 import { MarketDataSessionSummary } from "../api/contracts/marketData";
 import Button from "../components/Button";
 import FileDropzone from "../components/FileDropzone";
@@ -75,14 +75,16 @@ export default function MarketDataPage() {
   const [localLoading, setLocalLoading] = useState(false);
   const [statusText, setStatusText] = useState<string | null>(null);
   const [statusOk, setStatusOk] = useState(true);
+  const liveSyncAttemptedRef = useRef(false);
   const marketDataMode = dataState.marketDataMode ?? "api_auto";
   const apiAutoMode = marketDataMode === "api_auto";
 
   const hasPortfolio = dataState.portfolio.positions.length > 0;
   const summary = dataState.marketDataSummary;
 
-  const applySummary = (nextSummary: MarketDataSessionSummary, note?: string) => {
+  const applySummary = (nextSummary: MarketDataSessionSummary, note?: string, mode: "api_auto" | "manual_bundle" = "manual_bundle") => {
     dataDispatch({ type: "SET_MARKET_DATA_SUMMARY", summary: nextSummary });
+    dataDispatch({ type: "SET_MARKET_DATA_MODE", mode });
     dataDispatch({ type: "RESET_RESULTS" });
     dispatch({ type: "RESET_DOWNSTREAM", fromStep: WorkflowStep.MarketData });
     const missingFactors = nextSummary.blocking_errors;
@@ -116,6 +118,30 @@ export default function MarketDataPage() {
       applySummary(nextSummary, successNote);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Не удалось автоматически загрузить bundle из datasets.";
+      setStatusText(message);
+      setStatusOk(false);
+      dispatch({ type: "SET_MARKET_STATUS", missingFactors: wf.marketData.missingFactors, status: "idle" });
+    } finally {
+      setLocalLoading(false);
+    }
+  };
+
+  const syncLiveBundle = async (successNote = "Live market-data обновлены из ЦБ и MOEX.") => {
+    if (!hasPortfolio) {
+      setStatusText("Сначала загрузите портфель.");
+      setStatusOk(false);
+      return;
+    }
+
+    setLocalLoading(true);
+    setStatusText(null);
+    setStatusOk(true);
+    dispatch({ type: "SET_MARKET_STATUS", missingFactors: wf.marketData.missingFactors, status: "loading" });
+    try {
+      const nextSummary = await syncLiveMarketData({ lookbackDays: 180 });
+      applySummary(nextSummary, successNote, "api_auto");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Не удалось подтянуть live market-data из ЦБ/MOEX.";
       setStatusText(message);
       setStatusOk(false);
       dispatch({ type: "SET_MARKET_STATUS", missingFactors: wf.marketData.missingFactors, status: "idle" });
@@ -224,8 +250,19 @@ export default function MarketDataPage() {
   };
 
   const bundleStatusColor = isReady ? "success" : localLoading ? "warning" : blockingErrors > 0 ? "danger" : "default";
-  const bundleStatusText  = apiAutoMode ? "API авто-режим" : isReady ? "Bundle готов" : localLoading ? "Загрузка…" : "Bundle не завершён";
-  const canContinue = hasPortfolio && (apiAutoMode || isReady);
+  const liveReady = apiAutoMode && isReady && blockingErrors === 0 && missingRequired.length === 0;
+  const bundleStatusText  = apiAutoMode
+    ? liveReady
+      ? "Live API готов"
+      : localLoading
+        ? "Подтягиваем ЦБ/MOEX"
+        : "Нужны live market-data"
+    : isReady
+      ? "Bundle готов"
+      : localLoading
+        ? "Загрузка…"
+        : "Bundle не завершён";
+  const canContinue = hasPortfolio && (apiAutoMode ? liveReady : isReady);
   const layoutTransition = { type: "spring" as const, stiffness: 260, damping: 28, mass: 0.7 };
 
   const switchMarketDataMode = (mode: "api_auto" | "manual_bundle") => {
@@ -235,6 +272,12 @@ export default function MarketDataPage() {
     setStatusText(null);
     setStatusOk(true);
   };
+
+  useEffect(() => {
+    if (!apiAutoMode || !hasPortfolio || liveSyncAttemptedRef.current || localLoading) return;
+    liveSyncAttemptedRef.current = true;
+    void syncLiveBundle("Live market-data подтянуты из ЦБ и MOEX.");
+  }, [apiAutoMode, hasPortfolio, localLoading]);
 
   return (
     <div className="importPagePlain">
@@ -324,7 +367,7 @@ export default function MarketDataPage() {
               <div className="marketApiStubTitle">Источник рыночных данных</div>
               <div className="marketApiStubSub">
                 {apiAutoMode
-                  ? "Рекомендуемый режим: backend сам подбирает готовую сессию или делает live sync."
+                  ? "Live API-режим: frontend заранее создаёт market-data session из ЦБ и MOEX, затем расчёт использует её session_id."
                   : "Ручной режим: загрузите bundle через drag&drop или кнопкой datasets внутри блока."}
               </div>
             </div>
@@ -352,9 +395,22 @@ export default function MarketDataPage() {
               {!hasPortfolio
                 ? "Сначала загрузите портфель"
                 : apiAutoMode
-                  ? "В API-режиме ничего загружать вручную не нужно"
+                  ? liveReady
+                    ? `Готова live session ${summary?.session_id}`
+                    : "Нажмите обновление или дождитесь автозагрузки live-данных"
                   : "В ручном режиме сначала загрузите bundle, затем переходите к настройке расчёта"}
             </span>
+            {apiAutoMode && (
+              <Button
+                type="button"
+                variant="secondary"
+                loading={localLoading}
+                isDisabled={!hasPortfolio}
+                onClick={() => void syncLiveBundle()}
+              >
+                Обновить из ЦБ/MOEX
+              </Button>
+            )}
           </motion.div>
 
         </motion.div>
@@ -382,7 +438,7 @@ export default function MarketDataPage() {
             <div className="marketBoardGrid">
               <div className="marketBoardCard">
                 <div className="marketBoardTitle">Что используется в API-режиме</div>
-                <div className="marketBoardSub">Состав рыночных данных, необходимых для текущего портфеля.</div>
+                <div className="marketBoardSub">Состав live-данных, которые backend получает из ЦБ и MOEX.</div>
                 <ul className="marketBundleRequirementList marketBundleRequirementList--board">
                   {portfolioProfile.apiRequirements.map((requirement) => (
                     <li
@@ -398,14 +454,24 @@ export default function MarketDataPage() {
                   ))}
                 </ul>
                 <div className="marketBoardMeta">
-                  Данные подтягиваются автоматически при расчете через backend API-провайдеры.
+                  {liveReady
+                    ? `Расчёт будет использовать live session ${summary?.session_id}.`
+                    : "До расчёта нужна готовая live market-data session; без неё переход заблокирован."}
                 </div>
               </div>
 
               <div className="marketBoardCard">
                 <div className="marketBoardTitle">Профиль портфеля для market data</div>
-                <div className="marketBoardSub">По этому профилю формируется запрос данных в API-режиме.</div>
+                <div className="marketBoardSub">По этому профилю проверяются доступные FX и рыночные ряды.</div>
                 <div className="marketIssueList">
+                  <div className={`marketIssueRow ${liveReady ? "is-ok" : "is-warn"}`}>
+                    <strong>Live session</strong>
+                    <span>{liveReady ? summary?.session_id : "не готова"}</span>
+                  </div>
+                  <div className={`marketIssueRow ${(summary?.available_fx_pairs?.length ?? 0) > 0 ? "is-ok" : "is-warn"}`}>
+                    <strong>FX</strong>
+                    <span>{summary?.available_fx_pairs?.length ? summary.available_fx_pairs.join(", ") : "нет подтверждённых пар"}</span>
+                  </div>
                   <div className="marketIssueRow is-info">
                     <strong>Позиции</strong>
                     <span>{portfolioProfile.positionsCount}</span>

@@ -56,6 +56,7 @@ export function seedReadyForConfigure() {
       validationLog: [],
       scenarios: [],
       limits: null,
+      limitSource: "draft_auto",
       marketDataSummary: {
         session_id: "demo-market-session",
         files: [
@@ -77,7 +78,9 @@ export function seedReadyForConfigure() {
           calibration_instruments: 1,
           fx_history: 1,
         },
+        available_fx_pairs: ["USD/RUB"],
       },
+      marketDataMode: "manual_bundle",
       results: { metrics: null },
     })
   );

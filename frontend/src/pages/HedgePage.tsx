@@ -11,12 +11,6 @@ import { formatNumber } from "../utils/format";
 
 type HedgeKind = "delta" | "dv01" | "vega";
 
-type HedgeDraft = {
-  title: string;
-  rationale: string;
-  position: PositionDTO;
-};
-
 function uuid() {
   return (globalThis.crypto as any)?.randomUUID?.() ?? String(Date.now());
 }
@@ -159,12 +153,11 @@ export default function HedgePage() {
         <div className="pageHeaderText">
           <h1 className="pageTitle">Подсказки по хеджу</h1>
           <p className="pageHint">
-            Выберите, какой риск хотите уменьшить. Мы предложим простую “идею хеджа” и отправим её в песочницу “Что если”, чтобы вы увидели эффект.
+            Выберите, какой риск хотите уменьшить. Мы подготовим простую идею хеджа и покажем параметры позиции.
           </p>
         </div>
         <div className="pageActions">
-          <Button variant="secondary" onClick={() => nav("/actions")}>Назад</Button>
-          <Button variant="secondary" onClick={() => nav("/what-if")}>Открыть песочницу</Button>
+          <Button variant="secondary" onClick={() => nav("/export")}>Назад</Button>
         </div>
       </div>
 
@@ -227,6 +220,7 @@ export default function HedgePage() {
                     setLoading(s.kind);
                     try {
                       const useAutoMarketData = (dataState.marketDataMode ?? "api_auto") === "api_auto";
+                      const marketDataSessionId = dataState.marketDataSummary?.session_id;
                       const candidate = s.buildCandidate();
                       const perUnit = await runRiskCalculation({
                         positions: [{ ...candidate, quantity: 1 }],
@@ -240,8 +234,8 @@ export default function HedgePage() {
                         liquidityModel,
                         selectedMetrics: ["greeks"],
                         marginEnabled: false,
-                        marketDataSessionId: useAutoMarketData ? undefined : dataState.marketDataSummary?.session_id,
-                        forceAutoMarketData: useAutoMarketData,
+                        marketDataSessionId,
+                        forceAutoMarketData: useAutoMarketData && !marketDataSessionId,
                       });
                       const unitExposure = perUnit.greeks?.[s.metricKey as string] ?? Number.NaN;
                       if (!Number.isFinite(unitExposure) || unitExposure === 0) {
@@ -250,12 +244,7 @@ export default function HedgePage() {
                       const target = s.current * (Number.isFinite(hedgePct) ? hedgePct / 100 : 1);
                       const qty = -target / unitExposure;
 
-                      const draft: HedgeDraft = {
-                        title: s.title,
-                        rationale: `${s.metricKey.toUpperCase()} сейчас: ${s.current}. Доля: ${hedgePct}%.`,
-                        position: { ...candidate, quantity: qty },
-                      };
-                      nav("/what-if", { state: { hedgeDraft: draft } });
+                      setErrorText(`Идея хеджа: ${candidate.instrument_type}, ${candidate.underlying_symbol}, количество ${formatNumber(qty, 4)}.`);
                     } catch (e: any) {
                       setErrorText(e?.message ?? "Не удалось подготовить хедж");
                     } finally {
@@ -263,7 +252,7 @@ export default function HedgePage() {
                     }
                   }}
                 >
-                  Применить в песочнице
+                  Рассчитать идею
                 </Button>
               </div>
             </Card>

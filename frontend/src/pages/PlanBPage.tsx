@@ -76,7 +76,7 @@ export default function PlanBPage() {
           { id: "t1", text: "Открыть лимиты и посмотреть, что именно превышено", done: false },
           { id: "t2", text: "Посмотреть вклад сделок/факторов в превышение", done: false },
           { id: "t3", text: "Запустить стресс‑сценарии и сравнить с лимитами", done: false },
-          { id: "t4", text: "Подобрать хедж в песочнице “Что если”", done: false },
+          { id: "t4", text: "Оценить вариант хеджа и зафиксировать решение", done: false },
           { id: "t5", text: "Зафиксировать решение: уменьшить позицию / поставить лимит / добавить хедж", done: false },
         ],
       });
@@ -96,7 +96,7 @@ export default function PlanBPage() {
           { id: "s1", text: "Открыть стрессы и посмотреть худший сценарий", done: false },
           { id: "s2", text: "Проверить «топ‑вкладчиков» в убыток", done: false },
           { id: "s3", text: "Проверить, какие факторы двигают риск (цена/вола/ставка)", done: false },
-          { id: "s4", text: "Смоделировать хедж в песочнице", done: false },
+          { id: "s4", text: "Сформулировать действие: уменьшить позицию, поднять лимит или добавить хедж", done: false },
         ],
       });
     }
@@ -109,7 +109,7 @@ export default function PlanBPage() {
         summary: "Лимиты не превышены (по доступным метрикам), стресс‑убытки не критичны.",
         actions: [
           { label: "Открыть панель", to: "/dashboard" },
-          { label: "Песочница “Что если”", to: "/what-if" },
+          { label: "Открыть экспорт", to: "/export" },
         ],
         tasks: [
           { id: "o1", text: "Проверить, что данные актуальны (дата оценки/портфель)", done: false },
@@ -166,7 +166,7 @@ export default function PlanBPage() {
           >
             Сбросить галочки
           </Button>
-          <Button variant="secondary" onClick={() => nav("/actions")}>Назад</Button>
+          <Button variant="secondary" onClick={() => nav("/export")}>Назад</Button>
         </div>
       </div>
 

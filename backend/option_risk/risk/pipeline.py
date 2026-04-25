@@ -10,9 +10,8 @@ import numpy as np
 from ..data.models import MarketScenario, Portfolio
 from ..data.validation import ValidationMessage
 from ..pricing.market import MarketDataContext
-from .correlations import pnl_matrix
 from .limits import check_limits
-from .portfolio import greeks_summary, position_value
+from .portfolio import apply_scenario, greeks_summary, position_value
 from .stress import run_stress_tests
 from .var_es import (
     LiquidityInput,
@@ -41,9 +40,10 @@ class CalculationConfig:
     mode: str = "demo"  # demo | api
     aggregations: Optional[List[str]] = None  # например ["currency"]
     calc_correlations: bool = True
-    max_correlation_positions: int = 2000
+    max_correlation_positions: int = 200
     max_pnl_matrix_cells: int = 100_000
     max_lc_breakdown_rows: int = 500
+    allow_fx_fallback: bool = False  # legacy compatibility only; fail fast by default
 
 
 @dataclass
@@ -72,6 +72,7 @@ class CalculationResult:
     methodology_note: Optional[str] = None
     fx_warning: Optional[str] = None
     liquidity_model: str = "fraction_of_position_value"
+    worst_stress: Optional[float] = None
     capital: Optional[float] = None
     initial_margin: Optional[float] = None
     variation_margin: Optional[float] = None
@@ -104,42 +105,205 @@ def _normalize_currency(currency: str) -> str:
     return currency.strip().upper()
 
 
+def _validate_positive_fx_rate(label: str, value: float) -> float:
+    rate = float(value)
+    if not math.isfinite(rate) or rate <= 0.0:
+        raise ValueError(f"FX rate for {label} must be a positive finite number")
+    return rate
+
+
+def _normalized_scenario_signature(scenario: MarketScenario) -> tuple:
+    def _normalized_mapping(mapping: Optional[Dict[str, float]]) -> tuple[tuple[str, float], ...]:
+        if not mapping:
+            return ()
+        return tuple(sorted((str(key).strip().casefold(), float(value)) for key, value in mapping.items()))
+
+    scenario_id = str(scenario.scenario_id).strip()
+    return (
+        scenario_id.casefold(),
+        scenario_id,
+        float(scenario.underlying_shift),
+        float(scenario.volatility_shift),
+        float(scenario.rate_shift),
+        float(scenario.probability) if scenario.probability is not None else float("-inf"),
+        _normalized_mapping(scenario.curve_shifts),
+        _normalized_mapping(scenario.fx_spot_shifts),
+    )
+
+
+def _variation_margin_index(scenarios: List[MarketScenario]) -> int:
+    """Выбирает референсный сценарий для variation margin.
+
+    Предпочитаем именованные сценарии: сначала ``base``, затем ``last_scenario``.
+    Это делает результат независимым от порядка массива. Если ни одного такого
+    сценария нет, используем стабильный канонический fallback для legacy payloads
+    без привязки к позиции в списке.
+    """
+    if not scenarios:
+        raise ValueError("variation margin requires at least one scenario")
+    preferred_ids = ("base", "last_scenario")
+    for preferred_id in preferred_ids:
+        candidates = [
+            idx
+            for idx, scenario in enumerate(scenarios)
+            if str(scenario.scenario_id).strip().casefold() == preferred_id
+        ]
+        if candidates:
+            return min(candidates, key=lambda idx: _normalized_scenario_signature(scenarios[idx]))
+    return max(range(len(scenarios)), key=lambda idx: _normalized_scenario_signature(scenarios[idx]))
+
+
 def _resolve_fx_rates(
     portfolio: Portfolio,
     base_currency: str,
     fx_rates: Optional[Dict[str, float]],
+    market: MarketDataContext | None,
+    allow_fx_fallback: bool,
     validation_log: List[ValidationMessage],
 ) -> np.ndarray:
     rates_cfg: Dict[str, float] = {}
     for key, value in (fx_rates or {}).items():
         code = _normalize_currency(key)
-        rates_cfg[code] = float(value)
+        rates_cfg[code] = _validate_positive_fx_rate(code, float(value))
     rates_cfg[base_currency] = 1.0
 
     unique_currencies = {_normalize_currency(p.currency) for p in portfolio.positions}
+    if market is not None:
+        for ccy in unique_currencies:
+            if ccy == base_currency or ccy in rates_cfg:
+                continue
+            try:
+                rates_cfg[ccy] = _validate_positive_fx_rate(
+                    f"{ccy}/{base_currency}",
+                    float(market.fx_rate(ccy, base_currency)),
+                )
+            except ValueError:
+                continue
+
+    missing_currencies = sorted(ccy for ccy in unique_currencies if ccy != base_currency and ccy not in rates_cfg)
+    if missing_currencies and not allow_fx_fallback:
+        missing_pairs = ", ".join(f"{ccy}/{base_currency}" for ccy in missing_currencies)
+        raise ValueError(
+            "В портфеле есть позиции не в базовой валюте, но не хватает FX-курсов для: "
+            f"{', '.join(missing_currencies)} ({missing_pairs}). "
+            "Передайте fx_rates или включите allow_fx_fallback=True."
+        )
+
     rates: List[float] = []
     missing: set[str] = set()
     for p in portfolio.positions:
         ccy = _normalize_currency(p.currency)
         rate = rates_cfg.get(ccy)
         if rate is None:
-            # Минимальный fallback: считаем 1.0, но обязательно логируем предупреждение.
+            # Legacy fallback: используем 1.0 только если явно разрешили совместимость.
             missing.add(ccy)
             rate = 1.0
         rates.append(float(rate))
 
-    if len(unique_currencies) > 1 and missing:
+    if missing and allow_fx_fallback:
         validation_log.append(
             ValidationMessage(
                 severity="WARNING",
                 message=(
-                    "В портфеле смешанные валюты, но нет FX-курсов для: "
+                    "В портфеле есть позиции не в базовой валюте, но нет FX-курсов для: "
                     f"{', '.join(sorted(missing))}. Использован fallback 1.0; "
                     "агрегированные метрики могут быть некорректны."
                 ),
             )
         )
     return np.asarray(rates, dtype=np.float64)
+
+
+def _fx_shift_multiplier(currency: str, base_currency: str, fx_spot_shifts: Optional[Dict[str, float]]) -> float:
+    if not fx_spot_shifts:
+        return 1.0
+    ccy = _normalize_currency(currency)
+    base = _normalize_currency(base_currency)
+    if ccy == base:
+        return 1.0
+
+    direct_keys = {ccy, f"{ccy}/{base}", f"{ccy}-{base}", f"{ccy}{base}"}
+    inverse_keys = {f"{base}/{ccy}", f"{base}-{ccy}", f"{base}{ccy}"}
+    for raw_key, raw_shift in fx_spot_shifts.items():
+        key = str(raw_key).strip().upper()
+        shift = float(raw_shift)
+        if key in direct_keys:
+            return 1.0 + shift
+        if key in inverse_keys:
+            return 1.0 / (1.0 + shift)
+    return 1.0
+
+
+def _scenario_fx_rates(
+    portfolio: Portfolio,
+    base_currency: str,
+    base_fx_rates: np.ndarray,
+    scenario: MarketScenario,
+    market: MarketDataContext | None,
+    cfg: CalculationConfig,
+) -> np.ndarray:
+    if market is not None and cfg.fx_rates is None:
+        shocked_market = market.shocked(
+            global_curve_shift=scenario.rate_shift,
+            curve_shifts=scenario.curve_shifts,
+            fx_spot_shifts=scenario.fx_spot_shifts,
+        )
+        rates: List[float] = []
+        for idx, position in enumerate(portfolio.positions):
+            ccy = _normalize_currency(position.currency)
+            if ccy == base_currency:
+                rates.append(1.0)
+                continue
+            try:
+                rates.append(
+                    _validate_positive_fx_rate(
+                        f"{ccy}/{base_currency}",
+                        shocked_market.fx_rate(ccy, base_currency),
+                    )
+                )
+            except ValueError:
+                rates.append(float(base_fx_rates[idx]) * _fx_shift_multiplier(ccy, base_currency, scenario.fx_spot_shifts))
+        return np.asarray(rates, dtype=np.float64)
+
+    return np.asarray(
+        [
+            float(base_fx_rates[idx]) * _fx_shift_multiplier(position.currency, base_currency, scenario.fx_spot_shifts)
+            for idx, position in enumerate(portfolio.positions)
+        ],
+        dtype=np.float64,
+    )
+
+
+def _base_currency_pnl_matrix(
+    portfolio: Portfolio,
+    scenarios: List[MarketScenario],
+    *,
+    base_values: np.ndarray,
+    base_fx_rates: np.ndarray,
+    base_currency: str,
+    market: MarketDataContext | None,
+    cfg: CalculationConfig,
+) -> np.ndarray:
+    matrix = np.zeros((len(portfolio.positions), len(scenarios)), dtype=np.float64)
+    for scenario_idx, scenario in enumerate(scenarios):
+        stressed_market = (
+            market.shocked(
+                global_curve_shift=scenario.rate_shift,
+                curve_shifts=scenario.curve_shifts,
+                fx_spot_shifts=scenario.fx_spot_shifts,
+            )
+            if market is not None
+            else None
+        )
+        scenario_fx_rates = _scenario_fx_rates(portfolio, base_currency, base_fx_rates, scenario, market, cfg)
+        for position_idx, position in enumerate(portfolio.positions):
+            stressed = apply_scenario(position, scenario)
+            stressed_value = position_value(stressed, market=stressed_market)
+            matrix[position_idx, scenario_idx] = (
+                float(stressed_value) * float(scenario_fx_rates[position_idx])
+                - float(base_values[position_idx]) * float(base_fx_rates[position_idx])
+            )
+    return matrix
 
 
 def _resolve_scenario_weights(
@@ -258,7 +422,7 @@ def run_calculation(
     base_currency = _normalize_currency(cfg.base_currency)
     validation_log: List[ValidationMessage] = []
     position_ids = [p.position_id for p in portfolio.positions]
-    fx_rates = _resolve_fx_rates(portfolio, base_currency, cfg.fx_rates, validation_log)
+    fx_rates = _resolve_fx_rates(portfolio, base_currency, cfg.fx_rates, market, cfg.allow_fx_fallback, validation_log)
     scenario_weights = _resolve_scenario_weights(scenarios, validation_log) if (cfg.calc_var_es and scenarios) else None
     base_values = np.asarray([position_value(p, market=market) for p in portfolio.positions], dtype=np.float64)
     base_values_converted = base_values * fx_rates
@@ -272,8 +436,15 @@ def run_calculation(
     pnl_mat = None
     position_pnl_base = np.zeros((len(portfolio.positions), len(scenarios)), dtype=np.float64)
     if (cfg.calc_stress or cfg.calc_var_es or cfg.calc_correlations) and scenarios:
-        position_pnl = pnl_matrix(portfolio, scenarios, market=market)
-        position_pnl_base = position_pnl * fx_rates[:, None]
+        position_pnl_base = _base_currency_pnl_matrix(
+            portfolio,
+            scenarios,
+            base_values=base_values,
+            base_fx_rates=fx_rates,
+            base_currency=base_currency,
+            market=market,
+            cfg=cfg,
+        )
         pnl_dist = np.sum(position_pnl_base, axis=0, dtype=np.float64).tolist()
         if position_pnl_base.size <= max(0, int(cfg.max_pnl_matrix_cells)):
             pnl_mat = position_pnl_base.tolist()
@@ -358,11 +529,11 @@ def run_calculation(
     limits = (
         check_limits(
             {
-                "var_hist": var_h if var_h is not None else 0.0,
-                "es_hist": es_h if es_h is not None else 0.0,
-                "var_param": var_p if var_p is not None else 0.0,
-                "es_param": es_p if es_p is not None else 0.0,
-                "lc_var": lc_var if lc_var is not None else 0.0,
+                "var_hist": var_h,
+                "es_hist": es_h,
+                "var_param": var_p,
+                "es_param": es_p,
+                "lc_var": lc_var,
             },
             limits_cfg or {},
         )
@@ -382,7 +553,8 @@ def run_calculation(
                     severity="WARNING",
                     message=(
                         "Расчет корреляций пропущен: слишком много позиций "
-                        f"({position_pnl_base.shape[0]} > {int(cfg.max_correlation_positions)})."
+                        f"({position_pnl_base.shape[0]} > {int(cfg.max_correlation_positions)}); "
+                        "correlations возвращены как null."
                     ),
                 )
             )
@@ -411,7 +583,8 @@ def run_calculation(
             capital = economic_capital(var_h, es_h)
             initial_m = initial_margin(lc_var)
         if pnl_dist:
-            variation_m = variation_margin(pnl_dist[-1] if pnl_dist else 0.0)
+            variation_idx = _variation_margin_index(scenarios)
+            variation_m = variation_margin(pnl_dist[variation_idx])
 
     fx_warning = next((msg.message for msg in validation_log if "FX" in msg.message), None)
     methodology_note = (
@@ -446,6 +619,7 @@ def run_calculation(
         methodology_note=methodology_note,
         fx_warning=fx_warning,
         liquidity_model=cfg.liquidity_model,
+        worst_stress=min(pnl_dist) if pnl_dist else None,
         capital=capital,
         initial_margin=initial_m,
         variation_margin=variation_m,

@@ -4,7 +4,7 @@ import { renderWithProviders } from "./testUtils";
 import { demoPositions } from "../mock/demoData";
 import { WorkflowStep } from "../workflow/workflowTypes";
 
-test("рыночные данные подгружаются автоматически при открытии шага", async () => {
+test("рыночные данные открываются в API auto режиме при готовом портфеле", async () => {
   localStorage.setItem(
     "workflow_state_v1",
     JSON.stringify({
@@ -36,6 +36,8 @@ test("рыночные данные подгружаются автоматич�
   renderWithProviders(<App />, { route: "/market" });
 
   expect(await screen.findByRole("heading", { name: /Рыночные данные/i })).toBeInTheDocument();
-  expect(await screen.findByText(/Bundle готов/i)).toBeInTheDocument();
-  expect(await screen.findByText(/5 файлов в сессии/i)).toBeInTheDocument();
+  expect(await screen.findByRole("button", { name: /Обновить из ЦБ\/MOEX/i })).toBeInTheDocument();
+  expect(await screen.findByText(/Live API-режим/i)).toBeInTheDocument();
+  expect(await screen.findByText(/Профиль портфеля для market data/i)).toBeInTheDocument();
+  expect(await screen.findByText(/option: 1 · forward: 1/i)).toBeInTheDocument();
 });

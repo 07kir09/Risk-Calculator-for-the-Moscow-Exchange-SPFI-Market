@@ -26,7 +26,7 @@ export default function NextStepBanner() {
     [WorkflowStep.Limits]: "Шаг 8: проверьте лимиты после результатов.",
     [WorkflowStep.Margin]: "Шаг 9: маржа/капитал доступны после включения в настройках.",
     [WorkflowStep.Export]: "Шаг 10: выгрузите отчёт после расчёта.",
-    [WorkflowStep.PostActions]: "Шаг 11: what-if/хедж/план B после результатов.",
+    [WorkflowStep.PostActions]: "Шаг 11: дополнительные действия после результатов.",
   };
   return (
     <div className="card">

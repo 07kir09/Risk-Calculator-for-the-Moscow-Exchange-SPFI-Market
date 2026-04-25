@@ -7,11 +7,7 @@ import { useAppData } from "../state/appDataStore";
 import { useWorkflow } from "../workflow/workflowStore";
 import { utilityItems, workflowItems } from "./navigationModel";
 
-export default function Topbar({
-  title,
-}: {
-  title: string;
-}) {
+export default function Topbar() {
   const nav = useNavigate();
   const { state, dispatch } = useWorkflow();
   const { state: dataState, dispatch: dataDispatch } = useAppData();
@@ -58,10 +54,6 @@ export default function Topbar({
 
       <div className="topbarMenuSlot">
         <NavigationDrawer />
-        <div className="topbarPageContext" aria-label={`Текущий раздел: ${title}`}>
-          <div className="topbarPageEyebrow">Раздел</div>
-          <div className="topbarPageTitle">{title}</div>
-        </div>
         <nav className="srOnly" aria-label="Быстрые ссылки">
           {[...workflowItems, ...utilityItems].map((item) => (
             <Link key={item.to} to={item.to}>

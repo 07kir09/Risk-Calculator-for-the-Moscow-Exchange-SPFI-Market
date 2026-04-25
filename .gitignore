@@ -1,0 +1,30 @@
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/playwright-report/
+frontend/test-results/
+frontend/.playwright-cli/
+
+# Runtime/audit outputs
+.playwright-cli/
+.runlogs/
+audit_runtime_checks/reports/
+
+# Project outputs/logs
+output_demo/
+*.log
