@@ -8,7 +8,8 @@ API_LOG="/tmp/option_risk_api.log"
 API_PID="/tmp/option_risk_api.pid"
 VITE_LOG="/tmp/option_risk_vite.log"
 VITE_PID="/tmp/option_risk_vite.pid"
-DEFAULT_MARKET_DATA_DIR="${ROOT_DIR}/datasets/Данные для работы"
+DEFAULT_MARKET_DATA_DIR="${ROOT_DIR}/Datasets/Данные для работы"
+DEMO_OUTPUT_DIR="${OPTION_RISK_DEMO_OUTPUT_DIR:-${TMPDIR:-/tmp}/option_risk_output_demo}"
 
 stop_pidfile() {
   local pid_file="$1"
@@ -134,6 +135,30 @@ stop_vite_orphans() {
   done
 }
 
+start_detached() {
+  local pid_file="$1"
+  local log_file="$2"
+  shift 2
+
+  : >"${log_file}"
+  python3 - "$pid_file" "$log_file" "$@" <<'PY'
+import subprocess
+import sys
+
+pid_file, log_file, *cmd = sys.argv[1:]
+with open(log_file, "ab", buffering=0) as log:
+    proc = subprocess.Popen(
+        cmd,
+        stdin=subprocess.DEVNULL,
+        stdout=log,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    )
+with open(pid_file, "w", encoding="utf-8") as fh:
+    fh.write(str(proc.pid))
+PY
+}
+
 echo "==> 1) Подготовка Python окружения"
 if [ ! -d "${PY_ENV}" ]; then
   python3 -m venv "${PY_ENV}"
@@ -145,12 +170,13 @@ echo "==> 2) Тесты Python"
 cd "${ROOT_DIR}/backend"
 PYTHONPATH="." pytest tests -q
 
-echo "==> 3) Пример запуска CLI (выгрузки в backend/output_demo)"
+echo "==> 3) Пример запуска CLI (выгрузки в ${DEMO_OUTPUT_DIR})"
 PYTHONPATH="." python -m option_risk.cli \
-  --portfolio "${ROOT_DIR}/datasets/examples/portfolio.csv" \
-  --scenarios "${ROOT_DIR}/datasets/examples/scenarios.csv" \
-  --limits "${ROOT_DIR}/datasets/examples/limits.json" \
-  --output "${ROOT_DIR}/backend/output_demo"
+  --portfolio "${ROOT_DIR}/Datasets/examples/portfolio.csv" \
+  --scenarios "${ROOT_DIR}/Datasets/examples/scenarios.csv" \
+  --limits "${ROOT_DIR}/Datasets/examples/limits.json" \
+  --market-data-dir "${DEFAULT_MARKET_DATA_DIR}" \
+  --output "${DEMO_OUTPUT_DIR}"
 
 echo "==> 4) Запуск FastAPI (фон, :8000)"
 stop_pidfile "${API_PID}" "FastAPI" "uvicorn .*option_risk\\.api:app"
@@ -162,8 +188,7 @@ if command -v lsof >/dev/null 2>&1; then
     exit 1
   fi
 fi
-nohup env PYTHONPATH="." OPTION_RISK_DEFAULT_DATASETS_DIR="${DEFAULT_MARKET_DATA_DIR}" uvicorn option_risk.api:app --host 0.0.0.0 --port 8000 >"${API_LOG}" 2>&1 &
-echo $! >"${API_PID}"
+start_detached "${API_PID}" "${API_LOG}" env PYTHONPATH="." OPTION_RISK_DEFAULT_DATASETS_DIR="${DEFAULT_MARKET_DATA_DIR}" uvicorn option_risk.api:app --host 0.0.0.0 --port 8000
 echo "FastAPI запущен, лог: ${API_LOG}"
 if command -v curl >/dev/null 2>&1; then
   for _ in $(seq 1 60); do
@@ -187,9 +212,7 @@ npm test
 echo "==> 6) Запуск Vite dev-сервера на :5173 (фон)"
 stop_pidfile "${VITE_PID}" "Vite" "npm run dev|node_modules/\\.bin/vite"
 stop_vite_orphans 5173 5190
-rm -rf "${ROOT_DIR}/frontend/node_modules/.vite" 2>/dev/null || true
-nohup env VITE_DEMO_MODE=0 ./node_modules/.bin/vite --host --port 5173 --strictPort --force >"${VITE_LOG}" 2>&1 &
-echo $! >"${VITE_PID}"
+start_detached "${VITE_PID}" "${VITE_LOG}" env VITE_DEMO_MODE=0 ./node_modules/.bin/vite --host --port 5173 --strictPort
 echo "Vite запущен, лог: ${VITE_LOG}"
 
 echo "Готово. UI: http://localhost:5173 (бек: http://127.0.0.1:8000/health)."
