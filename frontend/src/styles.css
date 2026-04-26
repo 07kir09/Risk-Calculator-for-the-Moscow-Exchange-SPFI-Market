@@ -6472,6 +6472,59 @@ a:hover {
   line-height: 1.5;
 }
 
+.chartFootnote {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.02)),
+    rgba(10, 10, 12, 0.22);
+}
+
+.chartFootnote--success {
+  border-color: rgba(110, 255, 142, 0.18);
+  background:
+    linear-gradient(180deg, rgba(110, 255, 142, 0.08), rgba(110, 255, 142, 0.015)),
+    rgba(10, 10, 12, 0.22);
+}
+
+.chartFootnote--warning {
+  border-color: rgba(255, 184, 106, 0.2);
+  background:
+    linear-gradient(180deg, rgba(255, 184, 106, 0.08), rgba(255, 184, 106, 0.015)),
+    rgba(10, 10, 12, 0.22);
+}
+
+.chartFootnote--danger {
+  border-color: rgba(255, 143, 143, 0.22);
+  background:
+    linear-gradient(180deg, rgba(255, 143, 143, 0.09), rgba(255, 143, 143, 0.015)),
+    rgba(10, 10, 12, 0.22);
+}
+
+.chartFootnoteLabel {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(244, 241, 234, 0.58);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.chartFootnoteText {
+  margin: 0;
+  color: rgba(244, 241, 234, 0.84);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .glassPanelTitle,
 .richChartTitle {
   font-size: 18px;
@@ -8076,6 +8129,15 @@ a:hover {
   min-width: 0;
 }
 
+.dashboardStressChart {
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboardStressChartCaption {
+  margin-top: 14px;
+}
+
 .dashboardCompactPanel--stressPlain {
   padding: 14px !important;
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
@@ -8671,6 +8733,10 @@ a:hover {
 
   .chartInsightList {
     grid-template-columns: 1fr;
+  }
+
+  .chartFootnote {
+    flex-direction: column;
   }
 
   .riskConnectionLegend {

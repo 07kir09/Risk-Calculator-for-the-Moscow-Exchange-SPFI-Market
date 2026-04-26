@@ -1,5 +1,6 @@
 import json
 import math
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -13,6 +14,7 @@ from option_risk.risk.pipeline import CalculationConfig, run_calculation
 
 
 FX_RATES = {"USD": 90.0, "EUR": 100.0}
+DATASETS_DIR = Path(__file__).resolve().parents[2] / "Datasets"
 
 
 def _forward(position_id: str, currency: str, quantity: float, notional: float, spot: float, strike: float) -> dict:
@@ -188,7 +190,7 @@ def test_request_fx_rate_must_be_positive_finite(monkeypatch, bad_rate):
 
 def test_large_portfolio_no_nan_inf(monkeypatch):
     monkeypatch.setenv("OPTION_RISK_USE_LATEST_MARKET_DATA", "0")
-    path = "Datasets/portfolio_large_1000.xlsx"
+    path = DATASETS_DIR / "portfolio_large_1000.xlsx"
     df = pd.read_excel(path)
     positions = json.loads(df.where(df.notna(), None).to_json(orient="records"))
     response = TestClient(app).post(

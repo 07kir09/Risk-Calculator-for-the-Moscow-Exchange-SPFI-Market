@@ -135,6 +135,40 @@ stop_vite_orphans() {
   done
 }
 
+reuse_listener_if_matching() {
+  local pid_file="$1"
+  local name="$2"
+  local port="$3"
+  local expected_grep="$4"
+  local expected_cwd_suffix="$5"
+
+  if ! command -v lsof >/dev/null 2>&1; then
+    return 1
+  fi
+
+  local pid
+  pid="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -n 1)"
+  if [ -z "$pid" ]; then
+    return 1
+  fi
+
+  local cmd
+  cmd="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+  if [ -n "$expected_grep" ] && [ -n "$cmd" ] && ! echo "$cmd" | grep -E "$expected_grep" >/dev/null 2>&1; then
+    return 1
+  fi
+
+  local cwd
+  cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)"
+  if [ -n "$expected_cwd_suffix" ] && ! echo "$cwd" | grep -E "$expected_cwd_suffix" >/dev/null 2>&1; then
+    return 1
+  fi
+
+  echo "==> Используем уже запущенный ${name} (порт ${port}, pid ${pid})"
+  printf '%s' "$pid" >"$pid_file"
+  return 0
+}
+
 start_detached() {
   local pid_file="$1"
   local log_file="$2"
@@ -181,15 +215,22 @@ PYTHONPATH="." python -m option_risk.cli \
 echo "==> 4) Запуск FastAPI (фон, :8000)"
 stop_pidfile "${API_PID}" "FastAPI" "uvicorn .*option_risk\\.api:app"
 stop_api_orphans 8000
+api_reused=0
 if command -v lsof >/dev/null 2>&1; then
   if lsof -nP -iTCP:8000 -sTCP:LISTEN >/dev/null 2>&1; then
-    echo "❌ Порт 8000 уже занят. Освободите его и повторите запуск."
-    lsof -nP -iTCP:8000 -sTCP:LISTEN || true
-    exit 1
+    if reuse_listener_if_matching "${API_PID}" "FastAPI" 8000 "uvicorn .*option_risk\\.api:app" "/backend$"; then
+      api_reused=1
+    else
+      echo "❌ Порт 8000 уже занят. Освободите его и повторите запуск."
+      lsof -nP -iTCP:8000 -sTCP:LISTEN || true
+      exit 1
+    fi
   fi
 fi
-start_detached "${API_PID}" "${API_LOG}" env PYTHONPATH="." OPTION_RISK_DEFAULT_DATASETS_DIR="${DEFAULT_MARKET_DATA_DIR}" uvicorn option_risk.api:app --host 0.0.0.0 --port 8000
-echo "FastAPI запущен, лог: ${API_LOG}"
+if [ "${api_reused}" -ne 1 ]; then
+  start_detached "${API_PID}" "${API_LOG}" env PYTHONPATH="." OPTION_RISK_DEFAULT_DATASETS_DIR="${DEFAULT_MARKET_DATA_DIR}" uvicorn option_risk.api:app --host 0.0.0.0 --port 8000
+  echo "FastAPI запущен, лог: ${API_LOG}"
+fi
 if command -v curl >/dev/null 2>&1; then
   for _ in $(seq 1 60); do
     if curl -fsS "http://127.0.0.1:8000/health" >/dev/null 2>&1; then
@@ -212,7 +253,21 @@ npm test
 echo "==> 6) Запуск Vite dev-сервера на :5173 (фон)"
 stop_pidfile "${VITE_PID}" "Vite" "npm run dev|node_modules/\\.bin/vite"
 stop_vite_orphans 5173 5190
-start_detached "${VITE_PID}" "${VITE_LOG}" env VITE_DEMO_MODE=0 ./node_modules/.bin/vite --host --port 5173 --strictPort
-echo "Vite запущен, лог: ${VITE_LOG}"
+vite_reused=0
+if command -v lsof >/dev/null 2>&1; then
+  if lsof -nP -iTCP:5173 -sTCP:LISTEN >/dev/null 2>&1; then
+    if reuse_listener_if_matching "${VITE_PID}" "Vite" 5173 "(^|[[:space:]])vite([[:space:]]|$)|node_modules/(\\.bin/vite|vite/)" "/frontend$"; then
+      vite_reused=1
+    else
+      echo "❌ Порт 5173 уже занят. Освободите его и повторите запуск."
+      lsof -nP -iTCP:5173 -sTCP:LISTEN || true
+      exit 1
+    fi
+  fi
+fi
+if [ "${vite_reused}" -ne 1 ]; then
+  start_detached "${VITE_PID}" "${VITE_LOG}" env VITE_DEMO_MODE=0 ./node_modules/.bin/vite --host --port 5173 --strictPort
+  echo "Vite запущен, лог: ${VITE_LOG}"
+fi
 
 echo "Готово. UI: http://localhost:5173 (бек: http://127.0.0.1:8000/health)."

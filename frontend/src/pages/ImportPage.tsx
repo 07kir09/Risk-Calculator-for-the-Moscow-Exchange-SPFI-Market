@@ -74,9 +74,16 @@ function dataSourceLabel(source: DataSource) {
   }
 }
 
+function resolveBaseUrl() {
+  const baseUrl = (import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL;
+  if (!baseUrl) return "/";
+  return baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+}
+
 export default function ImportPage() {
-  const samplePortfolioCsvUrl = `${import.meta.env.BASE_URL}sample_portfolio.csv`;
-  const samplePortfolioXlsxUrl = `${import.meta.env.BASE_URL}sample_portfolio.xlsx`;
+  const baseUrl = resolveBaseUrl();
+  const samplePortfolioCsvUrl = `${baseUrl}sample_portfolio.csv`;
+  const samplePortfolioXlsxUrl = `${baseUrl}sample_portfolio.xlsx`;
   const nav = useNavigate();
   const { state: wf, dispatch } = useWorkflow();
   const { state: dataState, dispatch: dataDispatch } = useAppData();

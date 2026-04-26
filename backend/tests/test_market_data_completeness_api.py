@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -18,6 +19,7 @@ from option_risk.pricing.market import DiscountCurve, ForwardCurve, MarketDataCo
 
 
 SESSION_ID = "9" * 32
+DATASETS_DIR = Path(__file__).resolve().parents[2] / "Datasets"
 
 
 def _curve_market(*, complete: bool) -> MarketDataContext:
@@ -236,7 +238,7 @@ def test_var_es_scenario_method_labels(monkeypatch):
 
 def test_large_portfolio_market_data_completeness(monkeypatch):
     _patch_market_session(monkeypatch, _curve_market(complete=False))
-    df = pd.read_excel("Datasets/portfolio_large_1000.xlsx")
+    df = pd.read_excel(DATASETS_DIR / "portfolio_large_1000.xlsx")
     positions = json.loads(df.where(df.notna(), None).to_json(orient="records"))
 
     response = TestClient(app).post("/metrics", json=_payload(positions=positions))
