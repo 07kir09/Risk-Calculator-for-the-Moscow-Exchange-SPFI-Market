@@ -1,3 +1,0 @@
-instrument_type,position_id,quantity,notional,underlying_symbol,currency,underlying_price,strike,volatility,maturity_date,valuation_date,risk_free_rate,option_type,style,dividend_yield,liquidity_haircut,model
-forward,eur_forward,1.0,1,EUR_FORWARD,EUR,100,90,0,2026-12-31,2026-04-25,0.05,call,european,0,0,forward
-forward,usd_forward,1.0,1,USD_FORWARD,USD,100,90,0,2026-12-31,2026-04-25,0.05,call,european,0,0,forward

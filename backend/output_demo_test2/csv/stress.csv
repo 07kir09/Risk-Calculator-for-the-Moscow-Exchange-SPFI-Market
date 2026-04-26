@@ -1,6 +1,0 @@
-scenario_id,pnl,limit,breached
-mild_down,-539909.1344381929,,False
-base,0.0,,False
-mild_up,539909.9057380493,,False
-shock_down,-2704720.7825047886,9000.0,True
-shock_up,2691431.9199286005,9000.0,False

@@ -6,6 +6,7 @@ on:
       - main
       - master
       - v11.3
+      - v11.4
   workflow_dispatch:
 
 permissions:

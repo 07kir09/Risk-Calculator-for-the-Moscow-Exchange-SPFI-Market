@@ -1,6 +1,0 @@
-metric,value,limit,breached
-var_hist,2704720.7825047886,5000,True
-es_hist,2704720.7825047886,7000,True
-var_param,4528927.399256042,5000,True
-es_param,5188244.31406213,7000,True
-lc_var,2704745.865128646,8000,True
