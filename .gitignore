@@ -28,3 +28,7 @@ audit_runtime_checks/reports/
 # Project outputs/logs
 output_demo/
 *.log
+
+# Submission documents are kept locally, not in the GitHub branch.
+Документы_для_сдачи/
+Документы_для_сдачи.zip

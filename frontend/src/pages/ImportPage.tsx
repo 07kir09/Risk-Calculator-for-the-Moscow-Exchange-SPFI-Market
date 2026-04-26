@@ -75,6 +75,8 @@ function dataSourceLabel(source: DataSource) {
 }
 
 export default function ImportPage() {
+  const samplePortfolioCsvUrl = `${import.meta.env.BASE_URL}sample_portfolio.csv`;
+  const samplePortfolioXlsxUrl = `${import.meta.env.BASE_URL}sample_portfolio.xlsx`;
   const nav = useNavigate();
   const { state: wf, dispatch } = useWorkflow();
   const { state: dataState, dispatch: dataDispatch } = useAppData();
@@ -468,8 +470,8 @@ export default function ImportPage() {
 
         {!positions.length && !isLoading && (
           <div className="importZoneLinks importZoneLinks--compact">
-            <a className="importTemplateLink" href="/sample_portfolio.csv" download>Шаблон CSV</a>
-            <a className="importTemplateLink" href="/sample_portfolio.xlsx" download>Шаблон XLSX</a>
+            <a className="importTemplateLink" href={samplePortfolioCsvUrl} download>Шаблон CSV</a>
+            <a className="importTemplateLink" href={samplePortfolioXlsxUrl} download>Шаблон XLSX</a>
           </div>
         )}
         {marketDataNotice && (

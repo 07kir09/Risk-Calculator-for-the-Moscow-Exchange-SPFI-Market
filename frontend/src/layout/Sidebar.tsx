@@ -106,7 +106,7 @@ export default function Sidebar({
     >
       <div className={`appSidebarHeader ${collapsed ? "appSidebarHeader--collapsed" : ""}`}>
         <div className="brand" title="Risk Calculator">
-          <img className="brandMarkImage" src="/Logo.png" alt="" aria-hidden="true" />
+          <img className="brandMarkImage" src={`${import.meta.env.BASE_URL}Logo.png`} alt="" aria-hidden="true" />
           {!collapsed && (
             <div className="brandText">
               <div className="brandTitle">Панель расчёта риска</div>
