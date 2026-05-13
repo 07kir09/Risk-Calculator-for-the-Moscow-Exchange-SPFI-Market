@@ -1,0 +1,3 @@
+instrument_type,position_id,option_type,style,quantity,notional,underlying_symbol,underlying_price,strike,volatility,maturity_date,valuation_date,risk_free_rate,dividend_yield,currency,liquidity_haircut,model,fixed_rate,float_rate,day_count
+swap_ir,irs_rub_pay_fixed_test,call,european,1,800000000,RUB-RUONIA,1,0.11,0.0001,2031-04-22,2026-04-22,0.10,0.0,RUB,0.0,,0.11,0.0,0.5
+swap_ir,irs_rub_receive_fixed_test,call,european,-1,500000000,RUB-RUONIA,1,0.09,0.0001,2030-10-22,2026-04-22,0.10,0.0,RUB,0.0,,0.09,0.0,0.5

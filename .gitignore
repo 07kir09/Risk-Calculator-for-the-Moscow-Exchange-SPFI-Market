@@ -1,0 +1,44 @@
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/playwright-report/
+frontend/test-results/
+frontend/.playwright-cli/
+
+# Runtime/audit outputs
+.codex_runtime/
+.playwright-cli/
+.runlogs/
+tmp/
+audit_runtime_checks/
+audit_runtime_checks/reports/
+
+# Project outputs/logs
+output_demo/
+backend/output/
+backend/output_demo/
+backend/output_demo_test/
+backend/output_demo_test2/
+*.log
+
+# Third-party demo assets kept out of the app branch.
+Jit/
+
+# Submission documents are kept locally, not in the GitHub branch.
+Документы_для_сдачи/
+Документы_для_сдачи.zip

@@ -1,0 +1,15 @@
+import { WorkflowStep } from "./workflowTypes";
+
+export const stepToRoute: Record<WorkflowStep, string> = {
+  [WorkflowStep.Import]: "/import",
+  [WorkflowStep.Validate]: "/validate",
+  [WorkflowStep.MarketData]: "/market",
+  [WorkflowStep.Configure]: "/configure",
+  [WorkflowStep.CalcRun]: "/dashboard",
+  [WorkflowStep.Results]: "/dashboard",
+  [WorkflowStep.Stress]: "/stress",
+  [WorkflowStep.Limits]: "/limits",
+  [WorkflowStep.Margin]: "/export",
+  [WorkflowStep.Export]: "/export",
+  [WorkflowStep.PostActions]: "/dashboard",
+};
