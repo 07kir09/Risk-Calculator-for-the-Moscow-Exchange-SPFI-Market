@@ -340,13 +340,13 @@ API слой позволяет использовать risk engine не тол
 ## 🎬 Видео проекта
 
 <p align="center">
-  <a href="docs/assets/project-demo.mov>
+  <a href="docs/assets/project-demo.mp4">
     <img src="docs/assets/dashboard.png" alt="Открыть видео проекта" width="100%" />
   </a>
 </p>
 
 <p align="center">
-  <a href="docs/assets/project-demo.mov">Смотреть demo-видео проекта</a>
+  <a href="docs/assets/project-demo.mp4">Смотреть demo-видео проекта</a>
 </p>
 
 ---

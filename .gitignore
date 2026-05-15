@@ -36,6 +36,9 @@ backend/output_demo_test/
 backend/output_demo_test2/
 *.log
 
+# Keep the original large recording locally; publish the compressed mp4.
+docs/assets/project-demo.mov
+
 # Third-party demo assets kept out of the app branch.
 Jit/
 
