@@ -327,6 +327,27 @@ API слой позволяет использовать risk engine не тол
 <p align="center">
   <img src="docs/assets/dashboard.png" alt="Project preview" width="100%" />
 </p>
+<p align="center">
+  <img src="docs/assets/stress_scenarios.png" alt="Project preview" width="100%" />
+</p>
+<p align="center">
+  <img src="docs/assets/stress_scenarios.png" alt="Project preview" width="100%" />
+</p>
+<p align="center">
+  <img src="docs/assets/portfel.png" alt="Project preview" width="100%" />
+</p>
+
+## 🎬 Видео проекта
+
+<p align="center">
+  <a href="docs/assets/project-demo.mov>
+    <img src="docs/assets/dashboard.png" alt="Открыть видео проекта" width="100%" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="docs/assets/project-demo.mov">Смотреть demo-видео проекта</a>
+</p>
 
 ---
 
